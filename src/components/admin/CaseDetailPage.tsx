@@ -1,0 +1,639 @@
+import { useState, useEffect, useRef } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  ArrowLeft, User, Building2, Mail, Phone, Calendar,
+  FileText, Download, Edit, Clock, CheckCircle, AlertCircle,
+  Send, MoreVertical, Trash2, Reply, X, ShoppingBag
+} from 'lucide-react';
+import { supabase } from '../../lib/supabase';
+import { cn } from '../../lib/utils';
+import { useAuth } from '../../contexts/AuthContext';
+
+type Case = {
+  id: string;
+  title: string;
+  type: string;
+  sub_type: string | null;
+  status: 'New' | 'Assigned' | 'In Progress' | 'Completed';
+  contact_id: string;
+  owner_id: string | null;
+  description: string;
+  resume_url: string | null;
+  created_at: string;
+  updated_at: string;
+  contact: {
+    first_name: string;
+    last_name: string;
+    email: string;
+    company: string | null;
+    phone: string | null;
+  };
+};
+
+type Feed = {
+  id: string;
+  content: string;
+  parent_id: string | null;
+  parent_type: 'Case';
+  reference_id: string;
+  created_by: string;
+  created_at: string;
+  updated_by: string | null;
+  updated_at: string | null;
+  status: 'Active' | 'Deleted';
+  profile: {
+    name: string;
+  };
+};
+
+const STATUS_COLORS = {
+  'New': 'bg-blue-100 text-blue-800',
+  'Assigned': 'bg-yellow-100 text-yellow-800',
+  'In Progress': 'bg-purple-100 text-purple-800',
+  'Completed': 'bg-green-100 text-green-800'
+};
+
+export function CaseDetailPage() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const [caseData, setCaseData] = useState<Case | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [staff, setStaff] = useState<any[]>([]);
+  const { user } = useAuth();
+  const [feeds, setFeeds] = useState<Feed[]>([]);
+  const [newComment, setNewComment] = useState('');
+  const [replyTo, setReplyTo] = useState<Feed | null>(null);
+  const [editingFeed, setEditingFeed] = useState<Feed | null>(null);
+  const [processingOrder, setProcessingOrder] = useState(false);
+  const commentRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    fetchCase();
+    fetchStaff();
+  }, [id]);
+
+  useEffect(() => {
+    if (id) {
+      fetchFeeds();
+      // Set up real-time subscription
+      const feedsSubscription = supabase
+        .channel('feeds-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'feeds',
+            filter: `reference_id=eq.${id}`
+          },
+          () => {
+            fetchFeeds();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        feedsSubscription.unsubscribe();
+      };
+    }
+  }, [id]);
+
+  const fetchCase = async () => {
+    try {
+      if (!id) return;
+
+      const { data, error } = await supabase
+        .from('cases')
+        .select(`
+          *,
+          contact:customers(
+            first_name,
+            last_name,
+            email,
+            phone,
+            company
+          )
+        `)
+        .eq('id', id)
+        .single();
+
+      if (error) throw error;
+      setCaseData(data);
+    } catch (err) {
+      console.error('Error fetching case:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load case');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchStaff = async () => {
+    try {
+      const { data: profiles, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .in('type', ['admin', 'user']);
+
+      if (error) throw error;
+      setStaff(profiles || []);
+    } catch (err) {
+      console.error('Error fetching staff:', err);
+    }
+  };
+
+  const fetchFeeds = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('feeds')
+        .select(`
+          *,
+          created_by_profile:profiles!feeds_created_by_fkey(name)
+        `)
+        .eq('reference_id', id)
+        .eq('parent_type', 'Case')
+        .eq('status', 'Active')
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      // Transform the data to match the expected format
+      const transformedData = data?.map(feed => ({
+        ...feed,
+        profile: feed.created_by_profile
+      })) || [];
+
+      setFeeds(transformedData);
+    } catch (err) {
+      console.error('Error fetching feeds:', err);
+    }
+  };
+
+  const handleStatusChange = async (newStatus: Case['status']) => {
+    try {
+      // If changing to Approved, create order
+      if (newStatus === 'Approved') {
+        setProcessingOrder(true);
+        const { data: userData } = await supabase.auth.getUser();
+        if (!userData.user) throw new Error('Not authenticated');
+
+        const { data: orderId, error: orderError } = await supabase.rpc(
+          'create_order_from_quote',
+          { 
+            quote_id_param: id,
+            user_id_param: userData.user.id
+          }
+        );
+
+        if (orderError) throw orderError;
+        
+        // No need to update status manually as the stored procedure handles it
+        await fetchCase();
+        navigate('/admin/orders');
+      } else {
+        // For other status changes, just update the status
+        const { error } = await supabase
+          .from('cases')
+          .update({ 
+            status: newStatus,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', id);
+
+        if (error) throw error;
+        await fetchCase();
+      }
+    } catch (err) {
+      console.error('Error updating case status:', err);
+      setError(err instanceof Error ? err.message : 'Failed to update case status');
+    } finally {
+      setProcessingOrder(false);
+    }
+  };
+
+  const handleCreateOrder = async () => {
+    await handleStatusChange('Approved');
+  };
+
+  const handleAssign = async (userId: string) => {
+    try {
+      if (!id) return;
+
+      const { error } = await supabase
+        .from('cases')
+        .update({ 
+          owner_id: userId,
+          status: 'Assigned',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+      await fetchCase();
+    } catch (err) {
+      console.error('Error assigning case:', err);
+      setError(err instanceof Error ? err.message : 'Failed to assign case');
+    }
+  };
+
+  const handleSubmitComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newComment.trim() || !user) return;
+
+    try {
+      const { error } = await supabase
+        .from('feeds')
+        .insert([{
+          content: newComment.trim(),
+          parent_id: replyTo?.id || null,
+          parent_type: 'Case',
+          reference_id: id,
+          created_by: user.id,
+          created_at: new Date().toISOString(),
+          status: 'Active'
+        }]);
+
+      if (error) throw error;
+      setNewComment('');
+      setReplyTo(null);
+    } catch (err) {
+      console.error('Error adding comment:', err);
+    }
+  };
+
+  const handleUpdateComment = async (feedId: string, content: string) => {
+    if (!content.trim() || !user) return;
+
+    try {
+      const { error } = await supabase
+        .from('feeds')
+        .update({
+          content: content.trim(),
+          updated_by: user.id,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', feedId)
+        .eq('created_by', user.id);
+
+      if (error) throw error;
+      setEditingFeed(null);
+    } catch (err) {
+      console.error('Error updating comment:', err);
+    }
+  };
+
+  const handleDeleteComment = async (feedId: string) => {
+    if (!user || !window.confirm('Are you sure you want to delete this comment?')) return;
+
+    try {
+      const { error } = await supabase.rpc('soft_delete_feed', {
+        feed_id: feedId,
+        user_id: user.id
+      });
+
+      if (error) throw error;
+    } catch (err) {
+      console.error('Error deleting comment:', err);
+    }
+  };
+
+  const renderFeedItem = (feed: Feed, isReply = false) => {
+    const isEditing = editingFeed?.id === feed.id;
+    const isOwner = user?.id === feed.created_by;
+    const replies = feeds.filter(f => f.parent_id === feed.id);
+
+    return (
+      <motion.div
+        key={feed.id}
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className={cn(
+          "bg-white rounded-lg shadow-sm p-4 space-y-2",
+          isReply && "ml-8"
+        )}
+      >
+        <div className="flex justify-between items-start">
+          <div className="flex items-center space-x-2">
+            <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center">
+              <span className="text-primary-700 font-medium">
+                {feed.profile.name.charAt(0).toUpperCase()}
+              </span>
+            </div>
+            <div>
+              <div className="font-medium">{feed.profile.name}</div>
+              <div className="text-sm text-gray-500">
+                {new Date(feed.created_at).toLocaleString()}
+                {feed.updated_at && (
+                  <span className="ml-2 text-xs">(edited)</span>
+                )}
+              </div>
+            </div>
+          </div>
+          {isOwner && !isEditing && (
+            <div className="relative group">
+              <button className="p-1 rounded-full hover:bg-gray-100">
+                <MoreVertical className="w-4 h-4 text-gray-500" />
+              </button>
+              <div className="absolute right-0 mt-1 w-32 bg-white rounded-md shadow-lg border border-gray-200 py-1 hidden group-hover:block">
+                <button
+                  onClick={() => setEditingFeed(feed)}
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center"
+                >
+                  <Edit className="w-4 h-4 mr-2" />
+                  Edit
+                </button>
+                <button
+                  onClick={() => handleDeleteComment(feed.id)}
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 text-red-600 flex items-center"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {isEditing ? (
+          <div className="mt-2">
+            <textarea
+              value={editingFeed.content}
+              onChange={(e) => setEditingFeed({ ...editingFeed, content: e.target.value })}
+              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+              rows={3}
+            />
+            <div className="flex justify-end space-x-2 mt-2">
+              <button
+                onClick={() => setEditingFeed(null)}
+                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleUpdateComment(feed.id, editingFeed.content)}
+                className="px-4 py-2 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <p className="text-gray-700 whitespace-pre-wrap">{feed.content}</p>
+            <div className="flex items-center space-x-4 text-sm">
+              <button
+                onClick={() => setReplyTo(feed)}
+                className="text-gray-500 hover:text-gray-700 flex items-center"
+              >
+                <Reply className="w-4 h-4 mr-1" />
+                Reply
+              </button>
+            </div>
+          </>
+        )}
+
+        {replies.length > 0 && (
+          <div className="space-y-4 mt-4">
+            {replies.map(reply => renderFeedItem(reply, true))}
+          </div>
+        )}
+      </motion.div>
+    );
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+      </div>
+    );
+  }
+
+  if (error || !caseData) {
+    return (
+      <div className="bg-red-50 text-red-600 p-4 rounded-lg flex items-center">
+        <AlertCircle className="w-5 h-5 mr-2" />
+        {error || 'Case not found'}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <button
+          onClick={() => navigate('/admin/cases')}
+          className="inline-flex items-center text-gray-600 hover:text-gray-900"
+        >
+          <ArrowLeft className="w-5 h-5 mr-2" />
+          Back to Cases
+        </button>
+        <div className="flex items-center space-x-4">
+          <button
+            onClick={handleCreateOrder}
+            disabled={caseData?.status === 'Approved' || processingOrder}
+            className={cn(
+              "inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white",
+              caseData?.status === 'Approved' || processingOrder
+                ? "bg-gray-400 cursor-not-allowed"
+                : "bg-green-600 hover:bg-green-700"
+            )}
+          >
+            <ShoppingBag className={cn(
+              "w-4 h-4 mr-2",
+              processingOrder && "animate-pulse"
+            )} />
+            {processingOrder ? 'Creating Order...' : 'Create Order'}
+          </button>
+          <Link
+            to={`/admin/cases/${id}/edit`}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
+          >
+            <Edit className="w-4 h-4 mr-2" />
+            Edit Case
+          </Link>
+        </div>
+      </div>
+
+      <div className="bg-white shadow rounded-lg overflow-hidden">
+        <div className="p-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
+            <div>
+              <h1 className="text-2xl font-bold mb-2">{caseData.title}</h1>
+              <div className="flex items-center gap-4 text-sm text-gray-500">
+                <span className="flex items-center">
+                  <Calendar className="w-4 h-4 mr-1" />
+                  {new Date(caseData.created_at).toLocaleDateString()}
+                </span>
+                <span className="flex items-center">
+                  <Clock className="w-4 h-4 mr-1" />
+                  {new Date(caseData.created_at).toLocaleTimeString()}
+                </span>
+              </div>
+            </div>
+            <div className="mt-4 md:mt-0 flex items-center gap-4">
+              <select
+                value={caseData.status}
+                onChange={(e) => handleStatusChange(e.target.value as Case['status'])}
+                className={cn(
+                  "px-3 py-1 rounded-full text-sm font-medium border-2",
+                  STATUS_COLORS[caseData.status]
+                )}
+              >
+                <option value="New">New</option>
+                <option value="Assigned">Assigned</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Completed">Completed</option>
+              </select>
+              <select
+                value={caseData.owner_id || ''}
+                onChange={(e) => handleAssign(e.target.value)}
+                className="text-sm rounded-md border-gray-300 focus:border-primary-500 focus:ring-primary-500"
+              >
+                <option value="">Unassigned</option>
+                {staff.map((member) => (
+                  <option key={member.id} value={member.id}>
+                    {member.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div>
+              <h2 className="text-lg font-semibold mb-4">Case Details</h2>
+              <div className="bg-gray-50 rounded-lg p-4 space-y-4">
+                <div>
+                  <div className="text-sm font-medium text-gray-500 mb-1">Type</div>
+                  <div className="flex items-center">
+                    <span className="px-2 py-1 text-sm font-medium rounded-full bg-primary-100 text-primary-800">
+                      {caseData.type}
+                    </span>
+                    {caseData.sub_type && (
+                      <span className="ml-2 text-gray-500">
+                        / {caseData.sub_type}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-gray-500 mb-1">Description</div>
+                  <p className="text-gray-700 whitespace-pre-wrap">{caseData.description}</p>
+                </div>
+                {caseData.resume_url && (
+                  <div>
+                    <div className="text-sm font-medium text-gray-500 mb-1">Resume</div>
+                    <a
+                      href={caseData.resume_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    >
+                      <FileText className="w-4 h-4 mr-2" />
+                      View Resume
+                      <Download className="w-4 h-4 ml-2" />
+                    </a>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <h2 className="text-lg font-semibold mb-4">Contact Information</h2>
+              <div className="bg-gray-50 rounded-lg p-4 space-y-4">
+                <div className="flex items-center">
+                  <User className="w-5 h-5 text-gray-400 mr-3" />
+                  <div>
+                    <div className="font-medium">
+                      {caseData.contact.first_name} {caseData.contact.last_name}
+                    </div>
+                  </div>
+                </div>
+                {caseData.contact.company && (
+                  <div className="flex items-center">
+                    <Building2 className="w-5 h-5 text-gray-400 mr-3" />
+                    <div>{caseData.contact.company}</div>
+                  </div>
+                )}
+                <div className="flex items-center">
+                  <Mail className="w-5 h-5 text-gray-400 mr-3" />
+                  <a
+                    href={`mailto:${caseData.contact.email}`}
+                    className="text-primary-600 hover:text-primary-700"
+                  >
+                    {caseData.contact.email}
+                  </a>
+                </div>
+                {caseData.contact.phone && (
+                  <div className="flex items-center">
+                    <Phone className="w-5 h-5 text-gray-400 mr-3" />
+                    <a
+                      href={`tel:${caseData.contact.phone}`}
+                      className="text-primary-600 hover:text-primary-700"
+                    >
+                      {caseData.contact.phone}
+                    </a>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Add Feed Section */}
+          <div className="mt-8">
+            <h2 className="text-lg font-semibold mb-4">Comments</h2>
+            
+            <div className="space-y-4">
+              {/* Comment Form */}
+              <form onSubmit={handleSubmitComment} className="space-y-4">
+                {replyTo && (
+                  <div className="flex items-center justify-between bg-gray-50 p-2 rounded-lg">
+                    <span className="text-sm text-gray-600">
+                      Replying to {replyTo.profile.name}'s comment
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setReplyTo(null)}
+                      className="p-1 hover:bg-gray-200 rounded-full"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+                <div className="flex items-start space-x-4">
+                  <div className="flex-1">
+                    <textarea
+                      ref={commentRef}
+                      value={newComment}
+                      onChange={(e) => setNewComment(e.target.value)}
+                      placeholder="Add a comment..."
+                      rows={3}
+                      className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={!newComment.trim()}
+                    className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                  >
+                    <Send className="w-4 h-4 mr-2" />
+                    Send
+                  </button>
+                </div>
+              </form>
+
+              {/* Feed Items */}
+              <div className="space-y-4">
+                {feeds
+                  .filter(feed => !feed.parent_id)
+                  .map(feed => renderFeedItem(feed))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
