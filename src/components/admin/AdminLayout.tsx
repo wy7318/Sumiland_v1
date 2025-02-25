@@ -4,7 +4,8 @@ import { motion } from 'framer-motion';
 import { 
   FileText, Image, LogOut, Users, Package, Tag, Quote, MessageSquare, 
   LayoutDashboard, ChevronLeft, ChevronRight, Settings, ShoppingBag, 
-  Building2, Truck, ClipboardList, BoxSelect as BoxSeam, UserCog, Home 
+  Building2, Truck, ClipboardList, BoxSelect as BoxSeam, UserCog, Home,
+  UserPlus
 } from 'lucide-react';
 import { getCurrentUser, signOut } from '../../lib/auth';
 import { cn } from '../../lib/utils';
@@ -54,7 +55,8 @@ export function AdminLayout() {
       { path: '/admin/categories', icon: Tag, label: 'Categories' },
       { path: '/admin/customers', icon: Users, label: 'Customers' },
       { path: '/admin/vendors', icon: Building2, label: 'Vendors' },
-      { path: '/admin/user-organizations', icon: UserCog, label: 'User & Org Management' }
+      { path: '/admin/user-organizations', icon: UserCog, label: 'User & Org Management' },
+      { path: '/admin/users', icon: UserPlus, label: 'User Management' }
     ] : [])
   ];
 
