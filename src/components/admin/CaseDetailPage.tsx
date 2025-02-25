@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useParams, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ArrowLeft, User, Building2, Mail, Phone, Calendar,
   FileText, Download, Edit, Clock, CheckCircle, AlertCircle,
-  Send, MoreVertical, Trash2, Reply, X, ShoppingBag
+  Send, MoreVertical, Trash2, Reply, X
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { cn } from '../../lib/utils';
@@ -22,6 +22,7 @@ type Case = {
   resume_url: string | null;
   created_at: string;
   updated_at: string;
+  organization_id: string;
   contact: {
     first_name: string;
     last_name: string;
@@ -55,50 +56,31 @@ const STATUS_COLORS = {
 };
 
 export function CaseDetailPage() {
-  const { id } = useParams();
   const navigate = useNavigate();
+  const { id } = useParams();
   const [caseData, setCaseData] = useState<Case | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [staff, setStaff] = useState<any[]>([]);
-  const { user } = useAuth();
+  const { user, organizations } = useAuth();
   const [feeds, setFeeds] = useState<Feed[]>([]);
   const [newComment, setNewComment] = useState('');
   const [replyTo, setReplyTo] = useState<Feed | null>(null);
   const [editingFeed, setEditingFeed] = useState<Feed | null>(null);
-  const [processingOrder, setProcessingOrder] = useState(false);
   const commentRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    fetchCase();
-    fetchStaff();
+    if (id) {
+      fetchCase();
+    }
   }, [id]);
 
   useEffect(() => {
-    if (id) {
+    if (caseData) {
+      fetchStaff();
       fetchFeeds();
-      // Set up real-time subscription
-      const feedsSubscription = supabase
-        .channel('feeds-changes')
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'feeds',
-            filter: `reference_id=eq.${id}`
-          },
-          () => {
-            fetchFeeds();
-          }
-        )
-        .subscribe();
-
-      return () => {
-        feedsSubscription.unsubscribe();
-      };
     }
-  }, [id]);
+  }, [caseData]);
 
   const fetchCase = async () => {
     try {
@@ -108,18 +90,30 @@ export function CaseDetailPage() {
         .from('cases')
         .select(`
           *,
-          contact:customers(
-            first_name,
-            last_name,
-            email,
-            phone,
-            company
-          )
+          contact:customers(*)
         `)
         .eq('id', id)
+        .in('organization_id', organizations.map(org => org.id))
         .single();
 
       if (error) throw error;
+      if (!data) {
+        throw new Error('Case not found or you do not have access to it');
+      }
+
+      // If there's an owner_id, fetch the owner's details separately
+      if (data.owner_id) {
+        const { data: ownerData, error: ownerError } = await supabase
+          .from('profiles')
+          .select('id, name')
+          .eq('id', data.owner_id)
+          .single();
+
+        if (!ownerError && ownerData) {
+          data.owner = ownerData;
+        }
+      }
+
       setCaseData(data);
     } catch (err) {
       console.error('Error fetching case:', err);
@@ -130,13 +124,25 @@ export function CaseDetailPage() {
   };
 
   const fetchStaff = async () => {
+    if (!caseData) return;
+
     try {
-      const { data: profiles, error } = await supabase
+      // Get all users from the same organization
+      const { data: userOrgs, error: userOrgsError } = await supabase
+        .from('user_organizations')
+        .select('user_id')
+        .eq('organization_id', caseData.organization_id);
+
+      if (userOrgsError) throw userOrgsError;
+
+      // Get profiles for these users
+      const userIds = userOrgs?.map(uo => uo.user_id) || [];
+      const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('*')
-        .in('type', ['admin', 'user']);
+        .in('id', userIds);
 
-      if (error) throw error;
+      if (profilesError) throw profilesError;
       setStaff(profiles || []);
     } catch (err) {
       console.error('Error fetching staff:', err);
@@ -144,27 +150,24 @@ export function CaseDetailPage() {
   };
 
   const fetchFeeds = async () => {
+    if (!id || !caseData) return;
+
     try {
       const { data, error } = await supabase
         .from('feeds')
         .select(`
           *,
-          created_by_profile:profiles!feeds_created_by_fkey(name)
+          profile:profiles!feeds_created_by_fkey(name)
         `)
         .eq('reference_id', id)
         .eq('parent_type', 'Case')
         .eq('status', 'Active')
+        .eq('organization_id', caseData.organization_id)
         .order('created_at', { ascending: true });
 
       if (error) throw error;
 
-      // Transform the data to match the expected format
-      const transformedData = data?.map(feed => ({
-        ...feed,
-        profile: feed.created_by_profile
-      })) || [];
-
-      setFeeds(transformedData);
+      setFeeds(data || []);
     } catch (err) {
       console.error('Error fetching feeds:', err);
     }
@@ -172,53 +175,38 @@ export function CaseDetailPage() {
 
   const handleStatusChange = async (newStatus: Case['status']) => {
     try {
-      // If changing to Approved, create order
-      if (newStatus === 'Approved') {
-        setProcessingOrder(true);
-        const { data: userData } = await supabase.auth.getUser();
-        if (!userData.user) throw new Error('Not authenticated');
+      if (!id || !caseData) return;
 
-        const { data: orderId, error: orderError } = await supabase.rpc(
-          'create_order_from_quote',
-          { 
-            quote_id_param: id,
-            user_id_param: userData.user.id
-          }
-        );
-
-        if (orderError) throw orderError;
-        
-        // No need to update status manually as the stored procedure handles it
-        await fetchCase();
-        navigate('/admin/orders');
-      } else {
-        // For other status changes, just update the status
-        const { error } = await supabase
-          .from('cases')
-          .update({ 
-            status: newStatus,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', id);
-
-        if (error) throw error;
-        await fetchCase();
+      // Verify organization access
+      if (!organizations.some(org => org.id === caseData.organization_id)) {
+        throw new Error('You do not have permission to update this case');
       }
-    } catch (err) {
-      console.error('Error updating case status:', err);
-      setError(err instanceof Error ? err.message : 'Failed to update case status');
-    } finally {
-      setProcessingOrder(false);
-    }
-  };
 
-  const handleCreateOrder = async () => {
-    await handleStatusChange('Approved');
+      const { error } = await supabase
+        .from('cases')
+        .update({ 
+          status: newStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+        .eq('organization_id', caseData.organization_id);
+
+      if (error) throw error;
+      await fetchCase();
+    } catch (err) {
+      console.error('Error updating status:', err);
+      setError(err instanceof Error ? err.message : 'Failed to update status');
+    }
   };
 
   const handleAssign = async (userId: string) => {
     try {
-      if (!id) return;
+      if (!id || !caseData) return;
+
+      // Verify organization access
+      if (!organizations.some(org => org.id === caseData.organization_id)) {
+        throw new Error('You do not have permission to assign this case');
+      }
 
       const { error } = await supabase
         .from('cases')
@@ -227,7 +215,8 @@ export function CaseDetailPage() {
           status: 'Assigned',
           updated_at: new Date().toISOString()
         })
-        .eq('id', id);
+        .eq('id', id)
+        .eq('organization_id', caseData.organization_id);
 
       if (error) throw error;
       await fetchCase();
@@ -239,7 +228,7 @@ export function CaseDetailPage() {
 
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newComment.trim() || !user) return;
+    if (!newComment.trim() || !user || !caseData) return;
 
     try {
       const { error } = await supabase
@@ -249,6 +238,7 @@ export function CaseDetailPage() {
           parent_id: replyTo?.id || null,
           parent_type: 'Case',
           reference_id: id,
+          organization_id: caseData.organization_id,
           created_by: user.id,
           created_at: new Date().toISOString(),
           status: 'Active'
@@ -257,13 +247,14 @@ export function CaseDetailPage() {
       if (error) throw error;
       setNewComment('');
       setReplyTo(null);
+      await fetchFeeds();
     } catch (err) {
       console.error('Error adding comment:', err);
     }
   };
 
   const handleUpdateComment = async (feedId: string, content: string) => {
-    if (!content.trim() || !user) return;
+    if (!content.trim() || !user || !caseData) return;
 
     try {
       const { error } = await supabase
@@ -274,17 +265,19 @@ export function CaseDetailPage() {
           updated_at: new Date().toISOString()
         })
         .eq('id', feedId)
-        .eq('created_by', user.id);
+        .eq('created_by', user.id)
+        .eq('organization_id', caseData.organization_id);
 
       if (error) throw error;
       setEditingFeed(null);
+      await fetchFeeds();
     } catch (err) {
       console.error('Error updating comment:', err);
     }
   };
 
   const handleDeleteComment = async (feedId: string) => {
-    if (!user || !window.confirm('Are you sure you want to delete this comment?')) return;
+    if (!user || !caseData || !window.confirm('Are you sure you want to delete this comment?')) return;
 
     try {
       const { error } = await supabase.rpc('soft_delete_feed', {
@@ -293,6 +286,7 @@ export function CaseDetailPage() {
       });
 
       if (error) throw error;
+      await fetchFeeds();
     } catch (err) {
       console.error('Error deleting comment:', err);
     }
@@ -429,31 +423,13 @@ export function CaseDetailPage() {
           <ArrowLeft className="w-5 h-5 mr-2" />
           Back to Cases
         </button>
-        <div className="flex items-center space-x-4">
-          <button
-            onClick={handleCreateOrder}
-            disabled={caseData?.status === 'Approved' || processingOrder}
-            className={cn(
-              "inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white",
-              caseData?.status === 'Approved' || processingOrder
-                ? "bg-gray-400 cursor-not-allowed"
-                : "bg-green-600 hover:bg-green-700"
-            )}
-          >
-            <ShoppingBag className={cn(
-              "w-4 h-4 mr-2",
-              processingOrder && "animate-pulse"
-            )} />
-            {processingOrder ? 'Creating Order...' : 'Create Order'}
-          </button>
-          <Link
-            to={`/admin/cases/${id}/edit`}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
-          >
-            <Edit className="w-4 h-4 mr-2" />
-            Edit Case
-          </Link>
-        </div>
+        <Link
+          to={`/admin/cases/${id}/edit`}
+          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
+        >
+          <Edit className="w-4 h-4 mr-2" />
+          Edit Case
+        </Link>
       </div>
 
       <div className="bg-white shadow rounded-lg overflow-hidden">
@@ -472,7 +448,7 @@ export function CaseDetailPage() {
                 </span>
               </div>
             </div>
-            <div className="mt-4 md:mt-0 flex items-center gap-4">
+            <div className="mt-4 md:mt-0">
               <select
                 value={caseData.status}
                 onChange={(e) => handleStatusChange(e.target.value as Case['status'])}
@@ -485,18 +461,6 @@ export function CaseDetailPage() {
                 <option value="Assigned">Assigned</option>
                 <option value="In Progress">In Progress</option>
                 <option value="Completed">Completed</option>
-              </select>
-              <select
-                value={caseData.owner_id || ''}
-                onChange={(e) => handleAssign(e.target.value)}
-                className="text-sm rounded-md border-gray-300 focus:border-primary-500 focus:ring-primary-500"
-              >
-                <option value="">Unassigned</option>
-                {staff.map((member) => (
-                  <option key={member.id} value={member.id}>
-                    {member.name}
-                  </option>
-                ))}
               </select>
             </div>
           </div>

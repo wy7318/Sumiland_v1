@@ -4,24 +4,29 @@ import { Plus, Edit, Trash2, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import type { Database } from '../../lib/database.types';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 
 type Post = Database['public']['Tables']['posts']['Row'];
 
 export function PostsPage() {
+  const { organizations } = useAuth();
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchPosts();
-  }, []);
+  }, [organizations]);
 
   const fetchPosts = async () => {
     try {
       setLoading(true);
+      
+      // Only fetch posts for user's organizations
       const { data, error } = await supabase
         .from('posts')
         .select('*')
+        .in('organization_id', organizations.map(org => org.id))
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -41,7 +46,8 @@ export function PostsPage() {
           published: !post.published,
           published_at: !post.published ? new Date().toISOString() : null
         })
-        .eq('id', post.id);
+        .eq('id', post.id)
+        .eq('organization_id', post.organization_id); // Add organization check
 
       if (error) throw error;
       await fetchPosts();
@@ -50,14 +56,15 @@ export function PostsPage() {
     }
   };
 
-  const deletePost = async (id: string) => {
+  const deletePost = async (id: string, organizationId: string) => {
     if (!window.confirm('Are you sure you want to delete this post?')) return;
 
     try {
       const { error } = await supabase
         .from('posts')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .eq('organization_id', organizationId); // Add organization check
 
       if (error) throw error;
       await fetchPosts();
@@ -130,7 +137,7 @@ export function PostsPage() {
                     <Edit className="w-5 h-5" />
                   </Link>
                   <button
-                    onClick={() => deletePost(post.id)}
+                    onClick={() => deletePost(post.id, post.organization_id)}
                     className="p-2 text-red-600 hover:bg-red-50 rounded-full"
                   >
                     <Trash2 className="w-5 h-5" />

@@ -50,7 +50,17 @@ export function ContactSection() {
     setError(null);
     
     try {
-      // 1. Check if customer exists
+      // 1. Get default organization (Sumiland)
+      const { data: orgData, error: orgError } = await supabase
+        .from('organizations')
+        .select('id')
+        .eq('name', 'Sumiland')
+        .single();
+
+      if (orgError) throw orgError;
+      if (!orgData?.id) throw new Error('Default organization not found');
+
+      // 2. Check if customer exists
       const { data: existingCustomers, error: customerError } = await supabase
         .from('customers')
         .select('customer_id')
@@ -73,6 +83,7 @@ export function ContactSection() {
             email: formData.email,
             phone: formData.phone || null,
             company: formData.company,
+            organization_id: orgData.id, // Set organization ID
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           }])
@@ -85,7 +96,7 @@ export function ContactSection() {
         contactId = existingCustomers.customer_id;
       }
 
-      // 2. Upload resume if exists
+      // 3. Upload resume if exists
       let resumeUrl = null;
       if (formData.resume && formData.type === 'Career') {
         const fileExt = formData.resume.name.split('.').pop();
@@ -104,7 +115,7 @@ export function ContactSection() {
         resumeUrl = publicUrl;
       }
 
-      // 3. Create case
+      // 4. Create case
       const { error: caseError } = await supabase
         .from('cases')
         .insert([{
@@ -113,6 +124,7 @@ export function ContactSection() {
           sub_type: formData.type === 'Design Inquiry' ? formData.subType : null,
           status: 'New',
           contact_id: contactId,
+          organization_id: orgData.id, // Set organization ID
           description: formData.description,
           resume_url: resumeUrl,
           created_at: new Date().toISOString(),

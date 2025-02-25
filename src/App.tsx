@@ -36,6 +36,7 @@ import { InventoryPage } from './components/admin/InventoryPage';
 import { InventoryAlertsPage } from './components/admin/InventoryAlertsPage';
 import { SettingsPage } from './components/admin/SettingsPage';
 import { UserOrganizationsPage } from './components/admin/UserOrganizationsPage';
+import { UsersPage } from './components/admin/UsersPage';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { PublicRoute } from './components/auth/PublicRoute';
 import { AuthProvider } from './contexts/AuthContext';
@@ -112,6 +113,7 @@ function App() {
               <Route path="inventory" element={<InventoryPage />} />
               <Route path="inventory/alerts" element={<InventoryAlertsPage />} />
               <Route path="user-organizations" element={<UserOrganizationsPage />} />
+              <Route path="users" element={<UsersPage />} />
               <Route path="settings" element={<SettingsPage />} />
             </Route>
           </Routes>

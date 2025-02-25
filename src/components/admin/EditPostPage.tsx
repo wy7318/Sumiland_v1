@@ -5,6 +5,7 @@ import { Save, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { getCurrentUser } from '../../lib/auth';
 import { ImageUpload } from './ImageUpload';
+import { useAuth } from '../../contexts/AuthContext';
 import type { Database } from '../../lib/database.types';
 
 type Post = Database['public']['Tables']['posts']['Row'];
@@ -12,6 +13,7 @@ type Post = Database['public']['Tables']['posts']['Row'];
 export function EditPostPage() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const { organizations } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<Post>>({
@@ -33,6 +35,7 @@ export function EditPostPage() {
         .from('posts')
         .select('*')
         .eq('id', id)
+        .in('organization_id', organizations.map(org => org.id))
         .single();
 
       if (error) throw error;
@@ -42,6 +45,7 @@ export function EditPostPage() {
           content: post.content,
           excerpt: post.excerpt,
           featured_image: post.featured_image,
+          organization_id: post.organization_id
         });
       }
     } catch (err) {
@@ -65,6 +69,11 @@ export function EditPostPage() {
       const userData = await getCurrentUser();
       if (!userData?.user) throw new Error('Not authenticated');
 
+      // Verify organization access
+      if (!organizations.some(org => org.id === formData.organization_id)) {
+        throw new Error('You do not have permission to edit this post');
+      }
+
       const { error: updateError } = await supabase
         .from('posts')
         .update({
@@ -74,7 +83,8 @@ export function EditPostPage() {
           featured_image: formData.featured_image,
           updated_at: new Date().toISOString()
         })
-        .eq('id', id);
+        .eq('id', id)
+        .eq('organization_id', formData.organization_id);
 
       if (updateError) throw updateError;
       navigate('/admin/posts');
@@ -85,6 +95,14 @@ export function EditPostPage() {
       setLoading(false);
     }
   };
+
+  if (!formData.organization_id || !organizations.some(org => org.id === formData.organization_id)) {
+    return (
+      <div className="bg-red-50 text-red-600 p-4 rounded-lg">
+        You do not have permission to edit this post.
+      </div>
+    );
+  }
 
   return (
     <motion.div
