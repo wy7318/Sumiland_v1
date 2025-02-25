@@ -1,59 +1,83 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  ArrowLeft, User, Building2, Mail, Phone, Calendar,
-  FileText, Edit, Clock, CheckCircle, AlertCircle,
-  DollarSign, Percent, Save, FileText as Quote
+  ArrowLeft, Building2, Mail, Phone, Calendar,
+  Edit, AlertCircle, Send, FileDown, Truck,
+  CheckCircle, X, DollarSign, Package, User
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { cn, formatCurrency } from '../../lib/utils';
+import { AccountDetailsModal } from './AccountDetailsModal';
 
 type Order = {
   order_id: string;
   order_number: string;
   customer_id: string;
-  quote_id: string | null;
-  quote_number: string | null;
-  status: 'New' | 'In Progress' | 'In Review' | 'Completed' | 'Cancelled';
-  payment_status: 'Pending' | 'Partial Received' | 'Fully Received';
-  payment_amount: number;
-  payment_percent: number;
+  vendor_id: string | null;
+  status: 'draft' | 'sent' | 'received' | 'cancelled';
   total_amount: number;
+  expected_delivery_date: string | null;
+  actual_delivery_date: string | null;
   notes: string | null;
   created_at: string;
+  vendor: {
+    id: string;
+    name: string;
+    type: string;
+    status: string;
+    payment_terms: string | null;
+    customer: {
+      first_name: string;
+      last_name: string;
+      email: string;
+      phone: string | null;
+      company: string | null;
+    } | null;
+    shipping_address_line1: string | null;
+    shipping_address_line2: string | null;
+    shipping_city: string | null;
+    shipping_state: string | null;
+    shipping_country: string | null;
+    billing_address_line1: string | null;
+    billing_address_line2: string | null;
+    billing_city: string | null;
+    billing_state: string | null;
+    billing_country: string | null;
+  } | null;
   customer: {
     first_name: string;
     last_name: string;
     email: string;
-    company: string | null;
     phone: string | null;
+    company: string | null;
   };
   items: {
-    order_dtl_id: string;
-    product_id: string | null;
+    id: string;
+    product_id: string;
     quantity: number;
-    unit_price: number;
-    subtotal: number;
+    unit_cost: number;
+    received_quantity: number;
+    status: 'pending' | 'partial' | 'received';
     notes: string | null;
+    product: {
+      name: string;
+      description: string;
+    };
   }[];
-  quote?: {
-    quote_number: string;
-  };
 };
 
 const STATUS_COLORS = {
-  'New': 'bg-blue-100 text-blue-800',
-  'In Progress': 'bg-yellow-100 text-yellow-800',
-  'In Review': 'bg-purple-100 text-purple-800',
-  'Completed': 'bg-green-100 text-green-800',
-  'Cancelled': 'bg-red-100 text-red-800'
+  'draft': 'bg-gray-100 text-gray-800',
+  'sent': 'bg-blue-100 text-blue-800',
+  'received': 'bg-green-100 text-green-800',
+  'cancelled': 'bg-red-100 text-red-800'
 };
 
-const PAYMENT_STATUS_COLORS = {
-  'Pending': 'bg-gray-100 text-gray-800',
-  'Partial Received': 'bg-orange-100 text-orange-800',
-  'Fully Received': 'bg-green-100 text-green-800'
+const ITEM_STATUS_COLORS = {
+  'pending': 'bg-yellow-100 text-yellow-800',
+  'partial': 'bg-blue-100 text-blue-800',
+  'received': 'bg-green-100 text-green-800'
 };
 
 export function OrderDetailPage() {
@@ -62,9 +86,8 @@ export function OrderDetailPage() {
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [paymentAmount, setPaymentAmount] = useState<number>(0);
-  const [paymentPercent, setPaymentPercent] = useState<number>(0);
-  const [isUpdatingPayment, setIsUpdatingPayment] = useState(false);
+  const [processingAction, setProcessingAction] = useState(false);
+  const [showAccountModal, setShowAccountModal] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -72,37 +95,52 @@ export function OrderDetailPage() {
     }
   }, [id]);
 
-  useEffect(() => {
-    if (order) {
-      setPaymentAmount(order.payment_amount);
-      setPaymentPercent(order.payment_percent || 0);
-    }
-  }, [order]);
-
   const fetchOrder = async () => {
     try {
       if (!id) return;
 
-      const { data: orderData, error } = await supabase
+      const { data, error } = await supabase
         .from('order_hdr')
         .select(`
           *,
+          vendor:vendors(
+            id,
+            name,
+            type,
+            status,
+            payment_terms,
+            customer:customers(
+              first_name,
+              last_name,
+              email,
+              phone,
+              company
+            ),
+            shipping_address_line1,
+            shipping_address_line2,
+            shipping_city,
+            shipping_state,
+            shipping_country,
+            billing_address_line1,
+            billing_address_line2,
+            billing_city,
+            billing_state,
+            billing_country
+          ),
           customer:customers(*),
-          items:order_dtl(*),
-          quote:quote_hdr(quote_number)
+          items:order_dtl(
+            *,
+            product:products(
+              name,
+              description
+            )
+          )
         `)
         .eq('order_id', id)
         .single();
 
       if (error) throw error;
-
-      // Transform the data to include quote_number directly in the order object
-      const transformedOrder = {
-        ...orderData,
-        quote_number: orderData.quote?.quote_number || null
-      };
-
-      setOrder(transformedOrder);
+      setOrder(data);
     } catch (err) {
       console.error('Error fetching order:', err);
       setError(err instanceof Error ? err.message : 'Failed to load order');
@@ -123,67 +161,80 @@ export function OrderDetailPage() {
         })
         .eq('order_id', id);
 
-      if (error) {
-        // Check for the specific validation error message
-        if (error.message.includes('Order cannot be completed until payment is fully received')) {
-          throw new Error('Order cannot be completed until payment is fully received');
-        }
-        throw error;
-      }
+      if (error) throw error;
       
-      await fetchOrder();
+      // If status is changed to received, handle receiving items
+      if (newStatus === 'received') {
+        await handleReceiveItems();
+      } else {
+        await fetchOrder();
+      }
     } catch (err) {
       console.error('Error updating status:', err);
       setError(err instanceof Error ? err.message : 'Failed to update status');
     }
   };
 
-  const handlePaymentUpdate = async () => {
-    try {
-      if (!id || !order) return;
-      setIsUpdatingPayment(true);
-      setError(null);
+  const handleReceiveItems = async () => {
+    if (!order) return;
 
-      const { error } = await supabase
+    try {
+      setProcessingAction(true);
+      
+      // Update PO status
+      const { error: poError } = await supabase
         .from('order_hdr')
         .update({ 
-          payment_amount: paymentAmount,
+          status: 'received',
+          actual_delivery_date: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
         .eq('order_id', id);
 
-      if (error) throw error;
+      if (poError) throw poError;
+
+      // Get the current user
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error('Not authenticated');
+
+      // Update items status and create inventory transactions
+      for (const item of order.items) {
+        // Update item status
+        const { error: itemError } = await supabase
+          .from('order_dtl')
+          .update({
+            status: 'received',
+            received_quantity: item.quantity,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', item.id);
+
+        if (itemError) throw itemError;
+
+        // Create inventory transaction
+        const { error: transactionError } = await supabase
+          .from('inventory_transactions')
+          .insert([{
+            product_id: item.product_id,
+            transaction_type: 'purchase_received',
+            quantity: item.quantity,
+            unit_cost: item.unit_cost,
+            reference_id: order.order_id,
+            reference_type: 'purchase_order',
+            notes: `Received from PO ${order.order_number}`,
+            created_by: userData.user.id
+          }]);
+
+        if (transactionError) throw transactionError;
+      }
+
       await fetchOrder();
     } catch (err) {
-      console.error('Error updating payment:', err);
-      setError(err instanceof Error ? err.message : 'Failed to update payment');
+      console.error('Error receiving items:', err);
+      setError(err instanceof Error ? err.message : 'Failed to receive items');
     } finally {
-      setIsUpdatingPayment(false);
+      setProcessingAction(false);
     }
-  };
-
-  const handlePaymentPercentChange = (percent: number) => {
-    if (!order) return;
-    
-    // Validate percent is between 0 and 100
-    const validPercent = Math.max(0, Math.min(100, percent));
-    setPaymentPercent(validPercent);
-
-    // Calculate new payment amount based on percentage
-    const newAmount = (validPercent / 100) * order.total_amount;
-    setPaymentAmount(newAmount);
-  };
-
-  const handlePaymentAmountChange = (amount: number) => {
-    if (!order) return;
-    
-    // Validate amount is between 0 and total
-    const validAmount = Math.max(0, Math.min(order.total_amount, amount));
-    setPaymentAmount(validAmount);
-    
-    // Calculate and update percentage
-    const newPercent = (validAmount / order.total_amount) * 100;
-    setPaymentPercent(newPercent);
   };
 
   if (loading) {
@@ -205,13 +256,6 @@ export function OrderDetailPage() {
 
   return (
     <div className="space-y-6">
-      {error && (
-        <div className="bg-red-50 text-red-600 p-4 rounded-lg flex items-center">
-          <AlertCircle className="w-5 h-5 mr-2" />
-          {error}
-        </div>
-      )}
-
       <div className="flex items-center justify-between">
         <button
           onClick={() => navigate('/admin/orders')}
@@ -220,14 +264,36 @@ export function OrderDetailPage() {
           <ArrowLeft className="w-5 h-5 mr-2" />
           Back to Orders
         </button>
-        <Link
-          to={`/admin/orders/${id}/edit`}
-          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
-        >
-          <Edit className="w-4 h-4 mr-2" />
-          Edit Order
-        </Link>
+        <div className="flex items-center space-x-4">
+          {order.status === 'sent' && (
+            <button
+              onClick={() => handleStatusChange('received')}
+              disabled={processingAction}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 disabled:opacity-50"
+            >
+              <Truck className="w-4 h-4 mr-2" />
+              Receive Items
+            </button>
+          )}
+          <Link
+            to={`/admin/orders/${id}/edit`}
+            className={cn(
+              "inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700",
+              (order.status === 'received' || order.status === 'cancelled') && "opacity-50 cursor-not-allowed pointer-events-none"
+            )}
+          >
+            <Edit className="w-4 h-4 mr-2" />
+            Edit Order
+          </Link>
+        </div>
       </div>
+
+      {error && (
+        <div className="bg-red-50 text-red-600 p-4 rounded-lg flex items-center">
+          <AlertCircle className="w-5 h-5 mr-2" />
+          {error}
+        </div>
+      )}
 
       <div className="bg-white shadow rounded-lg overflow-hidden">
         <div className="p-6">
@@ -239,19 +305,6 @@ export function OrderDetailPage() {
                   <Calendar className="w-4 h-4 mr-1" />
                   {new Date(order.created_at).toLocaleDateString()}
                 </span>
-                <span className="flex items-center">
-                  <Clock className="w-4 h-4 mr-1" />
-                  {new Date(order.created_at).toLocaleTimeString()}
-                </span>
-                {order.quote_id && order.quote_number && (
-                  <Link 
-                    to={`/admin/quotes/${order.quote_id}/edit`}
-                    className="flex items-center text-primary-600 hover:text-primary-700 transition-colors"
-                  >
-                    <Quote className="w-4 h-4 mr-1" />
-                    Quote: {order.quote_number}
-                  </Link>
-                )}
               </div>
             </div>
             <div className="mt-4 md:mt-0">
@@ -263,90 +316,72 @@ export function OrderDetailPage() {
                   STATUS_COLORS[order.status]
                 )}
               >
-                <option value="New">New</option>
-                <option value="In Progress">In Progress</option>
-                <option value="In Review">In Review</option>
-                <option value="Completed">Completed</option>
-                <option value="Cancelled">Cancelled</option>
+                <option value="draft">Draft</option>
+                <option value="sent">Sent</option>
+                <option value="received">Received</option>
+                <option value="cancelled">Cancelled</option>
               </select>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div>
-              <h2 className="text-lg font-semibold mb-4">Order Details</h2>
-              <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-                <div>
-                  <div className="text-sm font-medium text-gray-500 mb-1">Status</div>
-                  <span className={cn(
-                    "px-2 inline-flex text-xs leading-5 font-semibold rounded-full",
-                    STATUS_COLORS[order.status]
-                  )}>
-                    {order.status}
-                  </span>
-                </div>
-                <div>
-                  <div className="text-sm font-medium text-gray-500 mb-1">Payment Status</div>
-                  <div className="flex items-center gap-4">
-                    <span className={cn(
-                      "px-2 inline-flex text-xs leading-5 font-semibold rounded-full",
-                      PAYMENT_STATUS_COLORS[order.payment_status]
-                    )}>
-                      {order.payment_status}
-                    </span>
-                  </div>
-                </div>
-                <div>
-                  <div className="text-sm font-medium text-gray-500 mb-1">Payment Details</div>
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <div className="relative flex-1">
-                        <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                        <input
-                          type="number"
-                          value={paymentAmount}
-                          onChange={(e) => handlePaymentAmountChange(parseFloat(e.target.value))}
-                          min="0"
-                          max={order.total_amount}
-                          step="0.01"
-                          className="w-full pl-9 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-                        />
+            {/* Account Information */}
+            {order.vendor && (
+              <div>
+                <h2 className="text-lg font-semibold mb-4">Account Information</h2>
+                <div className="bg-gray-50 rounded-lg p-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <Building2 className="w-5 h-5 text-gray-400 mr-3" />
+                      <div>
+                        <div className="font-medium">{order.vendor.name}</div>
+                        <div className="text-sm text-gray-500">
+                          Type: {order.vendor.type}
+                        </div>
                       </div>
-                      <span className="text-sm text-gray-500 whitespace-nowrap">
-                        of {formatCurrency(order.total_amount)}
-                      </span>
-                    </div>
-                    <div className="relative">
-                      <Percent className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                      <input
-                        type="number"
-                        value={paymentPercent}
-                        onChange={(e) => handlePaymentPercentChange(parseFloat(e.target.value))}
-                        min="0"
-                        max="100"
-                        step="0.01"
-                        className="w-full pl-9 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-                      />
                     </div>
                     <button
-                      onClick={handlePaymentUpdate}
-                      disabled={isUpdatingPayment}
-                      className="w-full flex items-center justify-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
+                      onClick={() => setShowAccountModal(true)}
+                      className="text-primary-600 hover:text-primary-700 text-sm"
                     >
-                      <Save className="w-4 h-4 mr-2" />
-                      {isUpdatingPayment ? 'Saving...' : 'Save Payment'}
+                      View Details
                     </button>
                   </div>
+                  {order.vendor.customer && (
+                    <div className="space-y-2">
+                      <div className="flex items-center">
+                        <User className="w-4 h-4 text-gray-400 mr-2" />
+                        <span className="text-sm text-gray-600">
+                          Contact: {order.vendor.customer.first_name} {order.vendor.customer.last_name}
+                        </span>
+                      </div>
+                      <div className="flex items-center">
+                        <Mail className="w-4 h-4 text-gray-400 mr-2" />
+                        <a
+                          href={`mailto:${order.vendor.customer.email}`}
+                          className="text-sm text-primary-600 hover:text-primary-700"
+                        >
+                          {order.vendor.customer.email}
+                        </a>
+                      </div>
+                      {order.vendor.customer.phone && (
+                        <div className="flex items-center">
+                          <Phone className="w-4 h-4 text-gray-400 mr-2" />
+                          <a
+                            href={`tel:${order.vendor.customer.phone}`}
+                            className="text-sm text-primary-600 hover:text-primary-700"
+                          >
+                            {order.vendor.customer.phone}
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-                {order.notes && (
-                  <div>
-                    <div className="text-sm font-medium text-gray-500 mb-1">Notes</div>
-                    <p className="text-gray-700 whitespace-pre-wrap">{order.notes}</p>
-                  </div>
-                )}
               </div>
-            </div>
+            )}
 
+            {/* Customer Information */}
             <div>
               <h2 className="text-lg font-semibold mb-4">Customer Information</h2>
               <div className="bg-gray-50 rounded-lg p-4 space-y-4">
@@ -356,23 +391,24 @@ export function OrderDetailPage() {
                     <div className="font-medium">
                       {order.customer.first_name} {order.customer.last_name}
                     </div>
+                    {order.customer.company && (
+                      <div className="text-sm text-gray-500">
+                        {order.customer.company}
+                      </div>
+                    )}
                   </div>
                 </div>
-                {order.customer.company && (
+                {order.customer.email && (
                   <div className="flex items-center">
-                    <Building2 className="w-5 h-5 text-gray-400 mr-3" />
-                    <div>{order.customer.company}</div>
+                    <Mail className="w-5 h-5 text-gray-400 mr-3" />
+                    <a
+                      href={`mailto:${order.customer.email}`}
+                      className="text-primary-600 hover:text-primary-700"
+                    >
+                      {order.customer.email}
+                    </a>
                   </div>
                 )}
-                <div className="flex items-center">
-                  <Mail className="w-5 h-5 text-gray-400 mr-3" />
-                  <a
-                    href={`mailto:${order.customer.email}`}
-                    className="text-primary-600 hover:text-primary-700"
-                  >
-                    {order.customer.email}
-                  </a>
-                </div>
                 {order.customer.phone && (
                   <div className="flex items-center">
                     <Phone className="w-5 h-5 text-gray-400 mr-3" />
@@ -395,45 +431,78 @@ export function OrderDetailPage() {
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Description
+                      Product
                     </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Qty
+                      Quantity
                     </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Unit Price
+                      Unit Cost
                     </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Total
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
                     </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {order.items.map((item) => (
-                    <tr key={item.order_dtl_id}>
+                    <tr key={item.id}>
                       <td className="px-6 py-4">
-                        <div className="text-sm font-medium text-gray-900">
-                          {item.notes}
+                        <div className="flex items-center">
+                          <Package className="w-5 h-5 text-gray-400 mr-3" />
+                          <div>
+                            <div className="font-medium text-gray-900">
+                              {item.product.name}
+                            </div>
+                            {item.product.description && (
+                              <div className="text-sm text-gray-500">
+                                {item.product.description}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-right text-sm text-gray-500">
-                        {item.quantity}
+                      <td className="px-6 py-4 text-right whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{item.quantity}</div>
+                        {item.received_quantity > 0 && (
+                          <div className="text-sm text-gray-500">
+                            Received: {item.received_quantity}
+                          </div>
+                        )}
                       </td>
-                      <td className="px-6 py-4 text-right text-sm text-gray-500">
-                        {formatCurrency(item.unit_price)}
+                      <td className="px-6 py-4 text-right whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {formatCurrency(item.unit_cost)}
+                        </div>
                       </td>
-                      <td className="px-6 py-4 text-right text-sm text-gray-900">
-                        {formatCurrency(item.subtotal)}
+                      <td className="px-6 py-4 text-right whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">
+                          {formatCurrency(item.quantity * item.unit_cost)}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={cn(
+                          "px-2 inline-flex text-xs leading-5 font-semibold rounded-full justify-center",
+                          ITEM_STATUS_COLORS[item.status]
+                        )}>
+                          {item.status}
+                        </span>
                       </td>
                     </tr>
                   ))}
                   <tr className="bg-gray-50">
-                    <td colSpan={3} className="px-6 py-4 text-right text-sm font-medium text-gray-900">
-                      Total
+                    <td colSpan={3} className="px-6 py-4 text-right font-medium">
+                      Total Amount:
                     </td>
-                    <td className="px-6 py-4 text-right text-sm font-medium text-gray-900">
-                      {formatCurrency(order.total_amount)}
+                    <td className="px-6 py-4 text-right whitespace-nowrap">
+                      <div className="text-lg font-bold text-gray-900">
+                        {formatCurrency(order.total_amount)}
+                      </div>
                     </td>
+                    <td></td>
                   </tr>
                 </tbody>
               </table>
@@ -441,6 +510,15 @@ export function OrderDetailPage() {
           </div>
         </div>
       </div>
+
+      <AnimatePresence>
+        {showAccountModal && order.vendor && (
+          <AccountDetailsModal
+            vendor={order.vendor}
+            onClose={() => setShowAccountModal(false)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

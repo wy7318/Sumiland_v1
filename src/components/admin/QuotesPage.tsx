@@ -14,6 +14,7 @@ type Quote = {
   quote_id: string;
   quote_number: string;
   customer_id: string;
+  vendor_id: string | null;
   quote_date: string;
   status: string;
   total_amount: number;
@@ -38,11 +39,6 @@ type Quote = {
   }[];
 };
 
-type SortConfig = {
-  key: keyof Quote;
-  direction: 'asc' | 'desc';
-};
-
 const STATUS_COLORS = {
   'Draft': 'bg-gray-100 text-gray-800',
   'Pending': 'bg-yellow-100 text-yellow-800',
@@ -59,11 +55,11 @@ export function QuotesPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [sortConfig, setSortConfig] = useState<SortConfig>({
-    key: 'created_at',
+  const [sortConfig, setSortConfig] = useState<{ field: keyof Quote; direction: 'asc' | 'desc' }>({
+    field: 'created_at',
     direction: 'desc'
   });
-  const [processingOrder, setProcessingOrder] = useState<string | null>(null);
+  const [processingQuote, setProcessingQuote] = useState<string | null>(null);
 
   useEffect(() => {
     fetchQuotes();
@@ -94,8 +90,9 @@ export function QuotesPage() {
 
   const handleStatusChange = async (quoteId: string, newStatus: string) => {
     try {
+      setProcessingQuote(quoteId);
       setError(null);
-      
+
       const { error: updateError } = await supabase
         .from('quote_hdr')
         .update({ 
@@ -120,36 +117,8 @@ export function QuotesPage() {
       setError(err instanceof Error ? err.message : 'Failed to update quote status');
       // Refresh quotes to get current statuses
       await fetchQuotes();
-    }
-  };
-
-  const handleCreateOrder = async (quote: Quote) => {
-    try {
-      setError(null);
-      setProcessingOrder(quote.quote_id);
-      
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) throw new Error('Not authenticated');
-
-      const { data: orderId, error: orderError } = await supabase.rpc(
-        'create_order_from_quote',
-        { 
-          quote_id_param: quote.quote_id,
-          user_id_param: userData.user.id
-        }
-      );
-
-      if (orderError) throw orderError;
-
-      // Navigate to orders page
-      navigate('/admin/orders');
-    } catch (err) {
-      console.error('Error creating order:', err);
-      setError(err instanceof Error ? err.message : 'Failed to create order');
-      // Refresh quotes to get current statuses
-      await fetchQuotes();
     } finally {
-      setProcessingOrder(null);
+      setProcessingQuote(null);
     }
   };
 
@@ -181,10 +150,11 @@ export function QuotesPage() {
         .from('quote_hdr')
         .insert([{
           customer_id: quote.customer_id,
+          vendor_id: quote.vendor_id,
+          organization_id: quote.organization_id,
           total_amount: quote.total_amount,
           notes: quote.notes,
           status: 'Draft',
-          organization_id: quote.organization_id,
           created_by: userData.user.id,
           updated_by: userData.user.id
         }])
@@ -193,20 +163,12 @@ export function QuotesPage() {
 
       if (quoteError) throw quoteError;
 
-      // Get quote items
-      const { data: items, error: itemsError } = await supabase
-        .from('quote_dtl')
-        .select('*')
-        .eq('quote_id', quote.quote_id);
-
-      if (itemsError) throw itemsError;
-
       // Create new quote items
-      if (items && items.length > 0) {
+      if (quote.items.length > 0) {
         const { error: detailsError } = await supabase
           .from('quote_dtl')
           .insert(
-            items.map(item => ({
+            quote.items.map(item => ({
               quote_id: newQuote.quote_id,
               item_name: item.item_name,
               item_desc: item.item_desc,
@@ -233,8 +195,8 @@ export function QuotesPage() {
   );
 
   const sortedQuotes = [...filteredQuotes].sort((a, b) => {
-    const aValue = a[sortConfig.key];
-    const bValue = b[sortConfig.key];
+    const aValue = a[sortConfig.field];
+    const bValue = b[sortConfig.field];
     if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
     if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
     return 0;
@@ -341,6 +303,7 @@ export function QuotesPage() {
                           <select
                             value={quote.status}
                             onChange={(e) => handleStatusChange(quote.quote_id, e.target.value)}
+                            disabled={processingQuote === quote.quote_id}
                             className={`px-2 py-1 text-xs font-medium rounded-full ${STATUS_COLORS[quote.status as keyof typeof STATUS_COLORS]}`}
                           >
                             <option value="Draft">Draft</option>
@@ -368,27 +331,6 @@ export function QuotesPage() {
                               title="Download PDF"
                             >
                               <FileDown className="w-5 h-5" />
-                            </button>
-                            <button
-                              onClick={() => handleCreateOrder(quote)}
-                              className={cn(
-                                "p-2 rounded-full",
-                                quote.status === 'Approved' || processingOrder === quote.quote_id
-                                  ? "text-gray-400 cursor-not-allowed"
-                                  : "text-green-600 hover:bg-green-50"
-                              )}
-                              title={
-                                quote.status === 'Approved' 
-                                  ? 'Order already created' 
-                                  : 'Create Order'
-                              }
-                              disabled={quote.status === 'Approved' || processingOrder === quote.quote_id}
-                            >
-                              <ShoppingBag className={cn(
-                                "w-5 h-5",
-                                quote.status === 'Approved' ? 'opacity-50' : '',
-                                processingOrder === quote.quote_id ? 'animate-pulse' : ''
-                              )} />
                             </button>
                             <Link
                               to={`/admin/quotes/${quote.quote_id}/edit`}
