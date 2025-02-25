@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Plus, Search, FileText, Edit, Trash2, FileDown,
   ChevronDown, ChevronUp, AlertCircle, ShoppingBag, Copy 
@@ -8,6 +8,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { generateQuotePDF } from '../../lib/pdf';
 import { cn, formatCurrency } from '../../lib/utils';
+import { useAuth } from '../../contexts/AuthContext';
 
 type Quote = {
   quote_id: string;
@@ -21,6 +22,7 @@ type Quote = {
   created_by: string;
   created_at: string;
   updated_at: string;
+  organization_id: string;
   customer: {
     first_name: string;
     last_name: string;
@@ -51,6 +53,7 @@ const STATUS_COLORS = {
 
 export function QuotesPage() {
   const navigate = useNavigate();
+  const { organizations } = useAuth();
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -64,7 +67,7 @@ export function QuotesPage() {
 
   useEffect(() => {
     fetchQuotes();
-  }, []);
+  }, [organizations]);
 
   const fetchQuotes = async () => {
     try {
@@ -76,6 +79,7 @@ export function QuotesPage() {
           customer:customers(*),
           items:quote_dtl(*)
         `)
+        .in('organization_id', organizations.map(org => org.id))
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -98,7 +102,8 @@ export function QuotesPage() {
           status: newStatus,
           updated_at: new Date().toISOString()
         })
-        .eq('quote_id', quoteId);
+        .eq('quote_id', quoteId)
+        .in('organization_id', organizations.map(org => org.id));
 
       if (updateError) throw updateError;
 
@@ -155,7 +160,8 @@ export function QuotesPage() {
       const { error } = await supabase
         .from('quote_hdr')
         .delete()
-        .eq('quote_id', quoteId);
+        .eq('quote_id', quoteId)
+        .in('organization_id', organizations.map(org => org.id));
 
       if (error) throw error;
       setQuotes(quotes.filter(q => q.quote_id !== quoteId));
@@ -178,6 +184,7 @@ export function QuotesPage() {
           total_amount: quote.total_amount,
           notes: quote.notes,
           status: 'Draft',
+          organization_id: quote.organization_id,
           created_by: userData.user.id,
           updated_by: userData.user.id
         }])
@@ -204,7 +211,8 @@ export function QuotesPage() {
               item_name: item.item_name,
               item_desc: item.item_desc,
               quantity: item.quantity,
-              unit_price: item.unit_price
+              unit_price: item.unit_price,
+              organization_id: quote.organization_id
             }))
           );
 

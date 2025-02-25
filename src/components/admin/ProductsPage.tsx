@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Package, Plus, Edit, Trash2, Eye, EyeOff, Search, Filter } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 import { cn } from '../../lib/utils';
 
 type Product = {
@@ -15,6 +16,7 @@ type Product = {
   image_url: string | null;
   created_at: string;
   updated_at: string;
+  organization_id: string;
   category: { 
     name: string;
     category_type: string;
@@ -22,6 +24,7 @@ type Product = {
 };
 
 export function ProductsPage() {
+  const { organizations } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -32,7 +35,7 @@ export function ProductsPage() {
 
   useEffect(() => {
     fetchProducts();
-  }, [sortBy, sortOrder]);
+  }, [organizations]);
 
   const fetchProducts = async () => {
     try {
@@ -43,6 +46,7 @@ export function ProductsPage() {
           *,
           category:product_categories(name, category_type)
         `)
+        .in('organization_id', organizations.map(org => org.id))
         .order(sortBy, { ascending: sortOrder === 'asc' });
 
       if (error) throw error;
@@ -57,11 +61,20 @@ export function ProductsPage() {
 
   const toggleStatus = async (product: Product) => {
     try {
+      // Verify organization access
+      if (!organizations.some(org => org.id === product.organization_id)) {
+        throw new Error('You do not have permission to update this product');
+      }
+
       const newStatus = product.status === 'active' ? 'inactive' : 'active';
       const { error } = await supabase
         .from('products')
-        .update({ status: newStatus })
-        .eq('id', product.id);
+        .update({ 
+          status: newStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', product.id)
+        .eq('organization_id', product.organization_id);
 
       if (error) throw error;
       await fetchProducts();
@@ -75,10 +88,19 @@ export function ProductsPage() {
     if (!window.confirm('Are you sure you want to delete this product?')) return;
 
     try {
+      const productToDelete = products.find(p => p.id === id);
+      if (!productToDelete) return;
+
+      // Verify organization access
+      if (!organizations.some(org => org.id === productToDelete.organization_id)) {
+        throw new Error('You do not have permission to delete this product');
+      }
+
       const { error } = await supabase
         .from('products')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .eq('organization_id', productToDelete.organization_id);
 
       if (error) throw error;
       await fetchProducts();
@@ -95,6 +117,13 @@ export function ProductsPage() {
       product.category?.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || product.status === statusFilter;
     return matchesSearch && matchesStatus;
+  });
+
+  const sortedProducts = [...filteredProducts].sort((a, b) => {
+    const aValue = a[sortBy];
+    const bValue = b[sortBy];
+    const multiplier = sortOrder === 'asc' ? 1 : -1;
+    return (aValue < bValue ? -1 : 1) * multiplier;
   });
 
   if (loading) {
@@ -166,7 +195,7 @@ export function ProductsPage() {
 
       <div className="bg-white shadow overflow-hidden sm:rounded-md">
         <ul className="divide-y divide-gray-200">
-          {filteredProducts.map((product) => (
+          {sortedProducts.map((product) => (
             <motion.li
               key={product.id}
               initial={{ opacity: 0 }}

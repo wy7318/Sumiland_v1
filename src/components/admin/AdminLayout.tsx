@@ -27,10 +27,11 @@ export function AdminLayout() {
     const userData = await getCurrentUser();
     if (!userData?.user) {
       navigate('/login');
-    } else {
-      setIsSuperAdmin(!!userData.profile?.is_super_admin);
-      setLoading(false);
+      return;
     }
+
+    setIsSuperAdmin(!!userData.profile?.is_super_admin);
+    setLoading(false);
   };
 
   const handleSignOut = async () => {
@@ -57,14 +58,15 @@ export function AdminLayout() {
     { path: '/admin/purchase-orders', icon: Truck, label: 'Purchase Orders' },
     { path: '/admin/work-orders', icon: ClipboardList, label: 'Work Orders' },
     { path: '/admin/inventory', icon: BoxSeam, label: 'Inventory' },
-    // Only show Customers menu for admin/owner roles
+    // Show Products, Customers, Categories and Accounts menus for admin/owner roles
     ...(hasAdminAccess ? [
-      { path: '/admin/customers', icon: Users, label: 'Customers' }
-    ] : []),
-    ...(isSuperAdmin ? [
       { path: '/admin/products', icon: Package, label: 'Products' },
+      { path: '/admin/customers', icon: Users, label: 'Customers' },
       { path: '/admin/categories', icon: Tag, label: 'Categories' },
-      { path: '/admin/vendors', icon: Building2, label: 'Vendors' },
+      { path: '/admin/vendors', icon: Building2, label: 'Accounts' }
+    ] : []),
+    // Show additional menus for super admin
+    ...(isSuperAdmin ? [
       { path: '/admin/user-organizations', icon: UserCog, label: 'User & Org Management' },
       { path: '/admin/users', icon: UserPlus, label: 'User Management' }
     ] : [])
@@ -79,7 +81,7 @@ export function AdminLayout() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 flex">
+    <div className="relative">
       {/* Sidebar */}
       <motion.div
         initial={false}
@@ -98,7 +100,7 @@ export function AdminLayout() {
           )}
           <button
             onClick={() => setIsExpanded(!isExpanded)}
-            className="p-1 hover:bg-primary-700 rounded-full focus:outline-none focus:ring-2 focus:ring-primary-400"
+            className="p-1 hover:bg-primary-700 rounded-full focus:outline-none focus:ring-2 focus:ring-primary-400 focus:ring-offset-2"
           >
             {isExpanded ? (
               <ChevronLeft className="w-5 h-5" />
@@ -143,7 +145,7 @@ export function AdminLayout() {
               isActive('/admin/settings') && "bg-primary-700 text-white"
             )}
           >
-            <Settings className="w-5 h-5 flex-shrink-0" />
+            <Settings className="w-4 h-4 flex-shrink-0" />
             {isExpanded && (
               <span className="ml-3 transition-opacity duration-200">
                 Settings
@@ -157,7 +159,7 @@ export function AdminLayout() {
               "hover:bg-primary-700 hover:text-white transition-colors"
             )}
           >
-            <Home className="w-5 h-5 flex-shrink-0" />
+            <Home className="w-4 h-4 flex-shrink-0" />
             {isExpanded && (
               <span className="ml-3 transition-opacity duration-200">
                 Home
@@ -171,7 +173,7 @@ export function AdminLayout() {
               "hover:bg-primary-700 hover:text-white transition-colors"
             )}
           >
-            <LogOut className="w-5 h-5 flex-shrink-0" />
+            <LogOut className="w-4 h-4 flex-shrink-0" />
             {isExpanded && (
               <span className="ml-3 transition-opacity duration-200">
                 Sign Out

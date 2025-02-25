@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Tag, Edit, Trash2, Save, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
+import { cn } from '../../lib/utils';
 
 type Category = {
   id: string;
@@ -9,11 +11,13 @@ type Category = {
   category_type: 'Design' | 'Web' | 'Logo' | 'Branding' | 'Software' | 'Consulting';
   description: string | null;
   created_at: string;
+  organization_id: string;
 };
 
 const CATEGORY_TYPES = ['Design', 'Web', 'Logo', 'Branding', 'Software', 'Consulting'] as const;
 
 export function CategoriesPage() {
+  const { organizations } = useAuth();
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -27,7 +31,7 @@ export function CategoriesPage() {
 
   useEffect(() => {
     fetchCategories();
-  }, []);
+  }, [organizations]);
 
   const fetchCategories = async () => {
     try {
@@ -35,6 +39,7 @@ export function CategoriesPage() {
       const { data, error } = await supabase
         .from('product_categories')
         .select('*')
+        .in('organization_id', organizations.map(org => org.id))
         .order('name');
 
       if (error) throw error;
@@ -52,12 +57,19 @@ export function CategoriesPage() {
     if (!newCategory.trim()) return;
 
     try {
+      // Use the first organization if creating new category
+      const organizationId = organizations[0]?.id;
+      if (!organizationId) {
+        throw new Error('No organization available');
+      }
+
       const { error } = await supabase
         .from('product_categories')
         .insert([{
           name: newCategory.trim(),
           category_type: newCategoryType,
           description: newDescription.trim() || null,
+          organization_id: organizationId,
           created_at: new Date().toISOString()
         }]);
 
@@ -67,6 +79,7 @@ export function CategoriesPage() {
       await fetchCategories();
     } catch (err) {
       console.error('Error adding category:', err);
+      setError(err instanceof Error ? err.message : 'Failed to add category');
     }
   };
 
@@ -74,6 +87,14 @@ export function CategoriesPage() {
     if (!editName.trim()) return;
 
     try {
+      const categoryToEdit = categories.find(c => c.id === id);
+      if (!categoryToEdit) return;
+
+      // Verify organization access
+      if (!organizations.some(org => org.id === categoryToEdit.organization_id)) {
+        throw new Error('You do not have permission to edit this category');
+      }
+
       const { error } = await supabase
         .from('product_categories')
         .update({ 
@@ -82,13 +103,15 @@ export function CategoriesPage() {
           description: editDescription.trim() || null,
           updated_at: new Date().toISOString()
         })
-        .eq('id', id);
+        .eq('id', id)
+        .eq('organization_id', categoryToEdit.organization_id);
 
       if (error) throw error;
       setEditingId(null);
       await fetchCategories();
     } catch (err) {
       console.error('Error updating category:', err);
+      setError(err instanceof Error ? err.message : 'Failed to update category');
     }
   };
 
@@ -96,15 +119,25 @@ export function CategoriesPage() {
     if (!window.confirm('Are you sure you want to delete this category?')) return;
 
     try {
+      const categoryToDelete = categories.find(c => c.id === id);
+      if (!categoryToDelete) return;
+
+      // Verify organization access
+      if (!organizations.some(org => org.id === categoryToDelete.organization_id)) {
+        throw new Error('You do not have permission to delete this category');
+      }
+
       const { error } = await supabase
         .from('product_categories')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .eq('organization_id', categoryToDelete.organization_id);
 
       if (error) throw error;
       await fetchCategories();
     } catch (err) {
       console.error('Error deleting category:', err);
+      setError(err instanceof Error ? err.message : 'Failed to delete category');
     }
   };
 

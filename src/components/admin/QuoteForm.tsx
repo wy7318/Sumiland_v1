@@ -2,11 +2,25 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Save, X, Plus, Trash2, AlertCircle, Search, 
-  UserPlus, Package, Check, Copy 
+  Save, X, Plus, Trash2, Search, Building2, Package, Scale,
+  AlertCircle, Calendar, DollarSign, Check 
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { cn } from '../../lib/utils';
+import { useAuth } from '../../contexts/AuthContext';
+
+type Vendor = {
+  id: string;
+  name: string;
+  type: string;
+  customer_id: string | null;
+  customer: {
+    first_name: string;
+    last_name: string;
+    email: string;
+    company: string | null;
+  } | null;
+};
 
 type Customer = {
   customer_id: string;
@@ -14,18 +28,24 @@ type Customer = {
   last_name: string;
   email: string;
   phone: string | null;
+  company: string | null;
+  organization_id: string;
 };
 
 type Product = {
   id: string;
   name: string;
-  description: string | null;
-  price: number;
-  image_url: string | null;
+  description: string;
+  last_purchase_cost: number;
+  stock_unit: 'weight' | 'quantity';
+  weight_unit: 'kg' | 'g' | 'lb' | 'oz' | null;
+  organization_id: string;
 };
 
 type QuoteFormData = {
+  vendor_id: string;
   customer_id: string;
+  organization_id: string;
   status: 'Draft' | 'Pending' | 'Approved' | 'Rejected' | 'Expired';
   notes: string;
   items: {
@@ -65,38 +85,63 @@ const initialCustomerForm: CustomerFormData = {
 export function QuoteForm() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const { organizations } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [customerSearch, setCustomerSearch] = useState('');
-  const [productSearch, setProductSearch] = useState('');
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
-  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
-  const [showProductDropdown, setShowProductDropdown] = useState(false);
-  const [showCustomerModal, setShowCustomerModal] = useState(false);
-  const [customerForm, setCustomerForm] = useState<CustomerFormData>(initialCustomerForm);
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [formData, setFormData] = useState<QuoteFormData>({
+    vendor_id: '',
     customer_id: '',
+    organization_id: organizations[0]?.id || '',
     status: 'Pending',
     notes: '',
     items: []
   });
+  
+  // Vendor search states
+  const [vendorSearch, setVendorSearch] = useState('');
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [filteredVendors, setFilteredVendors] = useState<Vendor[]>([]);
+  const [showVendorDropdown, setShowVendorDropdown] = useState(false);
+  const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
+  
+  // Customer search states
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  
+  // Product search states
+  const [productSearch, setProductSearch] = useState('');
+  const [products, setProducts] = useState<Product[]>([]);
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
+  const [showProductDropdown, setShowProductDropdown] = useState(false);
+  const [selectedProductIndex, setSelectedProductIndex] = useState<number | null>(null);
 
+  // Customer form state
+  const [showCustomerModal, setShowCustomerModal] = useState(false);
+  const [customerForm, setCustomerForm] = useState<CustomerFormData>(initialCustomerForm);
+
+  // Refs for dropdowns
+  const vendorSearchRef = useRef<HTMLDivElement>(null);
   const customerSearchRef = useRef<HTMLDivElement>(null);
   const productSearchRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetchCustomers();
-    fetchProducts();
     if (id) {
       fetchQuote();
+    } else if (organizations.length > 0) {
+      setFormData(prev => ({
+        ...prev,
+        organization_id: organizations[0].id
+      }));
     }
 
     // Click outside handler
     const handleClickOutside = (event: MouseEvent) => {
+      if (vendorSearchRef.current && !vendorSearchRef.current.contains(event.target as Node)) {
+        setShowVendorDropdown(false);
+      }
       if (customerSearchRef.current && !customerSearchRef.current.contains(event.target as Node)) {
         setShowCustomerDropdown(false);
       }
@@ -107,15 +152,33 @@ export function QuoteForm() {
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [id]);
+  }, [id, organizations]);
 
+  // Filter vendors based on search
+  useEffect(() => {
+    if (vendorSearch) {
+      const searchTerm = vendorSearch.toLowerCase();
+      const filtered = vendors.filter(vendor => 
+        vendor.name.toLowerCase().includes(searchTerm) ||
+        vendor.customer?.company?.toLowerCase().includes(searchTerm) ||
+        vendor.customer?.first_name.toLowerCase().includes(searchTerm) ||
+        vendor.customer?.last_name.toLowerCase().includes(searchTerm)
+      );
+      setFilteredVendors(filtered);
+    } else {
+      setFilteredVendors([]);
+    }
+  }, [vendorSearch, vendors]);
+
+  // Filter customers based on search
   useEffect(() => {
     if (customerSearch) {
       const searchTerm = customerSearch.toLowerCase();
       const filtered = customers.filter(customer => 
         customer.first_name.toLowerCase().includes(searchTerm) ||
         customer.last_name.toLowerCase().includes(searchTerm) ||
-        customer.email.toLowerCase().includes(searchTerm)
+        customer.email.toLowerCase().includes(searchTerm) ||
+        customer.company?.toLowerCase().includes(searchTerm)
       );
       setFilteredCustomers(filtered);
     } else {
@@ -123,6 +186,7 @@ export function QuoteForm() {
     }
   }, [customerSearch, customers]);
 
+  // Filter products based on search
   useEffect(() => {
     if (productSearch) {
       const searchTerm = productSearch.toLowerCase();
@@ -136,11 +200,91 @@ export function QuoteForm() {
     }
   }, [productSearch, products]);
 
+  const fetchQuote = async () => {
+    try {
+      const { data: quote, error } = await supabase
+        .from('quote_hdr')
+        .select(`
+          *,
+          vendor:vendors(
+            id,
+            name,
+            type,
+            customer:customers(
+              first_name,
+              last_name,
+              email,
+              company
+            )
+          ),
+          customer:customers(*),
+          items:quote_dtl(*)
+        `)
+        .eq('quote_id', id)
+        .in('organization_id', organizations.map(org => org.id))
+        .single();
+
+      if (error) throw error;
+
+      if (quote) {
+        setFormData({
+          vendor_id: quote.vendor_id || '',
+          customer_id: quote.customer_id,
+          organization_id: quote.organization_id,
+          status: quote.status,
+          notes: quote.notes || '',
+          items: quote.items.map((item: any) => ({
+            item_name: item.item_name,
+            item_desc: item.item_desc,
+            quantity: item.quantity,
+            unit_price: item.unit_price
+          }))
+        });
+
+        if (quote.vendor) {
+          setSelectedVendor(quote.vendor);
+        }
+
+        if (quote.customer) {
+          setSelectedCustomer(quote.customer);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching quote:', err);
+      setError('Failed to load quote');
+    }
+  };
+
+  const fetchVendors = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('vendors')
+        .select(`
+          *,
+          customer:customers(
+            first_name,
+            last_name,
+            email,
+            company
+          )
+        `)
+        .in('organization_id', organizations.map(org => org.id))
+        .order('name');
+
+      if (error) throw error;
+      setVendors(data || []);
+    } catch (err) {
+      console.error('Error fetching accounts:', err);
+      setError('Failed to load accounts');
+    }
+  };
+
   const fetchCustomers = async () => {
     try {
       const { data, error } = await supabase
         .from('customers')
         .select('*')
+        .in('organization_id', organizations.map(org => org.id))
         .order('first_name');
 
       if (error) throw error;
@@ -157,6 +301,7 @@ export function QuoteForm() {
         .from('products')
         .select('*')
         .eq('status', 'active')
+        .in('organization_id', organizations.map(org => org.id))
         .order('name');
 
       if (error) throw error;
@@ -167,37 +312,28 @@ export function QuoteForm() {
     }
   };
 
-  const fetchQuote = async () => {
-    try {
-      const { data: quote, error } = await supabase
-        .from('quote_hdr')
-        .select(`
-          *,
-          items:quote_dtl(*),
-          customer:customers(*)
-        `)
-        .eq('quote_id', id)
-        .single();
+  const handleVendorSelect = (vendor: Vendor) => {
+    setSelectedVendor(vendor);
+    setFormData(prev => ({
+      ...prev,
+      vendor_id: vendor.id,
+      // If vendor has an associated customer, use that as default
+      customer_id: vendor.customer_id || prev.customer_id
+    }));
+    setVendorSearch('');
+    setShowVendorDropdown(false);
 
-      if (error) throw error;
-
-      if (quote) {
-        setFormData({
-          customer_id: quote.customer_id,
-          status: quote.status,
-          notes: quote.notes || '',
-          items: quote.items.map((item: any) => ({
-            item_name: item.item_name,
-            item_desc: item.item_desc,
-            quantity: item.quantity,
-            unit_price: item.unit_price
-          }))
-        });
-        setSelectedCustomer(quote.customer);
-      }
-    } catch (err) {
-      console.error('Error fetching quote:', err);
-      setError('Failed to load quote');
+    // If vendor has an associated customer, select it
+    if (vendor.customer) {
+      setSelectedCustomer({
+        customer_id: vendor.customer_id!,
+        first_name: vendor.customer.first_name,
+        last_name: vendor.customer.last_name,
+        email: vendor.customer.email,
+        company: vendor.customer.company,
+        phone: null, // We don't have this in the vendor's customer data
+        organization_id: vendor.organization_id
+      });
     }
   };
 
@@ -209,27 +345,49 @@ export function QuoteForm() {
   };
 
   const handleProductSelect = (product: Product) => {
-    setFormData(prev => ({
-      ...prev,
-      items: [
-        ...prev.items,
-        {
-          item_name: product.name,
-          item_desc: product.description || undefined,
-          quantity: 1,
-          unit_price: product.price
-        }
-      ]
-    }));
+    if (selectedProductIndex !== null) {
+      // Update existing item
+      setFormData(prev => ({
+        ...prev,
+        items: prev.items.map((item, index) => 
+          index === selectedProductIndex
+            ? {
+                item_name: product.name,
+                item_desc: product.description,
+                quantity: 1,
+                unit_price: product.last_purchase_cost || 0
+              }
+            : item
+        )
+      }));
+    } else {
+      // Add new item
+      setFormData(prev => ({
+        ...prev,
+        items: [
+          ...prev.items,
+          {
+            item_name: product.name,
+            item_desc: product.description,
+            quantity: 1,
+            unit_price: product.last_purchase_cost || 0
+          }
+        ]
+      }));
+    }
     setProductSearch('');
     setShowProductDropdown(false);
+    setSelectedProductIndex(null);
   };
 
   const handleCreateCustomer = async () => {
     try {
       const { data, error } = await supabase
         .from('customers')
-        .insert([customerForm])
+        .insert([{
+          ...customerForm,
+          organization_id: formData.organization_id
+        }])
         .select()
         .single();
 
@@ -243,39 +401,6 @@ export function QuoteForm() {
     } catch (err) {
       console.error('Error creating customer:', err);
       setError('Failed to create customer');
-    }
-  };
-
-  const handleStatusChange = async (newStatus: string) => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const { error: updateError } = await supabase
-        .from('quote_hdr')
-        .update({
-          status: newStatus,
-          updated_at: new Date().toISOString()
-        })
-        .eq('quote_id', id);
-
-      if (updateError) throw updateError;
-
-      // If status was changed to Approved, wait briefly then navigate to orders
-      if (newStatus === 'Approved') {
-        setTimeout(() => {
-          navigate('/admin/orders');
-        }, 1000);
-      } else {
-        await fetchQuote();
-      }
-    } catch (err) {
-      console.error('Error updating quote status:', err);
-      setError(err instanceof Error ? err.message : 'Failed to update quote status');
-      // Refresh quote data to get current status
-      await fetchQuote();
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -330,20 +455,28 @@ export function QuoteForm() {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error('Not authenticated');
 
+      // Verify organization access
+      if (!organizations.some(org => org.id === formData.organization_id)) {
+        throw new Error('You do not have permission to manage quotes for this organization');
+      }
+
       const quoteData = {
+        vendor_id: formData.vendor_id || null,
         customer_id: formData.customer_id,
+        organization_id: formData.organization_id,
         status: formData.status,
         notes: formData.notes,
         total_amount: formData.items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0),
         created_by: userData.user.id,
-        updated_at: new Date().toISOString()
+        updated_by: userData.user.id
       };
 
       if (id) {
         const { error: updateError } = await supabase
           .from('quote_hdr')
           .update(quoteData)
-          .eq('quote_id', id);
+          .eq('quote_id', id)
+          .eq('organization_id', formData.organization_id);
 
         if (updateError) throw updateError;
 
@@ -358,7 +491,8 @@ export function QuoteForm() {
           .from('quote_dtl')
           .insert(formData.items.map(item => ({
             quote_id: id,
-            ...item
+            ...item,
+            organization_id: formData.organization_id
           })));
 
         if (itemsError) throw itemsError;
@@ -375,7 +509,8 @@ export function QuoteForm() {
           .from('quote_dtl')
           .insert(formData.items.map(item => ({
             quote_id: quote.quote_id,
-            ...item
+            ...item,
+            organization_id: formData.organization_id
           })));
 
         if (itemsError) throw itemsError;
@@ -390,56 +525,13 @@ export function QuoteForm() {
     }
   };
 
-  const handleDuplicate = async () => {
-    try {
-      setError(null);
-      setLoading(true);
-      
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) throw new Error('Not authenticated');
-
-      // Create new quote header
-      const { data: newQuote, error: quoteError } = await supabase
-        .from('quote_hdr')
-        .insert([{
-          customer_id: formData.customer_id,
-          total_amount: formData.items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0),
-          notes: formData.notes,
-          status: 'Draft',
-          created_by: userData.user.id,
-          updated_by: userData.user.id
-        }])
-        .select()
-        .single();
-
-      if (quoteError) throw quoteError;
-
-      // Create new quote items
-      if (formData.items.length > 0) {
-        const { error: detailsError } = await supabase
-          .from('quote_dtl')
-          .insert(
-            formData.items.map(item => ({
-              quote_id: newQuote.quote_id,
-              item_name: item.item_name,
-              item_desc: item.item_desc,
-              quantity: item.quantity,
-              unit_price: item.unit_price
-            }))
-          );
-
-        if (detailsError) throw detailsError;
-      }
-
-      // Navigate to edit page of new quote
-      navigate(`/admin/quotes/${newQuote.quote_id}/edit`);
-    } catch (err) {
-      console.error('Error duplicating quote:', err);
-      setError(err instanceof Error ? err.message : 'Failed to duplicate quote');
-    } finally {
-      setLoading(false);
-    }
-  };
+  if (organizations.length === 0) {
+    return (
+      <div className="bg-yellow-50 text-yellow-800 p-4 rounded-lg">
+        You need to be part of an organization to manage quotes.
+      </div>
+    );
+  }
 
   return (
     <motion.div
@@ -448,25 +540,15 @@ export function QuoteForm() {
       className="bg-white rounded-lg shadow-md p-6"
     >
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">{id ? 'Edit Quote' : 'Create New Quote'}</h1>
-        <div className="flex items-center space-x-4">
-          {id && (
-            <button
-              onClick={handleDuplicate}
-              disabled={loading}
-              className="inline-flex items-center px-4 py-2 border border-primary-600 text-sm font-medium rounded-md text-primary-600 hover:bg-primary-50"
-            >
-              <Copy className="w-4 h-4 mr-2" />
-              Duplicate Quote
-            </button>
-          )}
-          <button
-            onClick={() => navigate('/admin/quotes')}
-            className="p-2 text-gray-500 hover:text-gray-700 rounded-full hover:bg-gray-100"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
+        <h1 className="text-2xl font-bold">
+          {id ? 'Edit Quote' : 'Create New Quote'}
+        </h1>
+        <button
+          onClick={() => navigate('/admin/quotes')}
+          className="p-2 text-gray-500 hover:text-gray-700 rounded-full hover:bg-gray-100"
+        >
+          <X className="w-6 h-6" />
+        </button>
       </div>
 
       {error && (
@@ -478,6 +560,116 @@ export function QuoteForm() {
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Organization
+            </label>
+            <select
+              value={formData.organization_id}
+              onChange={(e) => setFormData(prev => ({ ...prev, organization_id: e.target.value }))}
+              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+              required
+            >
+              <option value="">Select Organization</option>
+              {organizations.map(org => (
+                <option key={org.id} value={org.id}>
+                  {org.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div ref={vendorSearchRef} className="relative">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Account
+            </label>
+            {selectedVendor ? (
+              <div className="flex items-center justify-between p-2 border rounded-lg">
+                <div>
+                  <p className="font-medium">{selectedVendor.name}</p>
+                  <div className="text-sm text-gray-500">
+                    <span className="capitalize">{selectedVendor.type}</span>
+                    {selectedVendor.customer && (
+                      <span className="ml-2">
+                        • Contact: {selectedVendor.customer.first_name} {selectedVendor.customer.last_name}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedVendor(null);
+                    setFormData(prev => ({ ...prev, vendor_id: '' }));
+                  }}
+                  className="p-1 hover:bg-gray-100 rounded-full"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="text"
+                  value={vendorSearch}
+                  onChange={(e) => {
+                    setVendorSearch(e.target.value);
+                    setShowVendorDropdown(true);
+                    if (!vendors.length) {
+                      fetchVendors();
+                    }
+                  }}
+                  onFocus={() => {
+                    setShowVendorDropdown(true);
+                    if (!vendors.length) {
+                      fetchVendors();
+                    }
+                  }}
+                  placeholder="Search accounts..."
+                  className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                />
+              </div>
+            )}
+
+            <AnimatePresence>
+              {showVendorDropdown && vendorSearch && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="absolute z-10 w-full mt-1 bg-white rounded-lg shadow-lg border border-gray-200"
+                >
+                  {filteredVendors.length > 0 ? (
+                    <ul className="py-1 max-h-60 overflow-auto">
+                      {filteredVendors.map(vendor => (
+                        <li
+                          key={vendor.id}
+                          onClick={() => handleVendorSelect(vendor)}
+                          className="px-4 py-2 hover:bg-gray-50 cursor-pointer"
+                        >
+                          <div className="font-medium">{vendor.name}</div>
+                          <div className="text-sm text-gray-500">
+                            <span className="capitalize">{vendor.type}</span>
+                            {vendor.customer && (
+                              <span className="ml-2">
+                                • Contact: {vendor.customer.first_name} {vendor.customer.last_name}
+                              </span>
+                            )}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="p-4 text-gray-500">
+                      No accounts found
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
           <div ref={customerSearchRef} className="relative">
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Customer
@@ -508,8 +700,16 @@ export function QuoteForm() {
                   onChange={(e) => {
                     setCustomerSearch(e.target.value);
                     setShowCustomerDropdown(true);
+                    if (!customers.length) {
+                      fetchCustomers();
+                    }
                   }}
-                  onFocus={() => setShowCustomerDropdown(true)}
+                  onFocus={() => {
+                    setShowCustomerDropdown(true);
+                    if (!customers.length) {
+                      fetchCustomers();
+                    }
+                  }}
                   placeholder="Search customers..."
                   className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
                 />
@@ -517,7 +717,7 @@ export function QuoteForm() {
             )}
 
             <AnimatePresence>
-              {showCustomerDropdown && (customerSearch || filteredCustomers.length > 0) && (
+              {showCustomerDropdown && customerSearch && (
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -549,7 +749,7 @@ export function QuoteForm() {
                         onClick={() => setShowCustomerModal(true)}
                         className="inline-flex items-center text-primary-600 hover:text-primary-700"
                       >
-                        <UserPlus className="w-4 h-4 mr-2" />
+                        <Plus className="w-4 h-4 mr-2" />
                         Add New Customer
                       </button>
                     </div>
@@ -590,15 +790,23 @@ export function QuoteForm() {
                     onChange={(e) => {
                       setProductSearch(e.target.value);
                       setShowProductDropdown(true);
+                      if (!products.length) {
+                        fetchProducts();
+                      }
                     }}
-                    onFocus={() => setShowProductDropdown(true)}
+                    onFocus={() => {
+                      setShowProductDropdown(true);
+                      if (!products.length) {
+                        fetchProducts();
+                      }
+                    }}
                     placeholder="Search products..."
                     className="w-64 px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
                   />
                 </div>
 
                 <AnimatePresence>
-                  {showProductDropdown && (productSearch || filteredProducts.length > 0) && (
+                  {showProductDropdown && productSearch && (
                     <motion.div
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -613,24 +821,26 @@ export function QuoteForm() {
                               onClick={() => handleProductSelect(product)}
                               className="px-4 py-2 hover:bg-gray-50 cursor-pointer"
                             >
-                              <div className="font-medium">{product.name}</div>
-                              <div className="text-sm text-gray-500">
-                                ${product.price.toFixed(2)}
+                              <div className="flex items-center">
+                                {product.stock_unit === 'quantity' ? (
+                                  <Package className="w-4 h-4 text-gray-400 mr-2" />
+                                ) : (
+                                  <Scale className="w-4 h-4 text-gray-400 mr-2" />
+                                )}
+                                <div>
+                                  <div className="font-medium">{product.name}</div>
+                                  <div className="text-sm text-gray-500">
+                                    Last Cost: ${product.last_purchase_cost.toFixed(2)} |
+                                    {product.stock_unit === 'quantity' ? ' Units' : ` Weight (${product.weight_unit})`}
+                                  </div>
+                                </div>
                               </div>
                             </li>
                           ))}
                         </ul>
                       ) : (
-                        <div className="p-4">
-                          <p className="text-gray-500 mb-2">No products found</p>
-                          <button
-                            type="button"
-                            onClick={addCustomItem}
-                            className="inline-flex items-center text-primary-600 hover:text-primary-700"
-                          >
-                            <Plus className="w-4 h-4 mr-2" />
-                            Add Custom Item
-                          </button>
+                        <div className="p-4 text-gray-500">
+                          No products found
                         </div>
                       )}
                     </motion.div>
@@ -823,111 +1033,111 @@ export function QuoteForm() {
                 </div>
 
                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Phone
-                                    </label>
-                                    <input
-                                        type="tel"
-                                        value={customerForm.phone}
-                                        onChange={(e) => setCustomerForm(prev => ({ ...prev, phone: e.target.value }))}
-                                        className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-                                    />
-                                </div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Phone
+                  </label>
+                  <input
+                    type="tel"
+                    value={customerForm.phone}
+                    onChange={(e) => setCustomerForm(prev => ({ ...prev, phone: e.target.value }))}
+                    className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                  />
+                </div>
 
-                                <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Address Line 1
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={customerForm.address_line1}
-                                        onChange={(e) => setCustomerForm(prev => ({ ...prev, address_line1: e.target.value }))}
-                                        className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-                                    />
-                                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Address Line 1
+                  </label>
+                  <input
+                    type="text"
+                    value={customerForm.address_line1}
+                    onChange={(e) => setCustomerForm(prev => ({ ...prev, address_line1: e.target.value }))}
+                    className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                  />
+                </div>
 
-                                <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Address Line 2
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={customerForm.address_line2}
-                                        onChange={(e) => setCustomerForm(prev => ({ ...prev, address_line2: e.target.value }))}
-                                        className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-                                    />
-                                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Address Line 2
+                  </label>
+                  <input
+                    type="text"
+                    value={customerForm.address_line2}
+                    onChange={(e) => setCustomerForm(prev => ({ ...prev, address_line2: e.target.value }))}
+                    className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                  />
+                </div>
 
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        City
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={customerForm.city}
-                                        onChange={(e) => setCustomerForm(prev => ({ ...prev, city: e.target.value }))}
-                                        className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-                                    />
-                                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    City
+                  </label>
+                  <input
+                    type="text"
+                    value={customerForm.city}
+                    onChange={(e) => setCustomerForm(prev => ({ ...prev, city: e.target.value }))}
+                    className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                  />
+                </div>
 
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        State
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={customerForm.state}
-                                        onChange={(e) => setCustomerForm(prev => ({ ...prev, state: e.target.value }))}
-                                        className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-                                    />
-                                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    State
+                  </label>
+                  <input
+                    type="text"
+                    value={customerForm.state}
+                    onChange={(e) => setCustomerForm(prev => ({ ...prev, state: e.target.value }))}
+                    className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                  />
+                </div>
 
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        ZIP Code
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={customerForm.zip_code}
-                                        onChange={(e) => setCustomerForm(prev => ({ ...prev, zip_code: e.target.value }))}
-                                        className="w-full px-4 py-2 rounded-lg border border-gray -300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-                                    />
-                                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    ZIP Code
+                  </label>
+                  <input
+                    type="text"
+                    value={customerForm.zip_code}
+                    onChange={(e) => setCustomerForm(prev => ({ ...prev, zip_code: e.target.value }))}
+                    className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                  />
+                </div>
 
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Country
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={customerForm.country}
-                                        onChange={(e) => setCustomerForm(prev => ({ ...prev, country: e.target.value }))}
-                                        className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-                                    />
-                                </div>
-                            </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Country
+                  </label>
+                  <input
+                    type="text"
+                    value={customerForm.country}
+                    onChange={(e) => setCustomerForm(prev => ({ ...prev, country: e.target.value }))}
+                    className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                  />
+                </div>
+              </div>
 
-                            <div className="flex justify-end mt-6 space-x-4">
-                                <button
-                                    type="button"
-                                    onClick={() => setShowCustomerModal(false)}
-                                    className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={handleCreateCustomer}
-                                    className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 flex items-center"
-                                >
-                                    <Check className="w-4 h-4 mr-2" />
-                                    Create Customer
-                                </button>
-                            </div>
-                        </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
-        </motion.div>
-    );
+              <div className="flex justify-end mt-6 space-x-4">
+                <button
+                  type="button"
+                  onClick={() => setShowCustomerModal(false)}
+                  className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCreateCustomer}
+                  className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 flex items-center"
+                >
+                  <Check className="w-4 h-4 mr-2" />
+                  Create Customer
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
 }

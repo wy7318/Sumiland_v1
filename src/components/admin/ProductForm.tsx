@@ -4,12 +4,14 @@ import { motion } from 'framer-motion';
 import { Save, X, AlertCircle, Package, Scale } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { ImageUpload } from './ImageUpload';
+import { useAuth } from '../../contexts/AuthContext';
 import { cn } from '../../lib/utils';
 
 type Category = {
   id: string;
   name: string;
   category_type: string;
+  organization_id: string;
 };
 
 type ProductFormData = {
@@ -19,7 +21,6 @@ type ProductFormData = {
   category_id: string;
   status: 'active' | 'inactive';
   image_url: string;
-  // Inventory fields
   stock_unit: 'weight' | 'quantity';
   weight_unit: 'kg' | 'g' | 'lb' | 'oz' | null;
   min_stock_level: string;
@@ -30,6 +31,7 @@ type ProductFormData = {
 export function ProductForm() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const { organizations } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -40,7 +42,6 @@ export function ProductForm() {
     category_id: '',
     status: 'active',
     image_url: '',
-    // Initialize inventory fields
     stock_unit: 'quantity',
     weight_unit: null,
     min_stock_level: '0',
@@ -49,36 +50,18 @@ export function ProductForm() {
   });
 
   useEffect(() => {
-    checkSuperAdmin();
     fetchCategories();
     if (id) {
       fetchProduct();
     }
-  }, [id]);
-
-  const checkSuperAdmin = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      navigate('/login');
-      return;
-    }
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('is_super_admin')
-      .eq('id', user.id)
-      .single();
-
-    if (!profile?.is_super_admin) {
-      navigate('/admin');
-    }
-  };
+  }, [id, organizations]);
 
   const fetchCategories = async () => {
     try {
       const { data, error } = await supabase
         .from('product_categories')
         .select('*')
+        .in('organization_id', organizations.map(org => org.id))
         .order('name');
 
       if (error) throw error;
@@ -95,6 +78,7 @@ export function ProductForm() {
         .from('products')
         .select('*')
         .eq('id', id)
+        .in('organization_id', organizations.map(org => org.id))
         .single();
 
       if (error) throw error;
@@ -115,7 +99,8 @@ export function ProductForm() {
       }
     } catch (err) {
       console.error('Error fetching product:', err);
-      setError('Failed to load product');
+      setError('Failed to load product or you do not have access');
+      navigate('/admin/products');
     }
   };
 
@@ -125,6 +110,25 @@ export function ProductForm() {
     setError(null);
 
     try {
+      // Use the first organization if creating new product
+      const organizationId = id 
+        ? (await supabase
+            .from('products')
+            .select('organization_id')
+            .eq('id', id)
+            .single()
+          ).data?.organization_id
+        : organizations[0]?.id;
+
+      if (!organizationId) {
+        throw new Error('No valid organization found');
+      }
+
+      // Verify organization access
+      if (!organizations.some(org => org.id === organizationId)) {
+        throw new Error('You do not have permission to manage this product');
+      }
+
       const productData = {
         name: formData.name,
         description: formData.description || null,
@@ -137,6 +141,7 @@ export function ProductForm() {
         min_stock_level: parseFloat(formData.min_stock_level) || 0,
         max_stock_level: formData.max_stock_level ? parseFloat(formData.max_stock_level) : null,
         avg_cost: parseFloat(formData.avg_cost) || 0,
+        organization_id: organizationId
       };
 
       if (id) {
@@ -146,7 +151,8 @@ export function ProductForm() {
             ...productData,
             updated_at: new Date().toISOString(),
           })
-          .eq('id', id);
+          .eq('id', id)
+          .eq('organization_id', organizationId);
 
         if (updateError) throw updateError;
       } else {
