@@ -4,9 +4,11 @@ import { motion } from 'framer-motion';
 import { Save, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { ImageUpload } from './ImageUpload';
+import { useAuth } from '../../contexts/AuthContext';
 
 export function NewPortfolioPage() {
   const navigate = useNavigate();
+  const { organizations } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -26,11 +28,16 @@ export function NewPortfolioPage() {
     setError(null);
 
     try {
+      // Get the first organization (you might want to add organization selection)
+      const organizationId = organizations[0]?.id;
+      if (!organizationId) throw new Error('No organization available');
+
       const { error: insertError } = await supabase
         .from('portfolio_items')
         .insert([
           {
             ...formData,
+            organization_id: organizationId,
             published: false,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
@@ -45,6 +52,14 @@ export function NewPortfolioPage() {
       setLoading(false);
     }
   };
+
+  if (organizations.length === 0) {
+    return (
+      <div className="bg-yellow-50 text-yellow-800 p-4 rounded-lg">
+        You need to be part of an organization to create portfolio items.
+      </div>
+    );
+  }
 
   return (
     <motion.div

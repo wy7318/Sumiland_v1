@@ -4,8 +4,10 @@ import {
   Plus, Search, Download, Edit, Trash2, ChevronDown, ChevronUp, 
   Check, X, FileSpreadsheet, AlertCircle 
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
+import { cn } from '../../lib/utils';
 
 type Customer = {
   customer_id: string;
@@ -19,48 +21,25 @@ type Customer = {
   state: string;
   zip_code: string;
   country: string;
+  company: string | null;
+  organization_id: string;
   created_at: string;
   updated_at: string;
 };
 
-type SortConfig = {
-  key: keyof Customer;
-  direction: 'asc' | 'desc';
-};
-
 export function CustomersPage() {
-  const navigate = useNavigate();
+  const { organizations } = useAuth();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'created_at', direction: 'desc' });
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
 
   useEffect(() => {
-    checkSuperAdmin();
     fetchCustomers();
-  }, []);
-
-  const checkSuperAdmin = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      navigate('/');
-      return;
-    }
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('is_super_admin')
-      .eq('id', user.id)
-      .single();
-
-    if (!profile?.is_super_admin) {
-      navigate('/');
-    }
-  };
+  }, [organizations]);
 
   const fetchCustomers = async () => {
     try {
@@ -68,59 +47,40 @@ export function CustomersPage() {
       const { data, error } = await supabase
         .from('customers')
         .select('*')
+        .in('organization_id', organizations.map(org => org.id))
         .order('created_at', { ascending: false });
 
       if (error) throw error;
       setCustomers(data || []);
     } catch (err) {
+      console.error('Error fetching customers:', err);
       setError(err instanceof Error ? err.message : 'Failed to load customers');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSort = (key: keyof Customer) => {
-    setSortConfig(current => ({
-      key,
-      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc'
-    }));
-  };
-
-  const sortedCustomers = [...customers].sort((a, b) => {
-    if (a[sortConfig.key] < b[sortConfig.key]) return sortConfig.direction === 'asc' ? -1 : 1;
-    if (a[sortConfig.key] > b[sortConfig.key]) return sortConfig.direction === 'asc' ? 1 : -1;
-    return 0;
-  });
-
-  const filteredCustomers = sortedCustomers.filter(customer => {
-    const searchString = searchTerm.toLowerCase();
-    return (
-      customer.first_name.toLowerCase().includes(searchString) ||
-      customer.last_name.toLowerCase().includes(searchString) ||
-      customer.email.toLowerCase().includes(searchString) ||
-      customer.phone?.toLowerCase().includes(searchString) ||
-      customer.city.toLowerCase().includes(searchString)
-    );
-  });
-
-  const paginatedCustomers = filteredCustomers.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
-
-  const totalPages = Math.ceil(filteredCustomers.length / itemsPerPage);
-
   const handleDelete = async (customerId: string) => {
     try {
+      const customerToDelete = customers.find(c => c.customer_id === customerId);
+      if (!customerToDelete) return;
+
+      // Verify organization access
+      if (!organizations.some(org => org.id === customerToDelete.organization_id)) {
+        throw new Error('You do not have permission to delete this customer');
+      }
+
       const { error } = await supabase
         .from('customers')
         .delete()
-        .eq('customer_id', customerId);
+        .eq('customer_id', customerId)
+        .eq('organization_id', customerToDelete.organization_id);
 
       if (error) throw error;
       await fetchCustomers();
       setShowDeleteConfirm(null);
     } catch (err) {
+      console.error('Error deleting customer:', err);
       setError(err instanceof Error ? err.message : 'Failed to delete customer');
     }
   };
@@ -131,6 +91,7 @@ export function CustomersPage() {
       'Last Name',
       'Email',
       'Phone',
+      'Company',
       'Address',
       'City',
       'State',
@@ -139,16 +100,17 @@ export function CustomersPage() {
       'Created At'
     ].join(',');
 
-    const csvData = filteredCustomers.map(customer => [
+    const csvData = customers.map(customer => [
       customer.first_name,
       customer.last_name,
       customer.email,
       customer.phone || '',
-      `${customer.address_line1} ${customer.address_line2 || ''}`,
-      customer.city,
-      customer.state,
-      customer.zip_code,
-      customer.country,
+      customer.company || '',
+      `${customer.address_line1 || ''} ${customer.address_line2 || ''}`,
+      customer.city || '',
+      customer.state || '',
+      customer.zip_code || '',
+      customer.country || '',
       new Date(customer.created_at).toLocaleDateString()
     ].join(',')).join('\n');
 
@@ -163,6 +125,24 @@ export function CustomersPage() {
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
   };
+
+  const filteredCustomers = customers.filter(customer => {
+    const searchString = searchTerm.toLowerCase();
+    return (
+      customer.first_name.toLowerCase().includes(searchString) ||
+      customer.last_name.toLowerCase().includes(searchString) ||
+      customer.email.toLowerCase().includes(searchString) ||
+      customer.company?.toLowerCase().includes(searchString) ||
+      customer.phone?.toLowerCase().includes(searchString)
+    );
+  });
+
+  const paginatedCustomers = filteredCustomers.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  const totalPages = Math.ceil(filteredCustomers.length / itemsPerPage);
 
   if (loading) {
     return (
@@ -184,13 +164,13 @@ export function CustomersPage() {
             <FileSpreadsheet className="w-4 h-4 mr-2" />
             Export CSV
           </button>
-          <button
-            onClick={() => navigate('/admin/customers/new')}
+          <Link
+            to="/admin/customers/new"
             className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
           >
             <Plus className="w-4 h-4 mr-2" />
             Add Customer
-          </button>
+          </Link>
         </div>
       </div>
 
@@ -203,16 +183,18 @@ export function CustomersPage() {
 
       <div className="bg-white shadow rounded-lg">
         <div className="p-4 border-b border-gray-200">
-          <div className="flex items-center">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input
-                type="text"
-                placeholder="Search customers..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-              />
+          <div className="flex flex-wrap gap-4">
+            <div className="flex-1 min-w-[300px]">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="text"
+                  placeholder="Search customers..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -221,28 +203,21 @@ export function CustomersPage() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                {[
-                  { key: 'first_name', label: 'Name' },
-                  { key: 'email', label: 'Email' },
-                  { key: 'phone', label: 'Phone' },
-                  { key: 'city', label: 'Location' },
-                  { key: 'created_at', label: 'Created' }
-                ].map(({ key, label }) => (
-                  <th
-                    key={key}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                    onClick={() => handleSort(key as keyof Customer)}
-                  >
-                    <div className="flex items-center space-x-1">
-                      <span>{label}</span>
-                      {sortConfig.key === key && (
-                        sortConfig.direction === 'asc' ? 
-                          <ChevronUp className="w-4 h-4" /> : 
-                          <ChevronDown className="w-4 h-4" />
-                      )}
-                    </div>
-                  </th>
-                ))}
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Name
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Contact
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Company
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Location
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Created
+                </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
                 </th>
@@ -258,28 +233,31 @@ export function CustomersPage() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-500">{customer.email}</div>
+                    {customer.phone && (
+                      <div className="text-sm text-gray-500">{customer.phone}</div>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-500">{customer.phone || '-'}</div>
+                    <div className="text-sm text-gray-900">
+                      {customer.company || '-'}
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-500">
                       {customer.city}, {customer.state}
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-500">
-                      {new Date(customer.created_at).toLocaleDateString()}
-                    </div>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {new Date(customer.created_at).toLocaleDateString()}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex justify-end space-x-2">
-                      <button
-                        onClick={() => navigate(`/admin/customers/${customer.customer_id}/edit`)}
+                      <Link
+                        to={`/admin/customers/${customer.customer_id}/edit`}
                         className="text-blue-600 hover:text-blue-900"
                       >
                         <Edit className="w-5 h-5" />
-                      </button>
+                      </Link>
                       {showDeleteConfirm === customer.customer_id ? (
                         <div className="flex items-center space-x-2">
                           <button
@@ -376,11 +354,12 @@ export function CustomersPage() {
                           <button
                             key={page}
                             onClick={() => setCurrentPage(page)}
-                            className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                            className={cn(
+                              "relative inline-flex items-center px-4 py-2 border text-sm font-medium",
                               currentPage === page
-                                ? 'z-10 bg-primary-50 border-primary-500 text-primary-600'
-                                : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
-                            }`}
+                                ? "z-10 bg-primary-50 border-primary-500 text-primary-600"
+                                : "bg-white border-gray-300 text-gray-500 hover:bg-gray-50"
+                            )}
                           >
                             {page}
                           </button>
@@ -390,11 +369,12 @@ export function CustomersPage() {
                         <button
                           key={page}
                           onClick={() => setCurrentPage(page)}
-                          className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                          className={cn(
+                            "relative inline-flex items-center px-4 py-2 border text-sm font-medium",
                             currentPage === page
-                              ? 'z-10 bg-primary-50 border-primary-500 text-primary-600'
-                              : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
-                          }`}
+                              ? "z-10 bg-primary-50 border-primary-500 text-primary-600"
+                              : "bg-white border-gray-300 text-gray-500 hover:bg-gray-50"
+                          )}
                         >
                           {page}
                         </button>

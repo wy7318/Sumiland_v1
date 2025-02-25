@@ -4,10 +4,12 @@ import { motion } from 'framer-motion';
 import { 
   FileText, Image, LogOut, Users, Package, Tag, Quote, MessageSquare, 
   LayoutDashboard, ChevronLeft, ChevronRight, Settings, ShoppingBag, 
-  Building2, Truck, ClipboardList, BoxSelect as BoxSeam, UserCog, Home 
+  Building2, Truck, ClipboardList, BoxSelect as BoxSeam, UserCog, Home,
+  UserPlus
 } from 'lucide-react';
 import { getCurrentUser, signOut } from '../../lib/auth';
 import { cn } from '../../lib/utils';
+import { useAuth } from '../../contexts/AuthContext';
 
 export function AdminLayout() {
   const navigate = useNavigate();
@@ -15,6 +17,7 @@ export function AdminLayout() {
   const [loading, setLoading] = useState(true);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [isExpanded, setIsExpanded] = useState(true);
+  const { organizations } = useAuth();
 
   useEffect(() => {
     checkAuth();
@@ -39,6 +42,11 @@ export function AdminLayout() {
     return location.pathname.startsWith(path);
   };
 
+  // Check if user has admin or owner role in any organization
+  const hasAdminAccess = organizations.some(org => 
+    org.role === 'admin' || org.role === 'owner'
+  );
+
   const menuItems = [
     { path: '/admin', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/admin/posts', icon: FileText, label: 'Blog Posts' },
@@ -49,12 +57,16 @@ export function AdminLayout() {
     { path: '/admin/purchase-orders', icon: Truck, label: 'Purchase Orders' },
     { path: '/admin/work-orders', icon: ClipboardList, label: 'Work Orders' },
     { path: '/admin/inventory', icon: BoxSeam, label: 'Inventory' },
+    // Only show Customers menu for admin/owner roles
+    ...(hasAdminAccess ? [
+      { path: '/admin/customers', icon: Users, label: 'Customers' }
+    ] : []),
     ...(isSuperAdmin ? [
       { path: '/admin/products', icon: Package, label: 'Products' },
       { path: '/admin/categories', icon: Tag, label: 'Categories' },
-      { path: '/admin/customers', icon: Users, label: 'Customers' },
       { path: '/admin/vendors', icon: Building2, label: 'Vendors' },
-      { path: '/admin/user-organizations', icon: UserCog, label: 'User & Org Management' }
+      { path: '/admin/user-organizations', icon: UserCog, label: 'User & Org Management' },
+      { path: '/admin/users', icon: UserPlus, label: 'User Management' }
     ] : [])
   ];
 

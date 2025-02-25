@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Save, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { ImageUpload } from './ImageUpload';
+import { useAuth } from '../../contexts/AuthContext';
 import type { Database } from '../../lib/database.types';
 
 type PortfolioItem = Database['public']['Tables']['portfolio_items']['Row'];
@@ -11,6 +12,7 @@ type PortfolioItem = Database['public']['Tables']['portfolio_items']['Row'];
 export function EditPortfolioPage() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const { organizations } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<PortfolioItem>>({
@@ -18,11 +20,12 @@ export function EditPortfolioPage() {
     description: '',
     category: '',
     image_url: '',
+    organization_id: '',
   });
 
   useEffect(() => {
     fetchPortfolioItem();
-  }, [id]);
+  }, [id, organizations]);
 
   const fetchPortfolioItem = async () => {
     if (!id) return;
@@ -32,6 +35,7 @@ export function EditPortfolioPage() {
         .from('portfolio_items')
         .select('*')
         .eq('id', id)
+        .in('organization_id', organizations.map(org => org.id))
         .single();
 
       if (error) throw error;
@@ -41,6 +45,7 @@ export function EditPortfolioPage() {
           description: item.description,
           category: item.category,
           image_url: item.image_url,
+          organization_id: item.organization_id,
         });
       }
     } catch (err) {
@@ -55,7 +60,13 @@ export function EditPortfolioPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!id) return;
+    if (!id || !formData.organization_id) return;
+
+    // Verify organization access
+    if (!organizations.some(org => org.id === formData.organization_id)) {
+      setError('You do not have permission to edit this item');
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -67,7 +78,8 @@ export function EditPortfolioPage() {
           ...formData,
           updated_at: new Date().toISOString()
         })
-        .eq('id', id);
+        .eq('id', id)
+        .eq('organization_id', formData.organization_id);
 
       if (updateError) throw updateError;
       navigate('/admin/portfolio');
@@ -77,6 +89,14 @@ export function EditPortfolioPage() {
       setLoading(false);
     }
   };
+
+  if (!formData.organization_id || !organizations.some(org => org.id === formData.organization_id)) {
+    return (
+      <div className="bg-red-50 text-red-600 p-4 rounded-lg">
+        You do not have permission to edit this item.
+      </div>
+    );
+  }
 
   return (
     <motion.div

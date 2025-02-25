@@ -3,18 +3,24 @@ import { motion } from 'framer-motion';
 import { Plus, Edit, Trash2, Eye, EyeOff } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 import type { Database } from '../../lib/database.types';
 
 type PortfolioItem = Database['public']['Tables']['portfolio_items']['Row'];
 
 export function PortfolioPage() {
+  const { organizations } = useAuth();
   const [items, setItems] = useState<PortfolioItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchItems();
-  }, []);
+    if (organizations.length > 0) {
+      fetchItems();
+    } else {
+      setLoading(false);
+    }
+  }, [organizations]);
 
   const fetchItems = async () => {
     try {
@@ -22,6 +28,7 @@ export function PortfolioPage() {
       const { data, error } = await supabase
         .from('portfolio_items')
         .select('*')
+        .in('organization_id', organizations.map(org => org.id))
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -35,31 +42,48 @@ export function PortfolioPage() {
 
   const togglePublished = async (item: PortfolioItem) => {
     try {
+      // Verify organization access
+      if (!organizations.some(org => org.id === item.organization_id)) {
+        throw new Error('You do not have permission to modify this item');
+      }
+
       const { error } = await supabase
         .from('portfolio_items')
-        .update({ published: !item.published })
-        .eq('id', item.id);
+        .update({ 
+          published: !item.published,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', item.id)
+        .eq('organization_id', item.organization_id);
 
       if (error) throw error;
       await fetchItems();
     } catch (err) {
       console.error('Error toggling item status:', err);
+      setError(err instanceof Error ? err.message : 'Failed to update item status');
     }
   };
 
-  const deleteItem = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this item?')) return;
-
+  const deleteItem = async (id: string, organizationId: string) => {
     try {
+      // Verify organization access
+      if (!organizations.some(org => org.id === organizationId)) {
+        throw new Error('You do not have permission to delete this item');
+      }
+
+      if (!window.confirm('Are you sure you want to delete this item?')) return;
+
       const { error } = await supabase
         .from('portfolio_items')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .eq('organization_id', organizationId);
 
       if (error) throw error;
       await fetchItems();
     } catch (err) {
       console.error('Error deleting item:', err);
+      setError(err instanceof Error ? err.message : 'Failed to delete item');
     }
   };
 
@@ -73,8 +97,16 @@ export function PortfolioPage() {
 
   if (error) {
     return (
-      <div className="text-red-500 text-center">
-        Error loading portfolio items: {error}
+      <div className="bg-red-50 text-red-600 p-4 rounded-lg">
+        {error}
+      </div>
+    );
+  }
+
+  if (organizations.length === 0) {
+    return (
+      <div className="bg-yellow-50 text-yellow-800 p-4 rounded-lg">
+        You need to be part of an organization to manage portfolio items.
       </div>
     );
   }
@@ -128,7 +160,7 @@ export function PortfolioPage() {
                   <Edit className="w-5 h-5" />
                 </Link>
                 <button
-                  onClick={() => deleteItem(item.id)}
+                  onClick={() => deleteItem(item.id, item.organization_id)}
                   className="p-2 text-red-600 hover:bg-red-50 rounded-full"
                 >
                   <Trash2 className="w-5 h-5" />

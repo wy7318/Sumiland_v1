@@ -5,9 +5,11 @@ import { Save, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { getCurrentUser } from '../../lib/auth';
 import { ImageUpload } from './ImageUpload';
+import { useAuth } from '../../contexts/AuthContext';
 
 export function NewPostPage() {
   const navigate = useNavigate();
+  const { organizations } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -30,6 +32,10 @@ export function NewPostPage() {
       const userData = await getCurrentUser();
       if (!userData?.user) throw new Error('Not authenticated');
 
+      // Get the first organization (you might want to add organization selection)
+      const organizationId = organizations[0]?.id;
+      if (!organizationId) throw new Error('No organization available');
+
       // First check if user has an author record
       const { data: authorData } = await supabase
         .from('authors')
@@ -46,6 +52,7 @@ export function NewPostPage() {
               id: userData.user.id,
               name: userData.profile?.name || 'Anonymous',
               email: userData.user.email || '',
+              organization_id: organizationId,
               created_at: new Date().toISOString()
             }
           ]);
@@ -63,6 +70,7 @@ export function NewPostPage() {
             excerpt: formData.excerpt,
             featured_image: formData.featured_image,
             author_id: userData.user.id,
+            organization_id: organizationId,
             published: false
           }
         ]);
@@ -76,6 +84,14 @@ export function NewPostPage() {
       setLoading(false);
     }
   };
+
+  if (organizations.length === 0) {
+    return (
+      <div className="bg-yellow-50 text-yellow-800 p-4 rounded-lg">
+        You need to be part of an organization to create posts.
+      </div>
+    );
+  }
 
   return (
     <motion.div
