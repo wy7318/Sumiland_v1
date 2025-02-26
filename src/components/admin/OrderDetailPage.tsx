@@ -1,53 +1,73 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  ArrowLeft, User, Building2, Mail, Phone, Calendar,
-  FileText, Edit, Clock, CheckCircle, AlertCircle,
-  DollarSign, Percent, Save, FileText as Quote
+  ArrowLeft, Building2, Mail, Phone, Calendar,
+  Edit, AlertCircle, FileText, DollarSign, User,
+  CheckCircle, X
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { cn, formatCurrency } from '../../lib/utils';
+import { AccountDetailsModal } from './AccountDetailsModal';
 
 type Order = {
   order_id: string;
   order_number: string;
   customer_id: string;
+  vendor_id: string | null;
   quote_id: string | null;
   quote_number: string | null;
   status: 'New' | 'In Progress' | 'In Review' | 'Completed' | 'Cancelled';
   payment_status: 'Pending' | 'Partial Received' | 'Fully Received';
   payment_amount: number;
-  payment_percent: number;
   total_amount: number;
   notes: string | null;
   created_at: string;
+  vendor: {
+    id: string;
+    name: string;
+    type: string;
+    status: string;
+    payment_terms: string | null;
+    customer: {
+      first_name: string;
+      last_name: string;
+      email: string;
+      phone: string | null;
+      company: string | null;
+    } | null;
+    shipping_address_line1: string | null;
+    shipping_address_line2: string | null;
+    shipping_city: string | null;
+    shipping_state: string | null;
+    shipping_country: string | null;
+    billing_address_line1: string | null;
+    billing_address_line2: string | null;
+    billing_city: string | null;
+    billing_state: string | null;
+    billing_country: string | null;
+  } | null;
   customer: {
     first_name: string;
     last_name: string;
     email: string;
-    company: string | null;
     phone: string | null;
+    company: string | null;
   };
   items: {
-    order_dtl_id: string;
+    id: string;
     product_id: string | null;
     quantity: number;
     unit_price: number;
     subtotal: number;
     notes: string | null;
+    item_name: string | null;
+    item_desc: string | null;
+    product: {
+      name: string;
+      description: string;
+    } | null;
   }[];
-  quote?: {
-    quote_number: string;
-  };
-};
-
-const STATUS_COLORS = {
-  'New': 'bg-blue-100 text-blue-800',
-  'In Progress': 'bg-yellow-100 text-yellow-800',
-  'In Review': 'bg-purple-100 text-purple-800',
-  'Completed': 'bg-green-100 text-green-800',
-  'Cancelled': 'bg-red-100 text-red-800'
 };
 
 const PAYMENT_STATUS_COLORS = {
@@ -62,9 +82,7 @@ export function OrderDetailPage() {
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [paymentAmount, setPaymentAmount] = useState<number>(0);
-  const [paymentPercent, setPaymentPercent] = useState<number>(0);
-  const [isUpdatingPayment, setIsUpdatingPayment] = useState(false);
+  const [showAccountModal, setShowAccountModal] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -72,118 +90,108 @@ export function OrderDetailPage() {
     }
   }, [id]);
 
-  useEffect(() => {
-    if (order) {
-      setPaymentAmount(order.payment_amount);
-      setPaymentPercent(order.payment_percent || 0);
-    }
-  }, [order]);
-
   const fetchOrder = async () => {
     try {
       if (!id) return;
 
-      const { data: orderData, error } = await supabase
+      // Get the order with quote information
+      const { data: orderData, error: orderError } = await supabase
         .from('order_hdr')
         .select(`
           *,
-          customer:customers(*),
-          items:order_dtl(*),
-          quote:quote_hdr(quote_number)
+          vendor:vendors(
+            id,
+            name,
+            type,
+            status,
+            payment_terms,
+            customer:customers(
+              first_name,
+              last_name,
+              email,
+              phone,
+              company
+            ),
+            shipping_address_line1,
+            shipping_address_line2,
+            shipping_city,
+            shipping_state,
+            shipping_country,
+            billing_address_line1,
+            billing_address_line2,
+            billing_city,
+            billing_state,
+            billing_country
+          ),
+          customer:customers(*)
         `)
         .eq('order_id', id)
         .single();
 
-      if (error) throw error;
+      if (orderError) throw orderError;
 
-      // Transform the data to include quote_number directly in the order object
-      const transformedOrder = {
+      // If there's a quote_id, get the quote details and number
+      let quoteDetails = null;
+      let quoteNumber = null;
+      if (orderData.quote_id) {
+        // Get quote header for the quote number
+        const { data: quoteHeader, error: quoteHeaderError } = await supabase
+          .from('quote_hdr')
+          .select('quote_number')
+          .eq('quote_id', orderData.quote_id)
+          .single();
+
+        if (quoteHeaderError) throw quoteHeaderError;
+        quoteNumber = quoteHeader.quote_number;
+
+        // Get quote details
+        const { data: quoteData, error: quoteError } = await supabase
+          .from('quote_dtl')
+          .select('*')
+          .eq('quote_id', orderData.quote_id);
+
+        if (quoteError) throw quoteError;
+        quoteDetails = quoteData;
+      }
+
+      // Get order details
+      const { data: itemsData, error: itemsError } = await supabase
+        .from('order_dtl')
+        .select(`
+          *,
+          product:products(
+            name,
+            description
+          )
+        `)
+        .eq('order_id', id);
+
+      if (itemsError) throw itemsError;
+
+      // Combine order details with quote details
+      const items = itemsData.map((item: any, index: number) => {
+        // If this item came from a quote, find the matching quote detail
+        const quoteItem = quoteDetails?.[index]; // Match by index since they should be in same order
+
+        return {
+          ...item,
+          item_name: quoteItem?.item_name || item.notes,
+          item_desc: quoteItem?.item_desc || null,
+          unit_price: quoteItem?.unit_price || item.unit_price // Use quote's unit price if available
+        };
+      });
+
+      setOrder({
         ...orderData,
-        quote_number: orderData.quote?.quote_number || null
-      };
-
-      setOrder(transformedOrder);
+        quote_number: quoteNumber,
+        items
+      });
     } catch (err) {
       console.error('Error fetching order:', err);
       setError(err instanceof Error ? err.message : 'Failed to load order');
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleStatusChange = async (newStatus: Order['status']) => {
-    try {
-      if (!id) return;
-
-      const { error } = await supabase
-        .from('order_hdr')
-        .update({ 
-          status: newStatus,
-          updated_at: new Date().toISOString()
-        })
-        .eq('order_id', id);
-
-      if (error) {
-        // Check for the specific validation error message
-        if (error.message.includes('Order cannot be completed until payment is fully received')) {
-          throw new Error('Order cannot be completed until payment is fully received');
-        }
-        throw error;
-      }
-      
-      await fetchOrder();
-    } catch (err) {
-      console.error('Error updating status:', err);
-      setError(err instanceof Error ? err.message : 'Failed to update status');
-    }
-  };
-
-  const handlePaymentUpdate = async () => {
-    try {
-      if (!id || !order) return;
-      setIsUpdatingPayment(true);
-      setError(null);
-
-      const { error } = await supabase
-        .from('order_hdr')
-        .update({ 
-          payment_amount: paymentAmount,
-          updated_at: new Date().toISOString()
-        })
-        .eq('order_id', id);
-
-      if (error) throw error;
-      await fetchOrder();
-    } catch (err) {
-      console.error('Error updating payment:', err);
-      setError(err instanceof Error ? err.message : 'Failed to update payment');
-    } finally {
-      setIsUpdatingPayment(false);
-    }
-  };
-
-  const handlePaymentPercentChange = (percent: number) => {
-    if (!order) return;
-    
-    // Validate percent is between 0 and 100
-    const validPercent = Math.max(0, Math.min(100, percent));
-    setPaymentPercent(validPercent);
-
-    // Calculate new payment amount based on percentage
-    const newAmount = (validPercent / 100) * order.total_amount;
-    setPaymentAmount(newAmount);
-  };
-
-  const handlePaymentAmountChange = (amount: number) => {
-    if (!order) return;
-    
-    // Validate amount is between 0 and total
-    const validAmount = Math.max(0, Math.min(order.total_amount, amount));
-    setPaymentAmount(validAmount);
-    
-    // Calculate and update percentage
-    const newPercent = (validAmount / order.total_amount) * 100;
-    setPaymentPercent(newPercent);
   };
 
   if (loading) {
@@ -205,13 +213,6 @@ export function OrderDetailPage() {
 
   return (
     <div className="space-y-6">
-      {error && (
-        <div className="bg-red-50 text-red-600 p-4 rounded-lg flex items-center">
-          <AlertCircle className="w-5 h-5 mr-2" />
-          {error}
-        </div>
-      )}
-
       <div className="flex items-center justify-between">
         <button
           onClick={() => navigate('/admin/orders')}
@@ -222,131 +223,112 @@ export function OrderDetailPage() {
         </button>
         <Link
           to={`/admin/orders/${id}/edit`}
-          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
+          className={cn(
+            "inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700",
+            (order.status === 'Completed' || order.status === 'Cancelled') && "opacity-50 cursor-not-allowed pointer-events-none"
+          )}
         >
           <Edit className="w-4 h-4 mr-2" />
           Edit Order
         </Link>
       </div>
 
+      {error && (
+        <div className="bg-red-50 text-red-600 p-4 rounded-lg flex items-center">
+          <AlertCircle className="w-5 h-5 mr-2" />
+          {error}
+        </div>
+      )}
+
       <div className="bg-white shadow rounded-lg overflow-hidden">
         <div className="p-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
             <div>
-              <h1 className="text-2xl font-bold mb-2">{order.order_number}</h1>
+              <div className="flex items-center gap-4 mb-2">
+                <h1 className="text-2xl font-bold">{order.order_number}</h1>
+                {order.quote_id && order.quote_number && (
+                  <Link
+                    to={`/admin/quotes/${order.quote_id}/edit`}
+                    className="inline-flex items-center text-sm text-primary-600 hover:text-primary-700"
+                  >
+                    <FileText className="w-4 h-4 mr-1" />
+                    From Quote: {order.quote_number}
+                  </Link>
+                )}
+              </div>
               <div className="flex items-center gap-4 text-sm text-gray-500">
                 <span className="flex items-center">
                   <Calendar className="w-4 h-4 mr-1" />
                   {new Date(order.created_at).toLocaleDateString()}
                 </span>
-                <span className="flex items-center">
-                  <Clock className="w-4 h-4 mr-1" />
-                  {new Date(order.created_at).toLocaleTimeString()}
+                <span className={cn(
+                  "px-2 py-1 rounded-full text-xs font-medium",
+                  PAYMENT_STATUS_COLORS[order.payment_status]
+                )}>
+                  {order.payment_status}
                 </span>
-                {order.quote_id && order.quote_number && (
-                  <Link 
-                    to={`/admin/quotes/${order.quote_id}/edit`}
-                    className="flex items-center text-primary-600 hover:text-primary-700 transition-colors"
-                  >
-                    <Quote className="w-4 h-4 mr-1" />
-                    Quote: {order.quote_number}
-                  </Link>
-                )}
               </div>
-            </div>
-            <div className="mt-4 md:mt-0">
-              <select
-                value={order.status}
-                onChange={(e) => handleStatusChange(e.target.value as Order['status'])}
-                className={cn(
-                  "px-3 py-1 rounded-full text-sm font-medium border-2",
-                  STATUS_COLORS[order.status]
-                )}
-              >
-                <option value="New">New</option>
-                <option value="In Progress">In Progress</option>
-                <option value="In Review">In Review</option>
-                <option value="Completed">Completed</option>
-                <option value="Cancelled">Cancelled</option>
-              </select>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div>
-              <h2 className="text-lg font-semibold mb-4">Order Details</h2>
-              <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-                <div>
-                  <div className="text-sm font-medium text-gray-500 mb-1">Status</div>
-                  <span className={cn(
-                    "px-2 inline-flex text-xs leading-5 font-semibold rounded-full",
-                    STATUS_COLORS[order.status]
-                  )}>
-                    {order.status}
-                  </span>
-                </div>
-                <div>
-                  <div className="text-sm font-medium text-gray-500 mb-1">Payment Status</div>
-                  <div className="flex items-center gap-4">
-                    <span className={cn(
-                      "px-2 inline-flex text-xs leading-5 font-semibold rounded-full",
-                      PAYMENT_STATUS_COLORS[order.payment_status]
-                    )}>
-                      {order.payment_status}
-                    </span>
-                  </div>
-                </div>
-                <div>
-                  <div className="text-sm font-medium text-gray-500 mb-1">Payment Details</div>
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <div className="relative flex-1">
-                        <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                        <input
-                          type="number"
-                          value={paymentAmount}
-                          onChange={(e) => handlePaymentAmountChange(parseFloat(e.target.value))}
-                          min="0"
-                          max={order.total_amount}
-                          step="0.01"
-                          className="w-full pl-9 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-                        />
+            {/* Account Information */}
+            {order.vendor && (
+              <div>
+                <h2 className="text-lg font-semibold mb-4">Account Information</h2>
+                <div className="bg-gray-50 rounded-lg p-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <Building2 className="w-5 h-5 text-gray-400 mr-3" />
+                      <div>
+                        <div className="font-medium">{order.vendor.name}</div>
+                        <div className="text-sm text-gray-500">
+                          Type: {order.vendor.type}
+                        </div>
                       </div>
-                      <span className="text-sm text-gray-500 whitespace-nowrap">
-                        of {formatCurrency(order.total_amount)}
-                      </span>
-                    </div>
-                    <div className="relative">
-                      <Percent className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                      <input
-                        type="number"
-                        value={paymentPercent}
-                        onChange={(e) => handlePaymentPercentChange(parseFloat(e.target.value))}
-                        min="0"
-                        max="100"
-                        step="0.01"
-                        className="w-full pl-9 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-                      />
                     </div>
                     <button
-                      onClick={handlePaymentUpdate}
-                      disabled={isUpdatingPayment}
-                      className="w-full flex items-center justify-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
+                      onClick={() => setShowAccountModal(true)}
+                      className="text-primary-600 hover:text-primary-700 text-sm"
                     >
-                      <Save className="w-4 h-4 mr-2" />
-                      {isUpdatingPayment ? 'Saving...' : 'Save Payment'}
+                      View Details
                     </button>
                   </div>
+                  {order.vendor.customer && (
+                    <div className="space-y-2">
+                      <div className="flex items-center">
+                        <User className="w-4 h-4 text-gray-400 mr-2" />
+                        <span className="text-sm text-gray-600">
+                          Contact: {order.vendor.customer.first_name} {order.vendor.customer.last_name}
+                        </span>
+                      </div>
+                      <div className="flex items-center">
+                        <Mail className="w-4 h-4 text-gray-400 mr-2" />
+                        <a
+                          href={`mailto:${order.vendor.customer.email}`}
+                          className="text-sm text-primary-600 hover:text-primary-700"
+                        >
+                          {order.vendor.customer.email}
+                        </a>
+                      </div>
+                      {order.vendor.customer.phone && (
+                        <div className="flex items-center">
+                          <Phone className="w-4 h-4 text-gray-400 mr-2" />
+                          <a
+                            href={`tel:${order.vendor.customer.phone}`}
+                            className="text-sm text-primary-600 hover:text-primary-700"
+                          >
+                            {order.vendor.customer.phone}
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-                {order.notes && (
-                  <div>
-                    <div className="text-sm font-medium text-gray-500 mb-1">Notes</div>
-                    <p className="text-gray-700 whitespace-pre-wrap">{order.notes}</p>
-                  </div>
-                )}
               </div>
-            </div>
+            )}
 
+            {/* Customer Information */}
             <div>
               <h2 className="text-lg font-semibold mb-4">Customer Information</h2>
               <div className="bg-gray-50 rounded-lg p-4 space-y-4">
@@ -356,23 +338,24 @@ export function OrderDetailPage() {
                     <div className="font-medium">
                       {order.customer.first_name} {order.customer.last_name}
                     </div>
+                    {order.customer.company && (
+                      <div className="text-sm text-gray-500">
+                        {order.customer.company}
+                      </div>
+                    )}
                   </div>
                 </div>
-                {order.customer.company && (
+                {order.customer.email && (
                   <div className="flex items-center">
-                    <Building2 className="w-5 h-5 text-gray-400 mr-3" />
-                    <div>{order.customer.company}</div>
+                    <Mail className="w-5 h-5 text-gray-400 mr-3" />
+                    <a
+                      href={`mailto:${order.customer.email}`}
+                      className="text-primary-600 hover:text-primary-700"
+                    >
+                      {order.customer.email}
+                    </a>
                   </div>
                 )}
-                <div className="flex items-center">
-                  <Mail className="w-5 h-5 text-gray-400 mr-3" />
-                  <a
-                    href={`mailto:${order.customer.email}`}
-                    className="text-primary-600 hover:text-primary-700"
-                  >
-                    {order.customer.email}
-                  </a>
-                </div>
                 {order.customer.phone && (
                   <div className="flex items-center">
                     <Phone className="w-5 h-5 text-gray-400 mr-3" />
@@ -386,6 +369,46 @@ export function OrderDetailPage() {
                 )}
               </div>
             </div>
+
+            {/* Payment Information */}
+            <div>
+              <h2 className="text-lg font-semibold mb-4">Payment Information</h2>
+              <div className="bg-gray-50 rounded-lg p-4 space-y-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600">Total Amount:</span>
+                  <span className="font-medium">{formatCurrency(order.total_amount)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600">Amount Received:</span>
+                  <span className="font-medium">{formatCurrency(order.payment_amount)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600">Balance Due:</span>
+                  <span className="font-medium text-red-600">
+                    {formatCurrency(order.total_amount - order.payment_amount)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600">Payment Status:</span>
+                  <span className={cn(
+                    "px-2 py-1 text-xs font-medium rounded-full",
+                    PAYMENT_STATUS_COLORS[order.payment_status]
+                  )}>
+                    {order.payment_status}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Notes */}
+            {order.notes && (
+              <div>
+                <h2 className="text-lg font-semibold mb-4">Notes</h2>
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <p className="text-gray-600 whitespace-pre-wrap">{order.notes}</p>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="mt-8">
@@ -395,10 +418,10 @@ export function OrderDetailPage() {
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Description
+                      Item
                     </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Qty
+                      Quantity
                     </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Unit Price
@@ -410,29 +433,42 @@ export function OrderDetailPage() {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {order.items.map((item) => (
-                    <tr key={item.order_dtl_id}>
+                    <tr key={item.id}>
                       <td className="px-6 py-4">
-                        <div className="text-sm font-medium text-gray-900">
-                          {item.notes}
+                        <div>
+                          <div className="font-medium text-gray-900">
+                            {item.product?.name || item.item_name || 'Custom Item'}
+                          </div>
+                          {(item.product?.description || item.item_desc) && (
+                            <div className="text-sm text-gray-500">
+                              {item.product?.description || item.item_desc}
+                            </div>
+                          )}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-right text-sm text-gray-500">
-                        {item.quantity}
+                      <td className="px-6 py-4 text-right whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{item.quantity}</div>
                       </td>
-                      <td className="px-6 py-4 text-right text-sm text-gray-500">
-                        {formatCurrency(item.unit_price)}
+                      <td className="px-6 py-4 text-right whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {formatCurrency(item.unit_price)}
+                        </div>
                       </td>
-                      <td className="px-6 py-4 text-right text-sm text-gray-900">
-                        {formatCurrency(item.subtotal)}
+                      <td className="px-6 py-4 text-right whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">
+                          {formatCurrency(item.quantity * item.unit_price)}
+                        </div>
                       </td>
                     </tr>
                   ))}
                   <tr className="bg-gray-50">
-                    <td colSpan={3} className="px-6 py-4 text-right text-sm font-medium text-gray-900">
-                      Total
+                    <td colSpan={3} className="px-6 py-4 text-right font-medium">
+                      Total Amount:
                     </td>
-                    <td className="px-6 py-4 text-right text-sm font-medium text-gray-900">
-                      {formatCurrency(order.total_amount)}
+                    <td className="px-6 py-4 text-right whitespace-nowrap">
+                      <div className="text-lg font-bold text-gray-900">
+                        {formatCurrency(order.total_amount)}
+                      </div>
                     </td>
                   </tr>
                 </tbody>
@@ -441,6 +477,15 @@ export function OrderDetailPage() {
           </div>
         </div>
       </div>
+
+      <AnimatePresence>
+        {showAccountModal && order.vendor && (
+          <AccountDetailsModal
+            vendor={order.vendor}
+            onClose={() => setShowAccountModal(false)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

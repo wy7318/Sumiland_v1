@@ -20,6 +20,8 @@ type Order = {
 type OrderItem = {
   order_dtl_id: string;
   product_id: string | null;
+  item_name: string;
+  item_desc: string | null;
   quantity: number;
   unit_price: number;
   subtotal: number;
@@ -60,13 +62,40 @@ export function OrderForm() {
       if (orderError) throw orderError;
       setOrder(orderData);
 
+      // If order came from a quote, get quote details first
+      let quoteDetails = null;
+      if (orderData.quote_id) {
+        const { data: quoteData, error: quoteError } = await supabase
+          .from('quote_dtl')
+          .select('*')
+          .eq('quote_id', orderData.quote_id);
+
+        if (quoteError) throw quoteError;
+        quoteDetails = quoteData;
+      }
+
+      // Get order details
       const { data: itemsData, error: itemsError } = await supabase
         .from('order_dtl')
         .select('*')
         .eq('order_id', id);
 
       if (itemsError) throw itemsError;
-      setItems(itemsData || []);
+
+      // Combine order details with quote details
+      const combinedItems = itemsData.map((item: any, index: number) => {
+        // If this item came from a quote, find the matching quote detail
+        const quoteItem = quoteDetails?.[index]; // Match by index since they should be in same order
+
+        return {
+          ...item,
+          item_name: quoteItem?.item_name || item.notes || 'Custom Item',
+          item_desc: quoteItem?.item_desc || null,
+          unit_price: quoteItem?.unit_price || item.unit_price
+        };
+      });
+
+      setItems(combinedItems);
     } catch (err) {
       console.error('Error fetching order:', err);
       setError(err instanceof Error ? err.message : 'Failed to load order');
@@ -128,6 +157,8 @@ export function OrderForm() {
         const { error: itemError } = await supabase
           .from('order_dtl')
           .update({
+            item_name: item.item_name,
+            item_desc: item.item_desc,
             quantity: item.quantity,
             unit_price: item.unit_price,
             subtotal: item.quantity * item.unit_price,
@@ -251,14 +282,14 @@ export function OrderForm() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Description
+                      Item Name
                     </label>
                     <input
                       type="text"
-                      value={item.notes || ''}
+                      value={item.item_name}
                       onChange={(e) => {
                         const newItems = [...items];
-                        newItems[index] = { ...item, notes: e.target.value };
+                        newItems[index] = { ...item, item_name: e.target.value };
                         setItems(newItems);
                       }}
                       className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
@@ -270,6 +301,7 @@ export function OrderForm() {
                     </label>
                     <input
                       type="number"
+                      min="1"
                       value={item.quantity}
                       onChange={(e) => {
                         const newItems = [...items];
@@ -280,11 +312,27 @@ export function OrderForm() {
                         };
                         setItems(newItems);
                       }}
-                      min="1"
                       className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
                     />
                   </div>
                 </div>
+
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Description
+                  </label>
+                  <textarea
+                    value={item.item_desc || ''}
+                    onChange={(e) => {
+                      const newItems = [...items];
+                      newItems[index] = { ...item, item_desc: e.target.value };
+                      setItems(newItems);
+                    }}
+                    rows={2}
+                    className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                  />
+                </div>
+
                 <div className="mt-4 flex justify-between items-center">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -325,7 +373,7 @@ export function OrderForm() {
             onClick={() => navigate(`/admin/orders/${id}`)}
             className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
           >
-            Cancel ```
+            Cancel
           </button>
           <button
             type="submit"
@@ -340,4 +388,3 @@ export function OrderForm() {
     </motion.div>
   );
 }
-  
