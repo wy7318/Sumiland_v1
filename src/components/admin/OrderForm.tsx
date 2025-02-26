@@ -21,7 +21,7 @@ type OrderItem = {
   order_dtl_id: string;
   product_id: string | null;
   item_name: string;
-  item_desc: string | null;
+  description: string | null;
   quantity: number;
   unit_price: number;
   subtotal: number;
@@ -90,7 +90,7 @@ export function OrderForm() {
         return {
           ...item,
           item_name: quoteItem?.item_name || item.notes || 'Custom Item',
-          item_desc: quoteItem?.item_desc || null,
+          description: item.description || null,
           unit_price: quoteItem?.unit_price || item.unit_price
         };
       });
@@ -158,7 +158,7 @@ export function OrderForm() {
           .from('order_dtl')
           .update({
             item_name: item.item_name,
-            item_desc: item.item_desc,
+            description: item.description,
             quantity: item.quantity,
             unit_price: item.unit_price,
             subtotal: item.quantity * item.unit_price,
@@ -322,10 +322,10 @@ export function OrderForm() {
                     Description
                   </label>
                   <textarea
-                    value={item.item_desc || ''}
+                    value={item.description || ''}
                     onChange={(e) => {
                       const newItems = [...items];
-                      newItems[index] = { ...item, item_desc: e.target.value };
+                      newItems[index] = { ...item, description: e.target.value };
                       setItems(newItems);
                     }}
                     rows={2}
