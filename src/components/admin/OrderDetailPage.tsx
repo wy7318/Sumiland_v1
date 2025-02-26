@@ -17,7 +17,6 @@ type Order = {
   vendor_id: string | null;
   quote_id: string | null;
   quote_number: string | null;
-  status: 'New' | 'In Progress' | 'In Review' | 'Completed' | 'Cancelled';
   payment_status: 'Pending' | 'Partial Received' | 'Fully Received';
   payment_amount: number;
   total_amount: number;
@@ -62,7 +61,7 @@ type Order = {
     subtotal: number;
     notes: string | null;
     item_name: string | null;
-    item_desc: string | null;
+    description: string | null;
     product: {
       name: string;
       description: string;
@@ -175,9 +174,9 @@ export function OrderDetailPage() {
 
         return {
           ...item,
-          item_name: quoteItem?.item_name || item.notes,
-          item_desc: quoteItem?.item_desc || null,
-          unit_price: quoteItem?.unit_price || item.unit_price // Use quote's unit price if available
+          item_name: quoteItem?.item_name || item.notes || 'Custom Item',
+          description: item.description || quoteItem?.item_desc,
+          unit_price: quoteItem?.unit_price || item.unit_price
         };
       });
 
@@ -223,10 +222,7 @@ export function OrderDetailPage() {
         </button>
         <Link
           to={`/admin/orders/${id}/edit`}
-          className={cn(
-            "inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700",
-            (order.status === 'Completed' || order.status === 'Cancelled') && "opacity-50 cursor-not-allowed pointer-events-none"
-          )}
+          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
         >
           <Edit className="w-4 h-4 mr-2" />
           Edit Order
@@ -439,9 +435,9 @@ export function OrderDetailPage() {
                           <div className="font-medium text-gray-900">
                             {item.product?.name || item.item_name || 'Custom Item'}
                           </div>
-                          {(item.product?.description || item.item_desc) && (
+                          {(item.product?.description || item.description) && (
                             <div className="text-sm text-gray-500">
-                              {item.product?.description || item.item_desc}
+                              {item.product?.description || item.description}
                             </div>
                           )}
                         </div>
