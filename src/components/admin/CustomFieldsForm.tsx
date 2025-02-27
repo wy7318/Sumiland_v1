@@ -16,18 +16,12 @@ type CustomField = {
   validation_rules: any;
 };
 
-type CustomFieldValue = {
-  id: string;
-  field_id: string;
-  value: any;
-};
-
 interface Props {
   entityType: 'case' | 'vendor' | 'customer' | 'product' | 'order' | 'quote';
   entityId?: string;
   organizationId: string;
   initialValues?: Record<string, any>;
-  onChange?: (values: Record<string, any>) => void;
+  onChange?: (values: Record<string, any>, isValid: boolean) => void;
   className?: string;
 }
 
@@ -41,6 +35,7 @@ export function CustomFieldsForm({
 }: Props) {
   const [fields, setFields] = useState<CustomField[]>([]);
   const [values, setValues] = useState<Record<string, any>>(initialValues);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -92,8 +87,9 @@ export function CustomFieldsForm({
       }), {});
 
       setValues(valueMap);
+      validateAllFields(valueMap);
       if (onChange) {
-        onChange(valueMap);
+        onChange(valueMap, true); // Initially assume valid
       }
     } catch (err) {
       console.error('Error fetching field values:', err);
@@ -101,16 +97,116 @@ export function CustomFieldsForm({
     }
   };
 
+  const validateField = (field: CustomField, value: any): string | null => {
+    // Check required fields
+    if (field.is_required && (value === undefined || value === null || value === '')) {
+      return `${field.field_label} is required`;
+    }
+
+    // Skip other validations if value is empty and field is not required
+    if (!value && !field.is_required) {
+      return null;
+    }
+
+    // Type-specific validation
+    switch (field.field_type) {
+      case 'email':
+        if (!/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(value)) {
+          return 'Invalid email address';
+        }
+        break;
+
+      case 'url':
+        try {
+          new URL(value);
+        } catch {
+          return 'Invalid URL';
+        }
+        break;
+
+      case 'phone':
+        if (!/^\+?[\d\s-()]{10,}$/.test(value)) {
+          return 'Invalid phone number';
+        }
+        break;
+
+      case 'number':
+      case 'currency':
+        if (isNaN(Number(value))) {
+          return 'Must be a valid number';
+        }
+        if (field.validation_rules?.min !== undefined && value < field.validation_rules.min) {
+          return `Must be at least ${field.validation_rules.min}`;
+        }
+        if (field.validation_rules?.max !== undefined && value > field.validation_rules.max) {
+          return `Must be at most ${field.validation_rules.max}`;
+        }
+        break;
+
+      case 'select':
+        if (!field.options?.includes(value)) {
+          return 'Invalid selection';
+        }
+        break;
+
+      case 'multi_select':
+        if (!Array.isArray(value) || !value.every(v => field.options?.includes(v))) {
+          return 'Invalid selection';
+        }
+        break;
+    }
+
+    return null;
+  };
+
+  const validateAllFields = (newValues: Record<string, any>) => {
+    const newErrors: Record<string, string> = {};
+    let isValid = true;
+
+    fields.forEach(field => {
+      const error = validateField(field, newValues[field.id]);
+      if (error) {
+        newErrors[field.id] = error;
+        isValid = false;
+      }
+    });
+
+    setErrors(newErrors);
+    return isValid;
+  };
+
   const handleValueChange = (fieldId: string, value: any) => {
+    const field = fields.find(f => f.id === fieldId);
+    if (!field) return;
+
     const newValues = { ...values, [fieldId]: value };
     setValues(newValues);
+
+    // Validate the changed field
+    const fieldError = validateField(field, value);
+    const newErrors = { ...errors };
+    if (fieldError) {
+      newErrors[fieldId] = fieldError;
+    } else {
+      delete newErrors[fieldId];
+    }
+    setErrors(newErrors);
+
     if (onChange) {
-      onChange(newValues);
+      onChange(newValues, Object.keys(newErrors).length === 0);
     }
   };
 
   const renderFieldInput = (field: CustomField) => {
     const value = values[field.id] ?? field.default_value;
+    const hasError = errors[field.id] != null;
+
+    const baseInputClass = cn(
+      "w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-primary-200 outline-none",
+      hasError 
+        ? "border-red-300 focus:border-red-500 bg-red-50" 
+        : "border-gray-300 focus:border-primary-500"
+    );
 
     switch (field.field_type) {
       case 'text':
@@ -122,7 +218,8 @@ export function CustomFieldsForm({
             type={field.field_type === 'email' ? 'email' : 'text'}
             value={value || ''}
             onChange={(e) => handleValueChange(field.id, e.target.value)}
-            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+            className={baseInputClass}
+            required={field.is_required}
           />
         );
 
@@ -134,9 +231,10 @@ export function CustomFieldsForm({
             value={value || ''}
             onChange={(e) => handleValueChange(field.id, e.target.value ? Number(e.target.value) : null)}
             step={field.field_type === 'currency' ? '0.01' : '1'}
-            min={field.validation_rules?.min || undefined}
-            max={field.validation_rules?.max || undefined}
-            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+            min={field.validation_rules?.min}
+            max={field.validation_rules?.max}
+            className={baseInputClass}
+            required={field.is_required}
           />
         );
 
@@ -146,7 +244,8 @@ export function CustomFieldsForm({
             type="date"
             value={value || ''}
             onChange={(e) => handleValueChange(field.id, e.target.value)}
-            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+            className={baseInputClass}
+            required={field.is_required}
           />
         );
 
@@ -156,7 +255,10 @@ export function CustomFieldsForm({
             type="checkbox"
             checked={value || false}
             onChange={(e) => handleValueChange(field.id, e.target.checked)}
-            className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+            className={cn(
+              "rounded border-gray-300 text-primary-600 focus:ring-primary-500",
+              hasError && "border-red-300"
+            )}
           />
         );
 
@@ -165,7 +267,8 @@ export function CustomFieldsForm({
           <select
             value={value || ''}
             onChange={(e) => handleValueChange(field.id, e.target.value)}
-            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+            className={baseInputClass}
+            required={field.is_required}
           >
             <option value="">Select an option</option>
             {field.options?.map((option) => (
@@ -185,8 +288,9 @@ export function CustomFieldsForm({
               const selectedOptions = Array.from(e.target.selectedOptions).map(opt => opt.value);
               handleValueChange(field.id, selectedOptions);
             }}
-            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+            className={baseInputClass}
             size={4}
+            required={field.is_required}
           >
             {field.options?.map((option) => (
               <option key={option} value={option}>
@@ -239,6 +343,11 @@ export function CustomFieldsForm({
               <p className="text-sm text-gray-500 mb-2">{field.description}</p>
             )}
             {renderFieldInput(field)}
+            {errors[field.id] && (
+              <p className="mt-1 text-sm text-red-600">
+                {errors[field.id]}
+              </p>
+            )}
           </div>
         ))}
       </div>

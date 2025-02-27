@@ -4,11 +4,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ArrowLeft, Building2, Mail, Phone, Calendar,
   Edit, AlertCircle, FileText, DollarSign, User,
-  CheckCircle, X
+  CheckCircle, X, Send, Package
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { cn, formatCurrency } from '../../lib/utils';
 import { AccountDetailsModal } from './AccountDetailsModal';
+import { CustomFieldsSection } from './CustomFieldsSection';
 
 type Order = {
   order_id: string;
@@ -22,6 +23,7 @@ type Order = {
   total_amount: number;
   notes: string | null;
   created_at: string;
+  organization_id: string;
   vendor: {
     id: string;
     name: string;
@@ -405,6 +407,16 @@ export function OrderDetailPage() {
                 </div>
               </div>
             )}
+
+            {/* Add Custom Fields section */}
+            <div className="md:col-span-2">
+              <CustomFieldsSection
+                entityType="order"
+                entityId={id || ''}
+                organizationId={order.organization_id}
+                className="bg-gray-50 rounded-lg p-4"
+              />
+            </div>
           </div>
 
           <div className="mt-8">
