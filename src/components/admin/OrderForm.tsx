@@ -4,6 +4,8 @@ import { motion } from 'framer-motion';
 import { Save, X, AlertCircle, DollarSign, Percent } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { cn, formatCurrency } from '../../lib/utils';
+import { useAuth } from '../../contexts/AuthContext';
+import { CustomFieldsForm } from './CustomFieldsForm';
 
 type Order = {
   order_id: string;
@@ -15,6 +17,7 @@ type Order = {
   total_amount: number;
   notes: string | null;
   quote_id: string | null;
+  organization_id: string;
 };
 
 type OrderItem = {
@@ -31,12 +34,14 @@ type OrderItem = {
 export function OrderForm() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [order, setOrder] = useState<Order | null>(null);
   const [items, setItems] = useState<OrderItem[]>([]);
   const [paymentAmount, setPaymentAmount] = useState<number>(0);
   const [paymentPercent, setPaymentPercent] = useState<number>(0);
+  const [customFields, setCustomFields] = useState<Record<string, any>>({});
 
   useEffect(() => {
     if (id) {
@@ -134,6 +139,7 @@ export function OrderForm() {
     setError(null);
 
     try {
+      // Update order header
       const { error: updateError } = await supabase
         .from('order_hdr')
         .update({
@@ -144,13 +150,7 @@ export function OrderForm() {
         })
         .eq('order_id', id);
 
-      if (updateError) {
-        // Check for the specific validation error message
-        if (updateError.message.includes('Order cannot be completed until payment is fully received')) {
-          throw new Error('Order cannot be completed until payment is fully received');
-        }
-        throw updateError;
-      }
+      if (updateError) throw updateError;
 
       // Update items
       for (const item of items) {
@@ -167,6 +167,29 @@ export function OrderForm() {
           .eq('order_dtl_id', item.order_dtl_id);
 
         if (itemError) throw itemError;
+      }
+
+      // Save custom field values
+      if (user) {
+        for (const [fieldId, value] of Object.entries(customFields)) {
+          const { error: valueError } = await supabase
+            .from('custom_field_values')
+            .upsert({
+              organization_id: order.organization_id,
+              entity_id: id,
+              field_id: fieldId,
+              value,
+              created_by: user.id,
+              updated_by: user.id,
+              updated_at: new Date().toISOString()
+            }, {
+              onConflict: 'organization_id,field_id,entity_id'
+            });
+
+          if (valueError) {
+            console.error('Error saving custom field value:', valueError);
+          }
+        }
       }
 
       navigate(`/admin/orders/${id}`);
@@ -366,6 +389,14 @@ export function OrderForm() {
             ))}
           </div>
         </div>
+
+        <CustomFieldsForm
+          entityType="order"
+          entityId={id}
+          organizationId={order.organization_id}
+          onChange={(values) => setCustomFields(values)}
+          className="border-t border-gray-200 pt-6"
+        />
 
         <div className="flex justify-end space-x-4">
           <button
