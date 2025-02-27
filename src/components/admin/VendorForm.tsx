@@ -5,6 +5,7 @@ import { Save, X, AlertCircle, Search, User, Mail, Phone, Building2, Check } fro
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { cn } from '../../lib/utils';
+import { CustomFieldsForm } from './CustomFieldsForm';
 
 type Customer = {
   customer_id: string;
@@ -34,6 +35,7 @@ type FormData = {
   billing_country: string;
   use_shipping_for_billing: boolean;
   organization_id: string;
+  custom_fields?: Record<string, any>;
 };
 
 const initialFormData: FormData = {
@@ -60,7 +62,7 @@ const initialFormData: FormData = {
 export function VendorForm() {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { organizations } = useAuth();
+  const { organizations, user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState<FormData>(initialFormData);
@@ -212,47 +214,74 @@ export function VendorForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) return;
-
+  
     setLoading(true);
     setError(null);
-
+  
     try {
-      // Verify organization access
-      if (!organizations.some(org => org.id === formData.organization_id)) {
-        throw new Error('You do not have permission to manage accounts for this organization');
-      }
-
+      let vendorId = id;
+  
+      // Remove custom_fields from the payload
+      const { custom_fields, ...vendorData } = formData;
+  
       if (id) {
         const { error: updateError } = await supabase
           .from('vendors')
           .update({
-            ...formData,
-            updated_at: new Date().toISOString()
+            ...vendorData,
+            updated_at: new Date().toISOString(),
           })
           .eq('id', id)
           .eq('organization_id', formData.organization_id);
-
+  
         if (updateError) throw updateError;
       } else {
-        const { error: insertError } = await supabase
+        const { data: newVendor, error: insertError } = await supabase
           .from('vendors')
           .insert([{
-            ...formData,
+            ...vendorData,
             created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }]);
-
+            updated_at: new Date().toISOString(),
+          }])
+          .select()
+          .single();
+  
         if (insertError) throw insertError;
+        vendorId = newVendor.id;
       }
-
+  
+      // Save custom field values
+      if (custom_fields && vendorId && user) {
+        for (const [fieldId, value] of Object.entries(custom_fields)) {
+          const { error: valueError } = await supabase
+            .from('custom_field_values')
+            .upsert({
+              organization_id: formData.organization_id,
+              entity_id: vendorId,
+              field_id: fieldId,
+              value,
+              created_by: user.id,
+              updated_by: user.id,
+              updated_at: new Date().toISOString(),
+            }, {
+              onConflict: 'organization_id,field_id,entity_id',
+            });
+  
+          if (valueError) {
+            console.error('Error saving custom field value:', valueError);
+          }
+        }
+      }
+  
       navigate('/admin/vendors');
     } catch (err) {
-      console.error('Error saving account:', err);
-      setError(err instanceof Error ? err.message : 'Failed to save account');
+      console.error('Error saving vendor:', err);
+      setError(err instanceof Error ? err.message : 'Failed to save vendor');
     } finally {
       setLoading(false);
     }
   };
+
 
   if (organizations.length === 0) {
     return (
@@ -619,6 +648,20 @@ export function VendorForm() {
             className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
           />
         </div>
+
+        {/* Custom Fields */}
+        <CustomFieldsForm
+          entityType="vendor"
+          entityId={id}
+          organizationId={formData.organization_id}
+          onChange={(customFieldValues) => {
+            setFormData(prev => ({
+              ...prev,
+              custom_fields: customFieldValues
+            }));
+          }}
+          className="border-t border-gray-200 pt-6"
+        />
 
         <div className="flex justify-end space-x-4">
           <button
