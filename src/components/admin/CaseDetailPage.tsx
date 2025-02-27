@@ -9,6 +9,7 @@ import {
 import { supabase } from '../../lib/supabase';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
+import { CustomFieldsSection } from './CustomFieldsSection';
 
 type Case = {
   id: string;
@@ -543,6 +544,15 @@ export function CaseDetailPage() {
                 )}
               </div>
             </div>
+          </div>
+
+          <div className="mt-8">
+            <CustomFieldsSection
+              entityType="case"
+              entityId={id || ''}
+              organizationId={caseData.organization_id}
+              className="bg-white shadow rounded-lg p-6"
+            />
           </div>
 
           {/* Add Feed Section */}

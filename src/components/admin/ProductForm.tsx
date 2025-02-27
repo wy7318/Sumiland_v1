@@ -5,6 +5,7 @@ import { Save, X, AlertCircle, Package, Scale } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { ImageUpload } from './ImageUpload';
 import { useAuth } from '../../contexts/AuthContext';
+import { CustomFieldsForm } from './CustomFieldsForm';
 import { cn } from '../../lib/utils';
 
 type Category = {
@@ -26,12 +27,13 @@ type ProductFormData = {
   min_stock_level: string;
   max_stock_level: string;
   avg_cost: string;
+  custom_fields?: Record<string, any>;
 };
 
 export function ProductForm() {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { organizations } = useAuth();
+  const { organizations, user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -110,61 +112,59 @@ export function ProductForm() {
     setError(null);
 
     try {
-      // Use the first organization if creating new product
-      const organizationId = id 
-        ? (await supabase
-            .from('products')
-            .select('organization_id')
-            .eq('id', id)
-            .single()
-          ).data?.organization_id
-        : organizations[0]?.id;
-
-      if (!organizationId) {
-        throw new Error('No valid organization found');
-      }
-
-      // Verify organization access
-      if (!organizations.some(org => org.id === organizationId)) {
-        throw new Error('You do not have permission to manage this product');
-      }
-
-      const productData = {
-        name: formData.name,
-        description: formData.description || null,
-        price: parseFloat(formData.price),
-        category_id: formData.category_id || null,
-        status: formData.status,
-        image_url: formData.image_url || null,
-        stock_unit: formData.stock_unit,
-        weight_unit: formData.stock_unit === 'weight' ? formData.weight_unit : null,
-        min_stock_level: parseFloat(formData.min_stock_level) || 0,
-        max_stock_level: formData.max_stock_level ? parseFloat(formData.max_stock_level) : null,
-        avg_cost: parseFloat(formData.avg_cost) || 0,
-        organization_id: organizationId
-      };
+      let productId = id;
+      const { custom_fields, ...productData } = formData;
 
       if (id) {
+        // Update existing product
         const { error: updateError } = await supabase
           .from('products')
           .update({
             ...productData,
-            updated_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
           })
           .eq('id', id)
-          .eq('organization_id', organizationId);
+          .eq('organization_id', organizations[0].id);
 
         if (updateError) throw updateError;
       } else {
-        const { error: insertError } = await supabase
+        // Create new product
+        const { data: newProduct, error: insertError } = await supabase
           .from('products')
           .insert([{
             ...productData,
+            organization_id: organizations[0].id,
             created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          }]);
+            updated_at: new Date().toISOString()
+          }])
+          .select()
+          .single();
 
         if (insertError) throw insertError;
+        productId = newProduct.id;
+      }
+
+      // Save custom field values
+      if (custom_fields && productId && user) {
+        for (const [fieldId, value] of Object.entries(custom_fields)) {
+          const { error: valueError } = await supabase
+            .from('custom_field_values')
+            .upsert({
+              organization_id: organizations[0].id,
+              entity_id: productId,
+              field_id: fieldId,
+              value,
+              created_by: user.id,
+              updated_by: user.id,
+              updated_at: new Date().toISOString()
+            }, {
+              onConflict: 'organization_id,field_id,entity_id'
+            });
+
+          if (valueError) {
+            console.error('Error saving custom field value:', valueError);
+          }
+        }
       }
 
       navigate('/admin/products');
@@ -175,6 +175,14 @@ export function ProductForm() {
       setLoading(false);
     }
   };
+
+  if (organizations.length === 0) {
+    return (
+      <div className="bg-yellow-50 text-yellow-800 p-4 rounded-lg">
+        You need to be part of an organization to manage products.
+      </div>
+    );
+  }
 
   return (
     <motion.div
@@ -398,6 +406,20 @@ export function ProductForm() {
             </div>
           </div>
         </div>
+
+        {/* Custom Fields Section */}
+        <CustomFieldsForm
+          entityType="product"
+          entityId={id}
+          organizationId={organizations[0]?.id}
+          onChange={(customFieldValues) => {
+            setFormData(prev => ({
+              ...prev,
+              custom_fields: customFieldValues
+            }));
+          }}
+          className="border-t border-gray-200 pt-6"
+        />
 
         <div className="flex justify-end space-x-4">
           <button

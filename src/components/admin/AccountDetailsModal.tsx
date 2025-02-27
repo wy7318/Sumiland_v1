@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
-import { X, Building2, Mail, Phone, User, MapPin } from 'lucide-react';
+import { X, Building2, Mail, Phone, User, MapPin, ExternalLink } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 type Vendor = {
   id: string;
@@ -24,6 +25,7 @@ type Vendor = {
   billing_city: string | null;
   billing_state: string | null;
   billing_country: string | null;
+  organization_id: string;
 };
 
 type Props = {
@@ -53,14 +55,14 @@ export function AccountDetailsModal({ vendor, onClose }: Props) {
       onClick={onClose}
     >
       <motion.div
-        initial={{ scale: 0.95 }}
-        animate={{ scale: 1 }}
-        exit={{ scale: 0.95 }}
-        className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4"
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.95, opacity: 0 }}
+        className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-bold">Account Details</h2>
+          <h2 className="text-xl font-semibold">Account Details</h2>
           <button
             onClick={onClose}
             className="p-2 hover:bg-gray-100 rounded-full"
@@ -72,7 +74,17 @@ export function AccountDetailsModal({ vendor, onClose }: Props) {
         <div className="space-y-6">
           {/* Basic Information */}
           <div>
-            <h3 className="text-lg font-semibold mb-4">Basic Information</h3>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium">Basic Information</h3>
+              <Link
+                to={`/admin/vendors/${vendor.id}/edit`}
+                className="text-primary-600 hover:text-primary-700 flex items-center"
+                onClick={onClose}
+              >
+                <ExternalLink className="w-4 h-4 mr-1" />
+                View Full Details
+              </Link>
+            </div>
             <div className="bg-gray-50 rounded-lg p-4 space-y-3">
               <div className="flex items-center">
                 <Building2 className="w-5 h-5 text-gray-400 mr-3" />
@@ -94,7 +106,7 @@ export function AccountDetailsModal({ vendor, onClose }: Props) {
           {/* Contact Information */}
           {vendor.customer && (
             <div>
-              <h3 className="text-lg font-semibold mb-4">Contact Information</h3>
+              <h3 className="text-lg font-medium mb-4">Contact Information</h3>
               <div className="bg-gray-50 rounded-lg p-4 space-y-3">
                 <div className="flex items-center">
                   <User className="w-5 h-5 text-gray-400 mr-3" />
@@ -137,7 +149,7 @@ export function AccountDetailsModal({ vendor, onClose }: Props) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Shipping Address */}
             <div>
-              <h3 className="text-lg font-semibold mb-4">Shipping Address</h3>
+              <h3 className="text-lg font-medium mb-4">Shipping Address</h3>
               <div className="bg-gray-50 rounded-lg p-4">
                 <div className="flex items-start">
                   <MapPin className="w-5 h-5 text-gray-400 mr-3 mt-1" />
@@ -156,7 +168,7 @@ export function AccountDetailsModal({ vendor, onClose }: Props) {
 
             {/* Billing Address */}
             <div>
-              <h3 className="text-lg font-semibold mb-4">Billing Address</h3>
+              <h3 className="text-lg font-medium mb-4">Billing Address</h3>
               <div className="bg-gray-50 rounded-lg p-4">
                 <div className="flex items-start">
                   <MapPin className="w-5 h-5 text-gray-400 mr-3 mt-1" />
