@@ -1,53 +1,55 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
-  Search, Filter, ChevronDown, ChevronUp, Edit, Trash2, 
-  Eye, Package, AlertCircle, FileDown 
+  Plus, Search, Filter, ChevronDown, ChevronUp, Edit, Trash2, 
+  Eye, Package, Calendar, DollarSign, Building2, AlertCircle,
+  FileDown, Send
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { cn, formatCurrency } from '../../lib/utils';
 
+type PicklistValue = {
+  id: string;
+  value: string;
+  label: string;
+  is_default: boolean;
+  is_active: boolean;
+  color: string | null;
+  text_color: string | null;
+};
+
 type Order = {
   order_id: string;
   order_number: string;
   customer_id: string;
-  status: 'New' | 'In Progress' | 'In Review' | 'Completed' | 'Cancelled';
+  vendor_id: string | null;
+  status: string;
   payment_status: 'Pending' | 'Partial Received' | 'Fully Received';
   payment_amount: number;
-  payment_percent: number;
   total_amount: number;
   notes: string | null;
   quote_id: string | null;
   created_at: string;
+  organization_id: string;
   customer: {
     first_name: string;
     last_name: string;
-    company: string | null;
     email: string;
+    phone: string | null;
+    company: string | null;
   };
   items: {
-    order_dtl_id: string;
-    product_id: string | null;
+    id: string;
+    product_id: string;
     quantity: number;
     unit_price: number;
     subtotal: number;
     notes: string | null;
+    product: {
+      name: string;
+    };
   }[];
-};
-
-const STATUS_COLORS = {
-  'New': 'bg-blue-100 text-blue-800',
-  'In Progress': 'bg-yellow-100 text-yellow-800',
-  'In Review': 'bg-purple-100 text-purple-800',
-  'Completed': 'bg-green-100 text-green-800',
-  'Cancelled': 'bg-red-100 text-red-800'
-};
-
-const PAYMENT_STATUS_COLORS = {
-  'Pending': 'bg-gray-100 text-gray-800',
-  'Partial Received': 'bg-orange-100 text-orange-800',
-  'Fully Received': 'bg-green-100 text-green-800'
 };
 
 export function OrdersPage() {
@@ -59,10 +61,30 @@ export function OrdersPage() {
   const [paymentStatusFilter, setPaymentStatusFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'created_at' | 'order_number' | 'total_amount'>('created_at');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [orderStatuses, setOrderStatuses] = useState<PicklistValue[]>([]);
 
   useEffect(() => {
+    fetchPicklists();
     fetchOrders();
   }, []);
+
+  const fetchPicklists = async () => {
+    try {
+      // Fetch order statuses
+      const { data: statusData, error: statusError } = await supabase
+        .from('picklist_values')
+        .select('id, value, label, is_default, is_active, color, text_color')
+        .eq('type', 'order_status')
+        .eq('is_active', true)
+        .order('display_order', { ascending: true });
+
+      if (statusError) throw statusError;
+      setOrderStatuses(statusData || []);
+    } catch (err) {
+      console.error('Error fetching picklists:', err);
+      setError('Failed to load picklist values');
+    }
+  };
 
   const fetchOrders = async () => {
     try {
@@ -71,12 +93,7 @@ export function OrdersPage() {
         .from('order_hdr')
         .select(`
           *,
-          customer:customers(
-            first_name,
-            last_name,
-            company,
-            email
-          ),
+          customer:customers(*),
           items:order_dtl(*)
         `)
         .order('created_at', { ascending: false });
@@ -91,7 +108,7 @@ export function OrdersPage() {
     }
   };
 
-  const handleStatusChange = async (orderId: string, newStatus: Order['status']) => {
+  const handleStatusChange = async (orderId: string, newStatus: string) => {
     try {
       const { error } = await supabase
         .from('order_hdr')
@@ -105,25 +122,24 @@ export function OrdersPage() {
       await fetchOrders();
     } catch (err) {
       console.error('Error updating order status:', err);
-      setError(err instanceof Error ? err.message : 'Failed to update order status');
+      setError(err instanceof Error ? err.message : 'Failed to update status');
     }
   };
 
-  const handlePaymentUpdate = async (orderId: string, amount: number) => {
+  const handleDelete = async (orderId: string) => {
+    if (!window.confirm('Are you sure you want to delete this order?')) return;
+
     try {
       const { error } = await supabase
         .from('order_hdr')
-        .update({ 
-          payment_amount: amount,
-          updated_at: new Date().toISOString()
-        })
+        .delete()
         .eq('order_id', orderId);
 
       if (error) throw error;
       await fetchOrders();
     } catch (err) {
-      console.error('Error updating payment:', err);
-      setError(err instanceof Error ? err.message : 'Failed to update payment');
+      console.error('Error deleting order:', err);
+      setError(err instanceof Error ? err.message : 'Failed to delete order');
     }
   };
 
@@ -131,9 +147,8 @@ export function OrdersPage() {
     const matchesSearch = 
       order.order_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
       `${order.customer.first_name} ${order.customer.last_name}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      order.customer.company?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      order.customer.email.toLowerCase().includes(searchQuery.toLowerCase());
-
+      order.customer.company?.toLowerCase().includes(searchQuery.toLowerCase());
+    
     const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
     const matchesPaymentStatus = paymentStatusFilter === 'all' || order.payment_status === paymentStatusFilter;
 
@@ -147,22 +162,19 @@ export function OrdersPage() {
     return (aValue < bValue ? -1 : 1) * multiplier;
   });
 
-  // Calculate metrics
-  const metrics = {
-    totalOrders: orders.length,
-    totalValue: orders.reduce((sum, order) => sum + order.total_amount, 0),
-    byStatus: Object.fromEntries(
-      ['New', 'In Progress', 'In Review', 'Completed', 'Cancelled'].map(status => [
-        status,
-        orders.filter(order => order.status === status).length
-      ])
-    ),
-    byPaymentStatus: Object.fromEntries(
-      ['Pending', 'Partial Received', 'Fully Received'].map(status => [
-        status,
-        orders.filter(order => order.payment_status === status).length
-      ])
-    )
+  // Get style for status badge
+  const getStatusStyle = (status: string) => {
+    const statusValue = orderStatuses.find(s => s.value === status);
+    if (!statusValue?.color) return {};
+    return {
+      backgroundColor: statusValue.color,
+      color: statusValue.text_color || '#FFFFFF'
+    };
+  };
+
+  // Get label for status
+  const getStatusLabel = (status: string) => {
+    return orderStatuses.find(s => s.value === status)?.label || status;
   };
 
   if (loading) {
@@ -174,42 +186,20 @@ export function OrdersPage() {
   }
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Order Management</h1>
         <Package className="w-8 h-8 text-primary-500" />
       </div>
 
-      {/* Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <div className="bg-white p-6 rounded-lg shadow-sm">
-          <h3 className="text-sm font-medium text-gray-500 mb-2">Total Orders</h3>
-          <p className="text-3xl font-bold">{metrics.totalOrders}</p>
-        </div>
-        <div className="bg-white p-6 rounded-lg shadow-sm">
-          <h3 className="text-sm font-medium text-gray-500 mb-2">Total Value</h3>
-          <p className="text-3xl font-bold">{formatCurrency(metrics.totalValue)}</p>
-        </div>
-        <div className="bg-white p-6 rounded-lg shadow-sm">
-          <h3 className="text-sm font-medium text-gray-500 mb-2">Active Orders</h3>
-          <p className="text-3xl font-bold">
-            {metrics.byStatus['In Progress'] + metrics.byStatus['In Review']}
-          </p>
-        </div>
-        <div className="bg-white p-6 rounded-lg shadow-sm">
-          <h3 className="text-sm font-medium text-gray-500 mb-2">Pending Payments</h3>
-          <p className="text-3xl font-bold">{metrics.byPaymentStatus['Pending']}</p>
-        </div>
-      </div>
-
       {error && (
-        <div className="mb-6 bg-red-50 text-red-600 p-4 rounded-lg flex items-center">
+        <div className="bg-red-50 text-red-600 p-4 rounded-lg flex items-center">
           <AlertCircle className="w-5 h-5 mr-2" />
           {error}
         </div>
       )}
 
-      <div className="bg-white shadow rounded-lg overflow-hidden">
+      <div className="bg-white shadow rounded-lg">
         <div className="p-4 border-b border-gray-200">
           <div className="flex flex-wrap gap-4">
             <div className="flex-1 min-w-[300px]">
@@ -231,11 +221,11 @@ export function OrdersPage() {
               className="px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
             >
               <option value="all">All Status</option>
-              <option value="New">New</option>
-              <option value="In Progress">In Progress</option>
-              <option value="In Review">In Review</option>
-              <option value="Completed">Completed</option>
-              <option value="Cancelled">Cancelled</option>
+              {orderStatuses.map(status => (
+                <option key={status.id} value={status.value}>
+                  {status.label}
+                </option>
+              ))}
             </select>
 
             <select
@@ -261,7 +251,7 @@ export function OrdersPage() {
 
             <button
               onClick={() => setSortOrder(order => order === 'asc' ? 'desc' : 'asc')}
-              className="px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50"
+              className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50"
             >
               <Filter className={cn(
                 "w-5 h-5 transition-transform",
@@ -319,28 +309,28 @@ export function OrdersPage() {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <select
                       value={order.status}
-                      onChange={(e) => handleStatusChange(order.order_id, e.target.value as Order['status'])}
-                      className={cn(
-                        "text-sm font-medium rounded-full px-3 py-1",
-                        STATUS_COLORS[order.status]
-                      )}
+                      onChange={(e) => handleStatusChange(order.order_id, e.target.value)}
+                      className="text-sm font-medium rounded-full px-3 py-1"
+                      style={getStatusStyle(order.status)}
                     >
-                      <option value="New">New</option>
-                      <option value="In Progress">In Progress</option>
-                      <option value="In Review">In Review</option>
-                      <option value="Completed">Completed</option>
-                      <option value="Cancelled">Cancelled</option>
+                      {orderStatuses.map(status => (
+                        <option key={status.id} value={status.value}>
+                          {status.label}
+                        </option>
+                      ))}
                     </select>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={cn(
                       "px-2 inline-flex text-xs leading-5 font-semibold rounded-full",
-                      PAYMENT_STATUS_COLORS[order.payment_status]
+                      order.payment_status === 'Pending' && "bg-gray-100 text-gray-800",
+                      order.payment_status === 'Partial Received' && "bg-orange-100 text-orange-800",
+                      order.payment_status === 'Fully Received' && "bg-green-100 text-green-800"
                     )}>
                       {order.payment_status}
                     </span>
                     <div className="text-sm text-gray-500 mt-1">
-                      {order.payment_percent}%
+                      {((order.payment_amount / order.total_amount) * 100).toFixed(0)}%
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -369,11 +359,7 @@ export function OrdersPage() {
                         <Edit className="w-5 h-5" />
                       </Link>
                       <button
-                        onClick={() => {
-                          if (window.confirm('Are you sure you want to delete this order?')) {
-                            // Handle delete
-                          }
-                        }}
+                        onClick={() => handleDelete(order.order_id)}
                         className="text-red-600 hover:text-red-900"
                       >
                         <Trash2 className="w-5 h-5" />
