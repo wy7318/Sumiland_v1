@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Save, X } from 'lucide-react';
@@ -6,17 +6,54 @@ import { supabase } from '../../lib/supabase';
 import { ImageUpload } from './ImageUpload';
 import { useAuth } from '../../contexts/AuthContext';
 
+type PicklistValue = {
+  id: string;
+  value: string;
+  label: string;
+  is_default: boolean;
+  is_active: boolean;
+};
+
 export function NewPortfolioPage() {
   const navigate = useNavigate();
   const { organizations } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [categories, setCategories] = useState<PicklistValue[]>([]);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     category: '',
     image_url: '',
   });
+
+  useEffect(() => {
+    fetchCategories();
+  }, []);
+
+  const fetchCategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('picklist_values')
+        .select('id, value, label, is_default, is_active')
+        .eq('type', 'portfolio_category')
+        .eq('is_active', true)
+        .order('display_order', { ascending: true })
+        .order('label', { ascending: true });
+
+      if (error) throw error;
+      setCategories(data || []);
+
+      // If we have categories, select the default one
+      if (data && data.length > 0) {
+        const defaultCategory = data.find(c => c.is_default)?.value || data[0].value;
+        setFormData(prev => ({ ...prev, category: defaultCategory }));
+      }
+    } catch (err) {
+      console.error('Error fetching categories:', err);
+      setError('Failed to load categories');
+    }
+  };
 
   const handleImageUploaded = (url: string) => {
     setFormData(prev => ({ ...prev, image_url: url }));
@@ -110,10 +147,11 @@ export function NewPortfolioPage() {
             className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
           >
             <option value="">Select a category</option>
-            <option value="Application Development">Application Development</option>
-            <option value="Package Design">Package Design</option>
-            <option value="Design">Design</option>
-            <option value="Branding">Branding</option>
+            {categories.map(category => (
+              <option key={category.id} value={category.value}>
+                {category.label}
+              </option>
+            ))}
           </select>
         </div>
 

@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Save, Mail, Phone, Lock, AlertCircle, CheckCircle, Settings as SettingsIcon, Database } from 'lucide-react';
+import { Save, Mail, Phone, Lock, AlertCircle, CheckCircle, Settings as SettingsIcon, Database, List } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { cn } from '../../lib/utils';
 import { CustomFieldsPage } from './CustomFieldsPage';
+import { PicklistManagementPage } from './PicklistManagementPage';
 
 type FormData = {
   email: string;
@@ -14,7 +15,7 @@ type FormData = {
   confirmPassword: string;
 };
 
-type Tab = 'profile' | 'custom-fields';
+type Tab = 'profile' | 'custom-fields' | 'picklists';
 
 export function SettingsPage() {
   const { user, checkAuth } = useAuth();
@@ -158,7 +159,8 @@ export function SettingsPage() {
 
   const tabs: { id: Tab; label: string; icon: typeof SettingsIcon }[] = [
     { id: 'profile', label: 'Profile Settings', icon: SettingsIcon },
-    { id: 'custom-fields', label: 'Custom Fields', icon: Database }
+    { id: 'custom-fields', label: 'Custom Fields', icon: Database },
+    { id: 'picklists', label: 'Picklist Values', icon: List }
   ];
 
   return (
@@ -233,7 +235,7 @@ export function SettingsPage() {
                   type="tel"
                   value={formData.phone}
                   onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-                  className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                  className="w-full pl- 10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
                   placeholder="+1 (555) 123-4567"
                 />
               </div>
@@ -302,12 +304,19 @@ export function SettingsPage() {
             </div>
           </form>
         </motion.div>
-      ) : (
+      ) : activeTab === 'custom-fields' ? (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
         >
           <CustomFieldsPage />
+        </motion.div>
+      ) : (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <PicklistManagementPage />
         </motion.div>
       )}
     </div>

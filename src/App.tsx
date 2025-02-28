@@ -17,6 +17,7 @@ import { NewPortfolioPage } from './components/admin/NewPortfolioPage';
 import { EditPortfolioPage } from './components/admin/EditPortfolioPage';
 import { CasesPage } from './components/admin/CasesPage';
 import { CaseDetailPage } from './components/admin/CaseDetailPage';
+import { CaseForm } from './components/admin/CaseForm';
 import { ProductsPage } from './components/admin/ProductsPage';
 import { ProductForm } from './components/admin/ProductForm';
 import { CategoriesPage } from './components/admin/CategoriesPage';
@@ -89,7 +90,9 @@ function App() {
               <Route path="portfolio/new" element={<NewPortfolioPage />} />
               <Route path="portfolio/:id/edit" element={<EditPortfolioPage />} />
               <Route path="cases" element={<CasesPage />} />
+              <Route path="cases/new" element={<CaseForm />} />
               <Route path="cases/:id" element={<CaseDetailPage />} />
+              <Route path="cases/:id/edit" element={<CaseForm />} />
               <Route path="products" element={<ProductsPage />} />
               <Route path="products/new" element={<ProductForm />} />
               <Route path="products/:id/edit" element={<ProductForm />} />

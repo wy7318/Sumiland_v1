@@ -7,40 +7,41 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { cn } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
+import { cn } from '../../lib/utils';
 
 type Case = {
   id: string;
   title: string;
   type: string;
   sub_type: string | null;
-  status: 'New' | 'Assigned' | 'In Progress' | 'Completed';
+  status: string;
   contact_id: string;
   owner_id: string | null;
   description: string;
   resume_url: string | null;
   created_at: string;
-  updated_at: string;
   organization_id: string;
   contact: {
     first_name: string;
     last_name: string;
     email: string;
-    company: string | null;
     phone: string | null;
   };
 };
 
-const STATUS_COLORS = {
-  'New': 'bg-blue-100 text-blue-800',
-  'Assigned': 'bg-yellow-100 text-yellow-800',
-  'In Progress': 'bg-purple-100 text-purple-800',
-  'Completed': 'bg-green-100 text-green-800'
+type PicklistValue = {
+  id: string;
+  value: string;
+  label: string;
+  is_default: boolean;
+  is_active: boolean;
+  color: string | null;
+  text_color: string | null;
 };
 
 export function CasesPage() {
-  const { organizations } = useAuth();
+  const { user, organizations } = useAuth();
   const [cases, setCases] = useState<Case[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -51,11 +52,47 @@ export function CasesPage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [selectedCases, setSelectedCases] = useState<string[]>([]);
   const [staff, setStaff] = useState<any[]>([]);
+  const [caseTypes, setCaseTypes] = useState<PicklistValue[]>([]);
+  const [caseStatuses, setCaseStatuses] = useState<PicklistValue[]>([]);
 
   useEffect(() => {
-    fetchCases();
-    fetchStaff();
+    if (organizations.length > 0) {
+      fetchCases();
+      fetchStaff();
+      fetchPicklists();
+    }
   }, [organizations]);
+
+  const fetchPicklists = async () => {
+    try {
+      // Fetch case types
+      const { data: typeData, error: typeError } = await supabase
+        .from('picklist_values')
+        .select('id, value, label, is_default, is_active, color, text_color')
+        .eq('type', 'case_type')
+        .eq('is_active', true)
+        .order('display_order', { ascending: true })
+        .order('label', { ascending: true });
+
+      if (typeError) throw typeError;
+      setCaseTypes(typeData || []);
+
+      // Fetch case statuses
+      const { data: statusData, error: statusError } = await supabase
+        .from('picklist_values')
+        .select('id, value, label, is_default, is_active, color, text_color')
+        .eq('type', 'case_status')
+        .eq('is_active', true)
+        .order('display_order', { ascending: true })
+        .order('label', { ascending: true });
+
+      if (statusError) throw statusError;
+      setCaseStatuses(statusData || []);
+    } catch (err) {
+      console.error('Error fetching picklists:', err);
+      setError('Failed to load picklist values');
+    }
+  };
 
   const fetchCases = async () => {
     try {
@@ -65,7 +102,6 @@ export function CasesPage() {
       const { data: casesData, error: casesError } = await supabase
         .from('cases')
         .select('*')
-        .in('organization_id', organizations.map(org => org.id))
         .order('created_at', { ascending: false });
 
       if (casesError) throw casesError;
@@ -96,20 +132,21 @@ export function CasesPage() {
 
   const fetchStaff = async () => {
     try {
-      // Get user IDs from user_organizations for the current user's organizations
-      const { data: userOrgs, error: userOrgsError } = await supabase
+      if (!user) return;
+
+      // Get all users from the same organizations
+      const { data: orgUsers, error: orgUsersError } = await supabase
         .from('user_organizations')
         .select('user_id')
         .in('organization_id', organizations.map(org => org.id));
 
-      if (userOrgsError) throw userOrgsError;
+      if (orgUsersError) throw orgUsersError;
 
       // Get profiles for these users
-      const userIds = userOrgs?.map(uo => uo.user_id) || [];
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('*')
-        .in('id', userIds);
+        .in('id', orgUsers?.map(ou => ou.user_id) || []);
 
       if (profilesError) throw profilesError;
       setStaff(profiles || []);
@@ -118,15 +155,10 @@ export function CasesPage() {
     }
   };
 
-  const handleStatusChange = async (caseId: string, newStatus: Case['status']) => {
+  const handleStatusChange = async (caseId: string, newStatus: string) => {
     try {
       const caseToUpdate = cases.find(c => c.id === caseId);
       if (!caseToUpdate) return;
-
-      // Verify organization access
-      if (!organizations.some(org => org.id === caseToUpdate.organization_id)) {
-        throw new Error('You do not have permission to update this case');
-      }
 
       const { error } = await supabase
         .from('cases')
@@ -134,8 +166,7 @@ export function CasesPage() {
           status: newStatus,
           updated_at: new Date().toISOString()
         })
-        .eq('id', caseId)
-        .eq('organization_id', caseToUpdate.organization_id);
+        .eq('id', caseId);
 
       if (error) throw error;
       await fetchCases();
@@ -146,20 +177,13 @@ export function CasesPage() {
   };
 
   const handleDelete = async (caseId: string) => {
+    if (!window.confirm('Are you sure you want to delete this case?')) return;
+
     try {
-      const caseToDelete = cases.find(c => c.id === caseId);
-      if (!caseToDelete) return;
-
-      // Verify organization access
-      if (!organizations.some(org => org.id === caseToDelete.organization_id)) {
-        throw new Error('You do not have permission to delete this case');
-      }
-
       const { error } = await supabase
         .from('cases')
         .delete()
-        .eq('id', caseId)
-        .eq('organization_id', caseToDelete.organization_id);
+        .eq('id', caseId);
 
       if (error) throw error;
       await fetchCases();
@@ -173,26 +197,15 @@ export function CasesPage() {
     if (!selectedCases.length) return;
 
     try {
-      // Get cases to update
-      const casesToUpdate = cases.filter(c => selectedCases.includes(c.id));
-      
-      // Verify organization access for all selected cases
-      const hasAccess = casesToUpdate.every(c => 
-        organizations.some(org => org.id === c.organization_id)
-      );
-
-      if (!hasAccess) {
-        throw new Error('You do not have permission to update some of these cases');
-      }
-
       if (action === 'delete') {
-        if (!window.confirm('Are you sure you want to delete the selected cases?')) return;
+        if (!window.confirm(`Are you sure you want to delete ${selectedCases.length} cases?`)) {
+          return;
+        }
         
         const { error } = await supabase
           .from('cases')
           .delete()
-          .in('id', selectedCases)
-          .in('organization_id', organizations.map(org => org.id));
+          .in('id', selectedCases);
 
         if (error) throw error;
       } else {
@@ -202,8 +215,7 @@ export function CasesPage() {
             status: action,
             updated_at: new Date().toISOString()
           })
-          .in('id', selectedCases)
-          .in('organization_id', organizations.map(org => org.id));
+          .in('id', selectedCases);
 
         if (error) throw error;
       }
@@ -222,7 +234,7 @@ export function CasesPage() {
         .from('cases')
         .update({ 
           owner_id: userId,
-          status: 'Assigned',
+          status: caseStatuses.find(s => s.value === 'Assigned')?.value || 'Assigned',
           updated_at: new Date().toISOString()
         })
         .eq('id', caseId);
@@ -254,6 +266,37 @@ export function CasesPage() {
     if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
     return 0;
   });
+
+  // Get style for status badge
+  const getStatusStyle = (status: string) => {
+    const statusValue = caseStatuses.find(s => s.value === status);
+    if (!statusValue?.color) return {};
+    return {
+      backgroundColor: statusValue.color,
+      color: statusValue.text_color || '#FFFFFF'
+    };
+  };
+
+  // Get style for type badge
+  const getTypeStyle = (type: string) => {
+    const typeValue = caseTypes.find(t => t.value === type);
+    if (!typeValue?.color) return {};
+    return {
+      backgroundColor: typeValue.color,
+      color: typeValue.text_color || '#FFFFFF'
+    };
+  };
+
+  // Get label for type and status
+  const getTypeLabel = (typeValue: string) => {
+    const type = caseTypes.find(t => t.value === typeValue);
+    return type?.label || typeValue;
+  };
+
+  const getStatusLabel = (statusValue: string) => {
+    const status = caseStatuses.find(s => s.value === statusValue);
+    return status?.label || statusValue;
+  };
 
   if (loading) {
     return (
@@ -298,10 +341,11 @@ export function CasesPage() {
               className="px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
             >
               <option value="all">All Status</option>
-              <option value="New">New</option>
-              <option value="Assigned">Assigned</option>
-              <option value="In Progress">In Progress</option>
-              <option value="Completed">Completed</option>
+              {caseStatuses.map(status => (
+                <option key={status.id} value={status.value}>
+                  {status.label}
+                </option>
+              ))}
             </select>
 
             <select
@@ -310,9 +354,11 @@ export function CasesPage() {
               className="px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
             >
               <option value="all">All Types</option>
-              <option value="Design Inquiry">Design Inquiry</option>
-              <option value="Career">Career</option>
-              <option value="Other">Other</option>
+              {caseTypes.map(type => (
+                <option key={type.id} value={type.value}>
+                  {type.label}
+                </option>
+              ))}
             </select>
 
             {selectedCases.length > 0 && (
@@ -322,9 +368,11 @@ export function CasesPage() {
                   className="px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
                 >
                   <option value="">Bulk Actions</option>
-                  <option value="Assigned">Mark as Assigned</option>
-                  <option value="In Progress">Mark as In Progress</option>
-                  <option value="Completed">Mark as Completed</option>
+                  {caseStatuses.map(status => (
+                    <option key={status.id} value={status.value}>
+                      Mark as {status.label}
+                    </option>
+                  ))}
                   <option value="delete">Delete Selected</option>
                 </select>
                 <span className="text-sm text-gray-500">
@@ -408,30 +456,29 @@ export function CasesPage() {
                       {case_.contact.first_name} {case_.contact.last_name}
                     </div>
                     <div className="text-sm text-gray-500">
-                      {case_.contact.company}
-                    </div>
-                    <div className="text-sm text-gray-500">
                       {case_.contact.email}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-primary-100 text-primary-800">
-                      {case_.type}
+                    <span 
+                      className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
+                      style={getTypeStyle(case_.type)}
+                    >
+                      {getTypeLabel(case_.type)}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <select
                       value={case_.status}
-                      onChange={(e) => handleStatusChange(case_.id, e.target.value as Case['status'])}
-                      className={cn(
-                        "px-2 py-1 text-xs font-medium rounded-full",
-                        STATUS_COLORS[case_.status]
-                      )}
+                      onChange={(e) => handleStatusChange(case_.id, e.target.value)}
+                      className="px-2 py-1 text-xs font-medium rounded-full"
+                      style={getStatusStyle(case_.status)}
                     >
-                      <option value="New">New</option>
-                      <option value="Assigned">Assigned</option>
-                      <option value="In Progress">In Progress</option>
-                      <option value="Completed">Completed</option>
+                      {caseStatuses.map(status => (
+                        <option key={status.id} value={status.value}>
+                          {status.label}
+                        </option>
+                      ))}
                     </select>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">

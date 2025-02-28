@@ -3,18 +3,51 @@ import { motion } from 'framer-motion';
 import { Plus, Edit, Trash2, Eye, EyeOff } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 import type { Database } from '../../lib/database.types';
 
 type PortfolioItem = Database['public']['Tables']['portfolio_items']['Row'];
+type PicklistValue = {
+  id: string;
+  value: string;
+  label: string;
+  is_default: boolean;
+  is_active: boolean;
+};
 
 export function AdminPortfolioPage() {
+  const { organizations } = useAuth();
   const [items, setItems] = useState<PortfolioItem[]>([]);
+  const [categories, setCategories] = useState<PicklistValue[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchItems();
-  }, []);
+    if (organizations.length > 0) {
+      fetchItems();
+      fetchCategories();
+    } else {
+      setLoading(false);
+    }
+  }, [organizations]);
+
+  const fetchCategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('picklist_values')
+        .select('id, value, label, is_default, is_active')
+        .eq('type', 'portfolio_category')
+        .eq('is_active', true)
+        .order('display_order', { ascending: true })
+        .order('label', { ascending: true });
+
+      if (error) throw error;
+      setCategories(data || []);
+    } catch (err) {
+      console.error('Error fetching categories:', err);
+      setError('Failed to load categories');
+    }
+  };
 
   const fetchItems = async () => {
     try {
@@ -22,13 +55,14 @@ export function AdminPortfolioPage() {
       const { data, error } = await supabase
         .from('portfolio_items')
         .select('*')
+        .in('organization_id', organizations.map(org => org.id))
         .order('created_at', { ascending: false });
 
       if (error) throw error;
       setItems(data || []);
     } catch (err) {
       console.error('Error fetching portfolio items:', err);
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      setError(err instanceof Error ? err.message : 'Failed to load portfolio items');
     } finally {
       setLoading(false);
     }
@@ -36,31 +70,48 @@ export function AdminPortfolioPage() {
 
   const togglePublished = async (item: PortfolioItem) => {
     try {
+      // Verify organization access
+      if (!organizations.some(org => org.id === item.organization_id)) {
+        throw new Error('You do not have permission to modify this item');
+      }
+
       const { error } = await supabase
         .from('portfolio_items')
-        .update({ published: !item.published })
-        .eq('id', item.id);
+        .update({ 
+          published: !item.published,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', item.id)
+        .eq('organization_id', item.organization_id);
 
       if (error) throw error;
       await fetchItems();
     } catch (err) {
       console.error('Error toggling item status:', err);
+      setError(err instanceof Error ? err.message : 'Failed to update item status');
     }
   };
 
-  const deleteItem = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this item?')) return;
-
+  const deleteItem = async (id: string, organizationId: string) => {
     try {
+      // Verify organization access
+      if (!organizations.some(org => org.id === organizationId)) {
+        throw new Error('You do not have permission to delete this item');
+      }
+
+      if (!window.confirm('Are you sure you want to delete this item?')) return;
+
       const { error } = await supabase
         .from('portfolio_items')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .eq('organization_id', organizationId);
 
       if (error) throw error;
       await fetchItems();
     } catch (err) {
       console.error('Error deleting item:', err);
+      setError(err instanceof Error ? err.message : 'Failed to delete item');
     }
   };
 
@@ -72,10 +123,32 @@ export function AdminPortfolioPage() {
     );
   }
 
+  if (error) {
+    return (
+      <div className="bg-red-50 text-red-600 p-4 rounded-lg">
+        {error}
+      </div>
+    );
+  }
+
+  if (organizations.length === 0) {
+    return (
+      <div className="bg-yellow-50 text-yellow-800 p-4 rounded-lg">
+        You need to be part of an organization to manage portfolio items.
+      </div>
+    );
+  }
+
+  // Get category label for display
+  const getCategoryLabel = (categoryValue: string) => {
+    const category = categories.find(c => c.value === categoryValue);
+    return category?.label || categoryValue;
+  };
+
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Portfolio Management</h1>
+        <h1 className="text-2xl font-bold">Portfolio Items</h1>
         <Link
           to="/admin/portfolio/new"
           className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
@@ -102,7 +175,7 @@ export function AdminPortfolioPage() {
             </div>
             <div className="p-4">
               <h3 className="text-lg font-medium text-gray-900">{item.title}</h3>
-              <p className="mt-1 text-sm text-gray-500">{item.category}</p>
+              <p className="mt-1 text-sm text-gray-500">{getCategoryLabel(item.category)}</p>
               <div className="mt-4 flex justify-end space-x-4">
                 <button
                   onClick={() => togglePublished(item)}
@@ -121,7 +194,7 @@ export function AdminPortfolioPage() {
                   <Edit className="w-5 h-5" />
                 </Link>
                 <button
-                  onClick={() => deleteItem(item.id)}
+                  onClick={() => deleteItem(item.id, item.organization_id)}
                   className="p-2 text-red-600 hover:bg-red-50 rounded-full"
                 >
                   <Trash2 className="w-5 h-5" />
