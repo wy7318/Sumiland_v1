@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Save, X, AlertCircle, DollarSign, Percent } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { cn, formatCurrency } from '../../lib/utils';
+import { cn } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
 import { CustomFieldsForm } from './CustomFieldsForm';
 
@@ -11,7 +11,7 @@ type Order = {
   order_id: string;
   order_number: string;
   customer_id: string;
-  status: 'New' | 'In Progress' | 'In Review' | 'Completed' | 'Cancelled';
+  status: string;
   payment_status: 'Pending' | 'Partial Received' | 'Fully Received';
   payment_amount: number;
   total_amount: number;
@@ -31,6 +31,16 @@ type OrderItem = {
   notes: string | null;
 };
 
+type PicklistValue = {
+  id: string;
+  value: string;
+  label: string;
+  is_default: boolean;
+  is_active: boolean;
+  color: string | null;
+  text_color: string | null;
+};
+
 export function OrderForm() {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -42,8 +52,10 @@ export function OrderForm() {
   const [paymentAmount, setPaymentAmount] = useState<number>(0);
   const [paymentPercent, setPaymentPercent] = useState<number>(0);
   const [customFields, setCustomFields] = useState<Record<string, any>>({});
+  const [orderStatuses, setOrderStatuses] = useState<PicklistValue[]>([]);
 
   useEffect(() => {
+    fetchPicklists();
     if (id) {
       fetchOrder();
     }
@@ -56,28 +68,42 @@ export function OrderForm() {
     }
   }, [order]);
 
+  const fetchPicklists = async () => {
+    try {
+      // Fetch order statuses
+      const { data: statusData, error: statusError } = await supabase
+        .from('picklist_values')
+        .select('id, value, label, is_default, is_active, color, text_color')
+        .eq('type', 'order_status')
+        .eq('is_active', true)
+        .order('display_order', { ascending: true });
+
+      if (statusError) throw statusError;
+      setOrderStatuses(statusData || []);
+
+      // If no order is being edited, set default status
+      if (!id && statusData) {
+        const defaultStatus = statusData.find(s => s.is_default)?.value || statusData[0]?.value;
+        if (defaultStatus) {
+          setOrder(prev => prev ? { ...prev, status: defaultStatus } : null);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching picklists:', err);
+      setError('Failed to load picklist values');
+    }
+  };
+
   const fetchOrder = async () => {
     try {
-      const { data: orderData, error: orderError } = await supabase
+      const { data: orderData, error } = await supabase
         .from('order_hdr')
         .select('*')
         .eq('order_id', id)
         .single();
 
-      if (orderError) throw orderError;
+      if (error) throw error;
       setOrder(orderData);
-
-      // If order came from a quote, get quote details first
-      let quoteDetails = null;
-      if (orderData.quote_id) {
-        const { data: quoteData, error: quoteError } = await supabase
-          .from('quote_dtl')
-          .select('*')
-          .eq('quote_id', orderData.quote_id);
-
-        if (quoteError) throw quoteError;
-        quoteDetails = quoteData;
-      }
 
       // Get order details
       const { data: itemsData, error: itemsError } = await supabase
@@ -86,24 +112,11 @@ export function OrderForm() {
         .eq('order_id', id);
 
       if (itemsError) throw itemsError;
-
-      // Combine order details with quote details
-      const combinedItems = itemsData.map((item: any, index: number) => {
-        // If this item came from a quote, find the matching quote detail
-        const quoteItem = quoteDetails?.[index]; // Match by index since they should be in same order
-
-        return {
-          ...item,
-          item_name: quoteItem?.item_name || item.notes || 'Custom Item',
-          description: item.description || null,
-          unit_price: quoteItem?.unit_price || item.unit_price
-        };
-      });
-
-      setItems(combinedItems);
+      setItems(itemsData || []);
     } catch (err) {
       console.error('Error fetching order:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load order');
+      setError('Failed to load order');
+      navigate('/admin/orders');
     }
   };
 
@@ -201,6 +214,16 @@ export function OrderForm() {
     }
   };
 
+  // Get style for status badge
+  const getStatusStyle = (status: string) => {
+    const statusValue = orderStatuses.find(s => s.value === status);
+    if (!statusValue?.color) return {};
+    return {
+      backgroundColor: statusValue.color,
+      color: statusValue.text_color || '#FFFFFF'
+    };
+  };
+
   if (!order) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -239,14 +262,15 @@ export function OrderForm() {
           </label>
           <select
             value={order.status}
-            onChange={(e) => setOrder(prev => prev ? { ...prev, status: e.target.value as Order['status'] } : null)}
-            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+            onChange={(e) => setOrder(prev => prev ? { ...prev, status: e.target.value } : null)}
+            className="text-sm font-medium rounded-full px-3 py-1"
+            style={getStatusStyle(order.status)}
           >
-            <option value="New">New</option>
-            <option value="In Progress">In Progress</option>
-            <option value="In Review">In Review</option>
-            <option value="Completed">Completed</option>
-            <option value="Cancelled">Cancelled</option>
+            {orderStatuses.map(status => (
+              <option key={status.id} value={status.value}>
+                {status.label}
+              </option>
+            ))}
           </select>
         </div>
 
@@ -268,7 +292,7 @@ export function OrderForm() {
               />
             </div>
             <span className="text-sm text-gray-500 whitespace-nowrap">
-              of {formatCurrency(order.total_amount)}
+              of {order.total_amount.toFixed(2)}
             </span>
           </div>
           <div className="relative">
@@ -381,7 +405,7 @@ export function OrderForm() {
                   <div className="text-right">
                     <span className="text-sm text-gray-500">Subtotal:</span>
                     <span className="ml-2 font-medium">
-                      {formatCurrency(item.subtotal)}
+                      {(item.subtotal).toFixed(2)}
                     </span>
                   </div>
                 </div>
