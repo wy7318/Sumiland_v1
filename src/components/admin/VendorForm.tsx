@@ -16,11 +16,21 @@ type Customer = {
   company: string | null;
 };
 
+type PicklistValue = {
+  id: string;
+  value: string;
+  label: string;
+  is_default: boolean;
+  is_active: boolean;
+  color: string | null;
+  text_color: string | null;
+};
+
 type FormData = {
   name: string;
-  type: 'Customer' | 'Distributor' | 'Vendor' | 'Manufacturer' | 'Corporate' | '';
+  type: string;
   customer_id: string | null;
-  status: 'active' | 'inactive';
+  status: string;
   payment_terms: string;
   notes: string;
   shipping_address_line1: string;
@@ -42,7 +52,7 @@ const initialFormData: FormData = {
   name: '',
   type: '',
   customer_id: null,
-  status: 'active',
+  status: '',
   payment_terms: '',
   notes: '',
   shipping_address_line1: '',
@@ -71,10 +81,13 @@ export function VendorForm() {
   const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [accountTypes, setAccountTypes] = useState<PicklistValue[]>([]);
+  const [accountStatuses, setAccountStatuses] = useState<PicklistValue[]>([]);
   
   const customerSearchRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    fetchPicklists();
     if (id) {
       fetchVendor();
     } else if (organizations.length > 0) {
@@ -109,6 +122,53 @@ export function VendorForm() {
       setFilteredCustomers([]);
     }
   }, [customerSearch, customers]);
+
+  const fetchPicklists = async () => {
+    try {
+      // Fetch account types
+      const { data: typeData, error: typeError } = await supabase
+        .from('picklist_values')
+        .select('id, value, label, is_default, is_active, color, text_color')
+        .eq('type', 'account_type')
+        .eq('is_active', true)
+        .order('display_order', { ascending: true })
+        .order('label', { ascending: true });
+
+      if (typeError) throw typeError;
+      setAccountTypes(typeData || []);
+
+      // If no account is being edited, set default type
+      if (!id && typeData) {
+        const defaultType = typeData.find(t => t.is_default)?.value || typeData[0]?.value;
+        if (defaultType) {
+          setFormData(prev => ({ ...prev, type: defaultType }));
+        }
+      }
+
+      // Fetch account statuses
+      const { data: statusData, error: statusError } = await supabase
+        .from('picklist_values')
+        .select('id, value, label, is_default, is_active, color, text_color')
+        .eq('type', 'account_status')
+        .eq('is_active', true)
+        .order('display_order', { ascending: true })
+        .order('label', { ascending: true });
+
+      if (statusError) throw statusError;
+      setAccountStatuses(statusData || []);
+
+      // If no account is being edited, set default status
+      if (!id && statusData) {
+        const defaultStatus = statusData.find(s => s.is_default)?.value || statusData[0]?.value;
+        if (defaultStatus) {
+          setFormData(prev => ({ ...prev, status: defaultStatus }));
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching picklists:', err);
+      setError('Failed to load picklist values');
+    }
+  };
 
   const fetchVendor = async () => {
     try {
@@ -282,6 +342,25 @@ export function VendorForm() {
     }
   };
 
+  // Get style for status badge
+  const getStatusStyle = (status: string) => {
+    const statusValue = accountStatuses.find(s => s.value === status);
+    if (!statusValue?.color) return {};
+    return {
+      backgroundColor: statusValue.color,
+      color: statusValue.text_color || '#FFFFFF'
+    };
+  };
+
+  // Get style for type badge
+  const getTypeStyle = (type: string) => {
+    const typeValue = accountTypes.find(t => t.value === type);
+    if (!typeValue?.color) return {};
+    return {
+      backgroundColor: typeValue.color,
+      color: typeValue.text_color || '#FFFFFF'
+    };
+  };
 
   if (organizations.length === 0) {
     return (
@@ -356,16 +435,37 @@ export function VendorForm() {
             </label>
             <select
               value={formData.type}
-              onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value as FormData['type'] }))}
+              onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value }))}
               className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+              style={getTypeStyle(formData.type)}
               required
             >
               <option value="">Select Type</option>
-              <option value="Customer">Customer</option>
-              <option value="Distributor">Distributor</option>
-              <option value="Vendor">Vendor</option>
-              <option value="Manufacturer">Manufacturer</option>
-              <option value="Corporate">Corporate</option>
+              {accountTypes.map(type => (
+                <option key={type.id} value={type.value}>
+                  {type.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Status
+            </label>
+            <select
+              value={formData.status}
+              onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
+              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+              style={getStatusStyle(formData.status)}
+              required
+            >
+              <option value="">Select Status</option>
+              {accountStatuses.map(status => (
+                <option key={status.id} value={status.value}>
+                  {status.label}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -458,20 +558,6 @@ export function VendorForm() {
                 </motion.div>
               )}
             </AnimatePresence>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Status
-            </label>
-            <select
-              value={formData.status}
-              onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value as FormData['status'] }))}
-              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-            >
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
           </div>
 
           <div>
