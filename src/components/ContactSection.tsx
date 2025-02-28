@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Mail, Phone, Building2, User, Send, Upload, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -10,11 +10,19 @@ type FormData = {
   email: string;
   company: string;
   phone: string;
-  type: 'Design Inquiry' | 'Career' | 'Other' | '';
+  type: string;
   subType: string;
   title: string;
   description: string;
   resume: File | null;
+};
+
+type PicklistValue = {
+  id: string;
+  value: string;
+  label: string;
+  is_default: boolean;
+  is_active: boolean;
 };
 
 const INITIAL_FORM_DATA: FormData = {
@@ -36,6 +44,36 @@ export function ContactSection() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [caseTypes, setCaseTypes] = useState<PicklistValue[]>([]);
+
+  useEffect(() => {
+    fetchCaseTypes();
+  }, []);
+
+  const fetchCaseTypes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('picklist_values')
+        .select('id, value, label, is_default, is_active')
+        .eq('type', 'case_type')
+        .eq('is_active', true)
+        .order('display_order', { ascending: true })
+        .order('label', { ascending: true });
+
+      if (error) throw error;
+      setCaseTypes(data || []);
+
+      // Set default type if available
+      if (data) {
+        const defaultType = data.find(t => t.is_default)?.value || data[0]?.value;
+        if (defaultType) {
+          setFormData(prev => ({ ...prev, type: defaultType }));
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching case types:', err);
+    }
+  };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -50,7 +88,7 @@ export function ContactSection() {
     setError(null);
     
     try {
-      // 1. Get default organization (Sumiland)
+      // Get default organization (Sumiland)
       const { data: orgData, error: orgError } = await supabase
         .from('organizations')
         .select('id')
@@ -60,7 +98,7 @@ export function ContactSection() {
       if (orgError) throw orgError;
       if (!orgData?.id) throw new Error('Default organization not found');
 
-      // 2. Check if customer exists
+      // Check if customer exists
       const { data: existingCustomers, error: customerError } = await supabase
         .from('customers')
         .select('customer_id')
@@ -83,7 +121,7 @@ export function ContactSection() {
             email: formData.email,
             phone: formData.phone || null,
             company: formData.company,
-            organization_id: orgData.id, // Set organization ID
+            organization_id: orgData.id,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           }])
@@ -96,7 +134,7 @@ export function ContactSection() {
         contactId = existingCustomers.customer_id;
       }
 
-      // 3. Upload resume if exists
+      // Upload resume if exists
       let resumeUrl = null;
       if (formData.resume && formData.type === 'Career') {
         const fileExt = formData.resume.name.split('.').pop();
@@ -115,16 +153,16 @@ export function ContactSection() {
         resumeUrl = publicUrl;
       }
 
-      // 4. Create case
+      // Create case
       const { error: caseError } = await supabase
         .from('cases')
         .insert([{
           title: formData.title || `${formData.type} - ${formData.firstName} ${formData.lastName}`,
           type: formData.type,
-          sub_type: formData.type === 'Design Inquiry' ? formData.subType : null,
+          sub_type: formData.type === 'Design_Inquiry' ? formData.subType : null,
           status: 'New',
           contact_id: contactId,
-          organization_id: orgData.id, // Set organization ID
+          organization_id: orgData.id,
           description: formData.description,
           resume_url: resumeUrl,
           created_at: new Date().toISOString(),
@@ -288,7 +326,7 @@ export function ContactSection() {
                     value={formData.type}
                     onChange={e => setFormData(prev => ({ 
                       ...prev, 
-                      type: e.target.value as FormData['type'],
+                      type: e.target.value,
                       subType: '',
                       title: '',
                       description: '',
@@ -298,13 +336,15 @@ export function ContactSection() {
                     required
                   >
                     <option value="">Select Type</option>
-                    <option value="Design Inquiry">Design Inquiry</option>
-                    <option value="Career">Career</option>
-                    <option value="Other">Other</option>
+                    {caseTypes.map(type => (
+                      <option key={type.id} value={type.value}>
+                        {type.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
-                {formData.type === 'Design Inquiry' && (
+                {formData.type === 'Design_Inquiry' && (
                   <>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -317,9 +357,9 @@ export function ContactSection() {
                         required
                       >
                         <option value="">Select Category</option>
-                        <option value="Graphic Design">Graphic Design</option>
-                        <option value="Website Design">Website Design</option>
-                        <option value="Package Design">Package Design</option>
+                        <option value="Graphic_Design">Graphic Design</option>
+                        <option value="Website_Design">Website Design</option>
+                        <option value="Package_Design">Package Design</option>
                         <option value="Branding">Branding</option>
                         <option value="Others">Others</option>
                       </select>

@@ -8,6 +8,13 @@ import { useAuth } from '../../contexts/AuthContext';
 import type { Database } from '../../lib/database.types';
 
 type PortfolioItem = Database['public']['Tables']['portfolio_items']['Row'];
+type PicklistValue = {
+  id: string;
+  value: string;
+  label: string;
+  is_default: boolean;
+  is_active: boolean;
+};
 
 export function EditPortfolioPage() {
   const navigate = useNavigate();
@@ -15,6 +22,7 @@ export function EditPortfolioPage() {
   const { organizations } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [categories, setCategories] = useState<PicklistValue[]>([]);
   const [formData, setFormData] = useState<Partial<PortfolioItem>>({
     title: '',
     description: '',
@@ -24,12 +32,42 @@ export function EditPortfolioPage() {
   });
 
   useEffect(() => {
-    fetchPortfolioItem();
+    fetchCategories();
+    if (id) {
+      fetchPortfolioItem();
+    } else if (organizations.length > 0) {
+      setFormData(prev => ({
+        ...prev,
+        organization_id: organizations[0].id
+      }));
+    }
   }, [id, organizations]);
 
-  const fetchPortfolioItem = async () => {
-    if (!id) return;
+  const fetchCategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('picklist_values')
+        .select('id, value, label, is_default, is_active')
+        .eq('type', 'portfolio_category')
+        .eq('is_active', true)
+        .order('display_order', { ascending: true })
+        .order('label', { ascending: true });
 
+      if (error) throw error;
+      setCategories(data || []);
+
+      // If no category is selected and we have categories, select the default one
+      if (!formData.category && data && data.length > 0) {
+        const defaultCategory = data.find(c => c.is_default)?.value || data[0].value;
+        setFormData(prev => ({ ...prev, category: defaultCategory }));
+      }
+    } catch (err) {
+      console.error('Error fetching categories:', err);
+      setError('Failed to load categories');
+    }
+  };
+
+  const fetchPortfolioItem = async () => {
     try {
       const { data: item, error } = await supabase
         .from('portfolio_items')
@@ -50,7 +88,8 @@ export function EditPortfolioPage() {
       }
     } catch (err) {
       console.error('Error fetching portfolio item:', err);
-      setError('Failed to load portfolio item');
+      setError('Failed to load portfolio item or you do not have access');
+      navigate('/admin/portfolio');
     }
   };
 
@@ -60,7 +99,7 @@ export function EditPortfolioPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!id || !formData.organization_id) return;
+    if (!formData.organization_id) return;
 
     // Verify organization access
     if (!organizations.some(org => org.id === formData.organization_id)) {
@@ -72,19 +111,32 @@ export function EditPortfolioPage() {
     setError(null);
 
     try {
-      const { error: updateError } = await supabase
-        .from('portfolio_items')
-        .update({
-          ...formData,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', id)
-        .eq('organization_id', formData.organization_id);
+      if (id) {
+        const { error: updateError } = await supabase
+          .from('portfolio_items')
+          .update({
+            ...formData,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', id)
+          .eq('organization_id', formData.organization_id);
 
-      if (updateError) throw updateError;
+        if (updateError) throw updateError;
+      } else {
+        const { error: insertError } = await supabase
+          .from('portfolio_items')
+          .insert([{
+            ...formData,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }]);
+
+        if (insertError) throw insertError;
+      }
+
       navigate('/admin/portfolio');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update portfolio item');
+      setError(err instanceof Error ? err.message : 'Failed to save portfolio item');
     } finally {
       setLoading(false);
     }
@@ -105,7 +157,9 @@ export function EditPortfolioPage() {
       className="bg-white rounded-lg shadow-md p-6"
     >
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Edit Portfolio Item</h1>
+        <h1 className="text-2xl font-bold">
+          {id ? 'Edit Portfolio Item' : 'Add New Portfolio Item'}
+        </h1>
         <button
           onClick={() => navigate('/admin/portfolio')}
           className="p-2 text-gray-500 hover:text-gray-700 rounded-full hover:bg-gray-100"
@@ -147,10 +201,11 @@ export function EditPortfolioPage() {
             className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
           >
             <option value="">Select a category</option>
-            <option value="Application Development">Application Development</option>
-            <option value="Package Design">Package Design</option>
-            <option value="Design">Design</option>
-            <option value="Branding">Branding</option>
+            {categories.map(category => (
+              <option key={category.id} value={category.value}>
+                {category.label}
+              </option>
+            ))}
           </select>
         </div>
 
