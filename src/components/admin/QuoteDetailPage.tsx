@@ -3,26 +3,22 @@ import { useNavigate, useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
   ArrowLeft, Building2, Mail, Phone, Calendar,
-  Edit, AlertCircle, FileText, DollarSign, User,
-  CheckCircle, X, Send, Package
+  Edit, AlertCircle, FileDown, DollarSign, User,
+  CheckCircle, X, Send, Package, ShoppingBag
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { cn, formatCurrency } from '../../lib/utils';
 import { AccountDetailsModal } from './AccountDetailsModal';
 import { CustomFieldsSection } from './CustomFieldsSection';
 
-type Order = {
-  order_id: string;
-  order_number: string;
+type Quote = {
+  quote_id: string;
+  quote_number: string;
   customer_id: string;
   vendor_id: string | null;
   status: string;
-  payment_status: 'Pending' | 'Partial Received' | 'Fully Received';
-  payment_amount: number;
   total_amount: number;
   notes: string | null;
-  quote_id: string | null;
-  quote_number: string | null;
   created_at: string;
   organization_id: string;
   vendor: {
@@ -38,16 +34,6 @@ type Order = {
       phone: string | null;
       company: string | null;
     } | null;
-    shipping_address_line1: string | null;
-    shipping_address_line2: string | null;
-    shipping_city: string | null;
-    shipping_state: string | null;
-    shipping_country: string | null;
-    billing_address_line1: string | null;
-    billing_address_line2: string | null;
-    billing_city: string | null;
-    billing_state: string | null;
-    billing_country: string | null;
   } | null;
   customer: {
     first_name: string;
@@ -57,18 +43,11 @@ type Order = {
     company: string | null;
   };
   items: {
-    id: string;
-    product_id: string | null;
+    quote_dtl_id: string;
+    item_name: string;
+    item_desc: string | null;
     quantity: number;
     unit_price: number;
-    subtotal: number;
-    notes: string | null;
-    item_name: string | null;
-    description: string | null;
-    product: {
-      name: string;
-      description: string;
-    } | null;
   }[];
 };
 
@@ -82,47 +61,47 @@ type PicklistValue = {
   text_color: string | null;
 };
 
-export function OrderDetailPage() {
+export function QuoteDetailPage() {
   const navigate = useNavigate();
   const { id } = useParams();
-  const [order, setOrder] = useState<Order | null>(null);
+  const [quote, setQuote] = useState<Quote | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAccountModal, setShowAccountModal] = useState(false);
-  const [orderStatuses, setOrderStatuses] = useState<PicklistValue[]>([]);
+  const [quoteStatuses, setQuoteStatuses] = useState<PicklistValue[]>([]);
+  const [creatingOrder, setCreatingOrder] = useState(false);
 
   useEffect(() => {
     fetchPicklists();
     if (id) {
-      fetchOrder();
+      fetchQuote();
     }
   }, [id]);
 
   const fetchPicklists = async () => {
     try {
-      // Fetch order statuses
+      // Fetch quote statuses
       const { data: statusData, error: statusError } = await supabase
         .from('picklist_values')
         .select('id, value, label, is_default, is_active, color, text_color')
-        .eq('type', 'order_status')
+        .eq('type', 'quote_status')
         .eq('is_active', true)
         .order('display_order', { ascending: true });
 
       if (statusError) throw statusError;
-      setOrderStatuses(statusData || []);
+      setQuoteStatuses(statusData || []);
     } catch (err) {
       console.error('Error fetching picklists:', err);
       setError('Failed to load picklist values');
     }
   };
 
-  const fetchOrder = async () => {
+  const fetchQuote = async () => {
     try {
       if (!id) return;
 
-      // Get the order with quote information
-      const { data: orderData, error: orderError } = await supabase
-        .from('order_hdr')
+      const { data: quoteData, error: quoteError } = await supabase
+        .from('quote_hdr')
         .select(`
           *,
           vendor:vendors(
@@ -137,84 +116,19 @@ export function OrderDetailPage() {
               email,
               phone,
               company
-            ),
-            shipping_address_line1,
-            shipping_address_line2,
-            shipping_city,
-            shipping_state,
-            shipping_country,
-            billing_address_line1,
-            billing_address_line2,
-            billing_city,
-            billing_state,
-            billing_country
+            )
           ),
-          customer:customers(*)
+          customer:customers(*),
+          items:quote_dtl(*)
         `)
-        .eq('order_id', id)
+        .eq('quote_id', id)
         .single();
 
-      if (orderError) throw orderError;
-
-      // If there's a quote_id, get the quote details and number
-      let quoteDetails = null;
-      let quoteNumber = null;
-      if (orderData.quote_id) {
-        // Get quote header for the quote number
-        const { data: quoteHeader, error: quoteHeaderError } = await supabase
-          .from('quote_hdr')
-          .select('quote_number')
-          .eq('quote_id', orderData.quote_id)
-          .single();
-
-        if (quoteHeaderError) throw quoteHeaderError;
-        quoteNumber = quoteHeader.quote_number;
-
-        // Get quote details
-        const { data: quoteData, error: quoteError } = await supabase
-          .from('quote_dtl')
-          .select('*')
-          .eq('quote_id', orderData.quote_id);
-
-        if (quoteError) throw quoteError;
-        quoteDetails = quoteData;
-      }
-
-      // Get order details
-      const { data: itemsData, error: itemsError } = await supabase
-        .from('order_dtl')
-        .select(`
-          *,
-          product:products(
-            name,
-            description
-          )
-        `)
-        .eq('order_id', id);
-
-      if (itemsError) throw itemsError;
-
-      // Combine order details with quote details
-      const items = itemsData.map((item: any, index: number) => {
-        // If this item came from a quote, find the matching quote detail
-        const quoteItem = quoteDetails?.[index]; // Match by index since they should be in same order
-
-        return {
-          ...item,
-          item_name: quoteItem?.item_name || item.notes || 'Custom Item',
-          description: item.description || quoteItem?.item_desc,
-          unit_price: quoteItem?.unit_price || item.unit_price
-        };
-      });
-
-      setOrder({
-        ...orderData,
-        quote_number: quoteNumber,
-        items
-      });
+      if (quoteError) throw quoteError;
+      setQuote(quoteData);
     } catch (err) {
-      console.error('Error fetching order:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load order');
+      console.error('Error fetching quote:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load quote');
     } finally {
       setLoading(false);
     }
@@ -222,27 +136,79 @@ export function OrderDetailPage() {
 
   const handleStatusChange = async (newStatus: string) => {
     try {
-      if (!id || !order) return;
+      if (!id || !quote) return;
 
       const { error } = await supabase
-        .from('order_hdr')
-        .update({
+        .from('quote_hdr')
+        .update({ 
           status: newStatus,
           updated_at: new Date().toISOString()
         })
-        .eq('order_id', id);
+        .eq('quote_id', id);
 
       if (error) throw error;
-      await fetchOrder();
+      await fetchQuote();
     } catch (err) {
       console.error('Error updating status:', err);
       setError(err instanceof Error ? err.message : 'Failed to update status');
     }
   };
 
+  const handleCreateOrder = async () => {
+    try {
+      if (!quote) {
+        setError("Quote data is missing.");
+        return;
+      }
+  
+      setCreatingOrder(true);
+      setError(null);
+  
+      // Get the authenticated user
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError || !userData?.user?.id) {
+        throw new Error('User not authenticated.');
+      }
+  
+      const userId = userData.user.id;
+  
+      // Call the Supabase function to create an order
+      const { data, error } = await supabase
+        .rpc('create_order_from_quote', { 
+          quote_id_param: quote.quote_id, 
+          user_id_param: userId 
+        });
+  
+      console.log('Supabase Function Response:', data);
+  
+      if (error) {
+        console.error('Supabase RPC Error:', error);
+        throw error;
+      }
+  
+      if (data?.error) {
+        console.error('Supabase Function Error:', data.error);
+        throw new Error(data.error);
+      }
+  
+      alert(`Order created successfully! Order ID: ${data.order_id}`);
+  
+      // Navigate to the orders page after successfully creating the order
+      navigate('/admin/orders');
+    } catch (err) {
+      console.error('Error creating order:', err);
+      setError(err instanceof Error ? err.message : 'Failed to create order');
+      alert('Error creating order: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    } finally {
+      setCreatingOrder(false);
+    }
+  };
+
+
+
   // Get style for status badge
   const getStatusStyle = (status: string) => {
-    const statusValue = orderStatuses.find(s => s.value === status);
+    const statusValue = quoteStatuses.find(s => s.value === status);
     if (!statusValue?.color) return {};
     return {
       backgroundColor: statusValue.color,
@@ -252,7 +218,7 @@ export function OrderDetailPage() {
 
   // Get label for status
   const getStatusLabel = (status: string) => {
-    return orderStatuses.find(s => s.value === status)?.label || status;
+    return quoteStatuses.find(s => s.value === status)?.label || status;
   };
 
   if (loading) {
@@ -263,11 +229,11 @@ export function OrderDetailPage() {
     );
   }
 
-  if (!order) {
+  if (!quote) {
     return (
       <div className="bg-red-50 text-red-600 p-4 rounded-lg flex items-center">
         <AlertCircle className="w-5 h-5 mr-2" />
-        Order not found
+        Quote not found
       </div>
     );
   }
@@ -276,19 +242,29 @@ export function OrderDetailPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <button
-          onClick={() => navigate('/admin/orders')}
+          onClick={() => navigate('/admin/quotes')}
           className="inline-flex items-center text-gray-600 hover:text-gray-900"
         >
           <ArrowLeft className="w-5 h-5 mr-2" />
-          Back to Orders
+          Back to Quotes
         </button>
-        <Link
-          to={`/admin/orders/${id}/edit`}
-          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
-        >
-          <Edit className="w-4 h-4 mr-2" />
-          Edit Order
-        </Link>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={handleCreateOrder}
+            disabled={creatingOrder}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 disabled:opacity-50"
+          >
+            <ShoppingBag className="w-4 h-4 mr-2" />
+            {creatingOrder ? 'Creating Order...' : 'Create Order'}
+          </button>
+          <Link
+            to={`/admin/quotes/${id}/edit`}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
+          >
+            <Edit className="w-4 h-4 mr-2" />
+            Edit Quote
+          </Link>
+        </div>
       </div>
 
       {error && (
@@ -302,30 +278,19 @@ export function OrderDetailPage() {
         <div className="p-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
             <div>
-              <div className="flex items-center gap-4 mb-2">
-                <h1 className="text-2xl font-bold">{order.order_number}</h1>
-                {order.quote_id && order.quote_number && (
-                  <Link
-                    to={`/admin/quotes/${order.quote_id}/edit`}
-                    className="inline-flex items-center text-sm text-primary-600 hover:text-primary-700"
-                  >
-                    <FileText className="w-4 h-4 mr-1" />
-                    From Quote: {order.quote_number}
-                  </Link>
-                )}
-              </div>
+              <h1 className="text-2xl font-bold mb-2">{quote.quote_number}</h1>
               <div className="flex items-center gap-4 text-sm text-gray-500">
                 <span className="flex items-center">
                   <Calendar className="w-4 h-4 mr-1" />
-                  {new Date(order.created_at).toLocaleDateString()}
+                  {new Date(quote.created_at).toLocaleDateString()}
                 </span>
                 <select
-                  value={order.status}
+                  value={quote.status}
                   onChange={(e) => handleStatusChange(e.target.value)}
                   className="text-sm font-medium rounded-full px-3 py-1"
-                  style={getStatusStyle(order.status)}
+                  style={getStatusStyle(quote.status)}
                 >
-                  {orderStatuses.map(status => (
+                  {quoteStatuses.map(status => (
                     <option key={status.id} value={status.value}>
                       {status.label}
                     </option>
@@ -337,7 +302,7 @@ export function OrderDetailPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {/* Account Information */}
-            {order.vendor && (
+            {quote.vendor && (
               <div>
                 <h2 className="text-lg font-semibold mb-4">Account Information</h2>
                 <div className="bg-gray-50 rounded-lg p-4 space-y-4">
@@ -345,9 +310,9 @@ export function OrderDetailPage() {
                     <div className="flex items-center">
                       <Building2 className="w-5 h-5 text-gray-400 mr-3" />
                       <div>
-                        <div className="font-medium">{order.vendor.name}</div>
+                        <div className="font-medium">{quote.vendor.name}</div>
                         <div className="text-sm text-gray-500">
-                          Type: {order.vendor.type}
+                          Type: {quote.vendor.type}
                         </div>
                       </div>
                     </div>
@@ -358,31 +323,31 @@ export function OrderDetailPage() {
                       View Details
                     </button>
                   </div>
-                  {order.vendor.customer && (
+                  {quote.vendor.customer && (
                     <div className="space-y-2">
                       <div className="flex items-center">
                         <User className="w-4 h-4 text-gray-400 mr-2" />
                         <span className="text-sm text-gray-600">
-                          Contact: {order.vendor.customer.first_name} {order.vendor.customer.last_name}
+                          Contact: {quote.vendor.customer.first_name} {quote.vendor.customer.last_name}
                         </span>
                       </div>
                       <div className="flex items-center">
                         <Mail className="w-4 h-4 text-gray-400 mr-2" />
                         <a
-                          href={`mailto:${order.vendor.customer.email}`}
+                          href={`mailto:${quote.vendor.customer.email}`}
                           className="text-sm text-primary-600 hover:text-primary-700"
                         >
-                          {order.vendor.customer.email}
+                          {quote.vendor.customer.email}
                         </a>
                       </div>
-                      {order.vendor.customer.phone && (
+                      {quote.vendor.customer.phone && (
                         <div className="flex items-center">
                           <Phone className="w-4 h-4 text-gray-400 mr-2" />
                           <a
-                            href={`tel:${order.vendor.customer.phone}`}
+                            href={`tel:${quote.vendor.customer.phone}`}
                             className="text-sm text-primary-600 hover:text-primary-700"
                           >
-                            {order.vendor.customer.phone}
+                            {quote.vendor.customer.phone}
                           </a>
                         </div>
                       )}
@@ -400,78 +365,46 @@ export function OrderDetailPage() {
                   <User className="w-5 h-5 text-gray-400 mr-3" />
                   <div>
                     <div className="font-medium">
-                      {order.customer.first_name} {order.customer.last_name}
+                      {quote.customer.first_name} {quote.customer.last_name}
                     </div>
-                    {order.customer.company && (
+                    {quote.customer.company && (
                       <div className="text-sm text-gray-500">
-                        {order.customer.company}
+                        {quote.customer.company}
                       </div>
                     )}
                   </div>
                 </div>
-                {order.customer.email && (
+                {quote.customer.email && (
                   <div className="flex items-center">
                     <Mail className="w-5 h-5 text-gray-400 mr-3" />
                     <a
-                      href={`mailto:${order.customer.email}`}
+                      href={`mailto:${quote.customer.email}`}
                       className="text-primary-600 hover:text-primary-700"
                     >
-                      {order.customer.email}
+                      {quote.customer.email}
                     </a>
                   </div>
                 )}
-                {order.customer.phone && (
+                {quote.customer.phone && (
                   <div className="flex items-center">
                     <Phone className="w-5 h-5 text-gray-400 mr-3" />
                     <a
-                      href={`tel:${order.customer.phone}`}
+                      href={`tel:${quote.customer.phone}`}
                       className="text-primary-600 hover:text-primary-700"
                     >
-                      {order.customer.phone}
+                      {quote.customer.phone}
                     </a>
                   </div>
                 )}
-              </div>
-            </div>
-
-            {/* Payment Information */}
-            <div>
-              <h2 className="text-lg font-semibold mb-4">Payment Information</h2>
-              <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Total Amount:</span>
-                  <span className="font-medium">{formatCurrency(order.total_amount)}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Amount Received:</span>
-                  <span className="font-medium">{formatCurrency(order.payment_amount)}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Balance Due:</span>
-                  <span className="font-medium text-red-600">
-                    {formatCurrency(order.total_amount - order.payment_amount)}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Payment Status:</span>
-                  <span className={cn(
-                    "px-2 py-1 text-xs font-medium rounded-full",
-                    order.payment_status === 'Pending' && "bg-gray-100 text-gray-800",
-                    order.payment_status === 'Partial Received' && "bg-orange-100 text-orange-800",
-                    order.payment_status === 'Fully Received' && "bg-green-100 text-green-800"
-                  )}>
-                    {order.payment_status}
-                  </span>
-                </div>
               </div>
             </div>
 
             {/* Notes */}
-            {order.notes && (
+            {quote.notes && (
               <div>
                 <h2 className="text-lg font-semibold mb-4">Notes</h2>
                 <div className="bg-gray-50 rounded-lg p-4">
-                  <p className="text-gray-600 whitespace-pre-wrap">{order.notes}</p>
+                  <p className="text-gray-600 whitespace-pre-wrap">{quote.notes}</p>
                 </div>
               </div>
             )}
@@ -479,16 +412,16 @@ export function OrderDetailPage() {
             {/* Add Custom Fields section */}
             <div className="md:col-span-2">
               <CustomFieldsSection
-                entityType="order"
+                entityType="quote"
                 entityId={id || ''}
-                organizationId={order.organization_id}
+                organizationId={quote.organization_id}
                 className="bg-gray-50 rounded-lg p-4"
               />
             </div>
           </div>
 
           <div className="mt-8">
-            <h2 className="text-lg font-semibold mb-4">Order Items</h2>
+            <h2 className="text-lg font-semibold mb-4">Quote Items</h2>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
@@ -508,16 +441,16 @@ export function OrderDetailPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {order.items.map((item) => (
-                    <tr key={item.id}>
+                  {quote.items.map((item) => (
+                    <tr key={item.quote_dtl_id}>
                       <td className="px-6 py-4">
                         <div>
                           <div className="font-medium text-gray-900">
-                            {item.product?.name || item.item_name || 'Custom Item'}
+                            {item.item_name}
                           </div>
-                          {(item.product?.description || item.description) && (
+                          {item.item_desc && (
                             <div className="text-sm text-gray-500">
-                              {item.product?.description || item.description}
+                              {item.item_desc}
                             </div>
                           )}
                         </div>
@@ -543,7 +476,7 @@ export function OrderDetailPage() {
                     </td>
                     <td className="px-6 py-4 text-right whitespace-nowrap">
                       <div className="text-lg font-bold text-gray-900">
-                        {formatCurrency(order.total_amount)}
+                        {formatCurrency(quote.total_amount)}
                       </div>
                     </td>
                   </tr>
@@ -554,9 +487,9 @@ export function OrderDetailPage() {
         </div>
       </div>
 
-      {showAccountModal && order.vendor && (
+      {showAccountModal && quote.vendor && (
         <AccountDetailsModal
-          vendor={order.vendor}
+          vendor={quote.vendor}
           onClose={() => setShowAccountModal(false)}
         />
       )}
