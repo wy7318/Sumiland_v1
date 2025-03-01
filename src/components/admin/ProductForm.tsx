@@ -8,6 +8,16 @@ import { useAuth } from '../../contexts/AuthContext';
 import { CustomFieldsForm } from './CustomFieldsForm';
 import { cn } from '../../lib/utils';
 
+type PicklistValue = {
+  id: string;
+  value: string;
+  label: string;
+  is_default: boolean;
+  is_active: boolean;
+  color: string | null;
+  text_color: string | null;
+};
+
 type Category = {
   id: string;
   name: string;
@@ -19,11 +29,11 @@ type ProductFormData = {
   name: string;
   description: string;
   price: string;
-  category_id: string;
+  category: string;
   status: 'active' | 'inactive';
   image_url: string;
-  stock_unit: 'weight' | 'quantity';
-  weight_unit: 'kg' | 'g' | 'lb' | 'oz' | null;
+  stock_unit: string;
+  weight_unit: string | null;
   min_stock_level: string;
   max_stock_level: string;
   avg_cost: string;
@@ -37,14 +47,16 @@ export function ProductForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [stockUnits, setStockUnits] = useState<PicklistValue[]>([]);
+  const [weightUnits, setWeightUnits] = useState<PicklistValue[]>([]);
   const [formData, setFormData] = useState<ProductFormData>({
     name: '',
     description: '',
     price: '',
-    category_id: '',
+    category: '',
     status: 'active',
     image_url: '',
-    stock_unit: 'quantity',
+    stock_unit: '',
     weight_unit: null,
     min_stock_level: '0',
     max_stock_level: '',
@@ -52,20 +64,59 @@ export function ProductForm() {
   });
 
   useEffect(() => {
+    fetchPicklists();
     fetchCategories();
     if (id) {
       fetchProduct();
     }
   }, [id, organizations]);
 
+  const fetchPicklists = async () => {
+    try {
+      // Fetch stock unit types
+      const { data: stockUnitData, error: stockUnitError } = await supabase
+        .from('picklist_values')
+        .select('id, value, label, is_default, is_active, color, text_color')
+        .eq('type', 'product_stock_unit')
+        .eq('is_active', true)
+        .order('display_order', { ascending: true });
+
+      if (stockUnitError) throw stockUnitError;
+      setStockUnits(stockUnitData || []);
+
+      // If no product is being edited, set default stock unit
+      if (!id && stockUnitData) {
+        const defaultUnit = stockUnitData.find(u => u.is_default)?.value || stockUnitData[0]?.value;
+        if (defaultUnit) {
+          setFormData(prev => ({ ...prev, stock_unit: defaultUnit }));
+        }
+      }
+
+      // Fetch weight units
+      const { data: weightUnitData, error: weightUnitError } = await supabase
+        .from('picklist_values')
+        .select('id, value, label, is_default, is_active, color, text_color')
+        .eq('type', 'product_weight_unit')
+        .eq('is_active', true)
+        .order('display_order', { ascending: true });
+
+      if (weightUnitError) throw weightUnitError;
+      setWeightUnits(weightUnitData || []);
+    } catch (err) {
+      console.error('Error fetching picklists:', err);
+      setError('Failed to load picklist values');
+    }
+  };
+
   const fetchCategories = async () => {
     try {
       const { data, error } = await supabase
-        .from('product_categories')
-        .select('*')
-        .in('organization_id', organizations.map(org => org.id))
-        .order('name');
-
+        .from('picklist_values')
+        .select('id, value, label, is_default, is_active, color, text_color')
+        .eq('type', 'product_category')
+        .eq('is_active', true)
+        .order('display_order', { ascending: true });
+  
       if (error) throw error;
       setCategories(data || []);
     } catch (err) {
@@ -73,7 +124,6 @@ export function ProductForm() {
       setError('Failed to load categories');
     }
   };
-
   const fetchProduct = async () => {
     try {
       const { data: product, error } = await supabase
@@ -89,10 +139,10 @@ export function ProductForm() {
           name: product.name,
           description: product.description || '',
           price: product.price.toString(),
-          category_id: product.category_id || '',
+          category: product.category || '',
           status: product.status,
           image_url: product.image_url || '',
-          stock_unit: product.stock_unit || 'quantity',
+          stock_unit: product.stock_unit || '',
           weight_unit: product.weight_unit,
           min_stock_level: product.min_stock_level?.toString() || '0',
           max_stock_level: product.max_stock_level?.toString() || '',
@@ -235,14 +285,14 @@ export function ProductForm() {
               </label>
               <select
                 id="category"
-                value={formData.category_id}
-                onChange={(e) => setFormData(prev => ({ ...prev, category_id: e.target.value }))}
+                value={formData.category}
+                onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
                 className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
               >
                 <option value="">Select a category</option>
                 {categories.map(category => (
-                  <option key={category.id} value={category.id}>
-                    {category.name} ({category.category_type})
+                  <option key={category.id} value={category.value}>
+                    {category.label} 
                   </option>
                 ))}
               </select>
@@ -297,13 +347,17 @@ export function ProductForm() {
                 value={formData.stock_unit}
                 onChange={(e) => setFormData(prev => ({ 
                   ...prev, 
-                  stock_unit: e.target.value as 'weight' | 'quantity',
-                  weight_unit: e.target.value === 'weight' ? 'kg' : null
+                  stock_unit: e.target.value,
+                  weight_unit: e.target.value === 'weight' ? weightUnits[0]?.value || null : null
                 }))}
                 className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
               >
-                <option value="quantity">Quantity (Units)</option>
-                <option value="weight">Weight</option>
+                <option value="">Select Unit Type</option>
+                {stockUnits.map(unit => (
+                  <option key={unit.id} value={unit.value}>
+                    {unit.label}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -313,14 +367,16 @@ export function ProductForm() {
                   Weight Unit
                 </label>
                 <select
-                  value={formData.weight_unit || 'kg'}
-                  onChange={(e) => setFormData(prev => ({ ...prev, weight_unit: e.target.value as 'kg' | 'g' | 'lb' | 'oz' }))}
+                  value={formData.weight_unit || ''}
+                  onChange={(e) => setFormData(prev => ({ ...prev, weight_unit: e.target.value }))}
                   className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
                 >
-                  <option value="kg">Kilograms (kg)</option>
-                  <option value="g">Grams (g)</option>
-                  <option value="lb">Pounds (lb)</option>
-                  <option value="oz">Ounces (oz)</option>
+                  <option value="">Select Weight Unit</option>
+                  {weightUnits.map(unit => (
+                    <option key={unit.id} value={unit.value}>
+                      {unit.label}
+                    </option>
+                  ))}
                 </select>
               </div>
             )}

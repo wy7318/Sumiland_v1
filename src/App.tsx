@@ -25,6 +25,7 @@ import { CustomersPage } from './components/admin/CustomersPage';
 import { CustomerForm } from './components/admin/CustomerForm';
 import { QuotesPage } from './components/admin/QuotesPage';
 import { QuoteForm } from './components/admin/QuoteForm';
+import { QuoteDetailPage } from './components/admin/QuoteDetailPage';
 import { OrdersPage } from './components/admin/OrdersPage';
 import { OrderDetailPage } from './components/admin/OrderDetailPage';
 import { OrderForm } from './components/admin/OrderForm';
@@ -102,6 +103,7 @@ function App() {
               <Route path="customers/:id/edit" element={<CustomerForm />} />
               <Route path="quotes" element={<QuotesPage />} />
               <Route path="quotes/new" element={<QuoteForm />} />
+              <Route path="quotes/:id" element={<QuoteDetailPage />} />
               <Route path="quotes/:id/edit" element={<QuoteForm />} />
               <Route path="orders" element={<OrdersPage />} />
               <Route path="orders/:id" element={<OrderDetailPage />} />
