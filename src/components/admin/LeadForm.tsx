@@ -53,7 +53,7 @@ type PicklistValue = {
 export function LeadForm() {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { organizations } = useAuth();
+  const { organizations, user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState<FormData>(initialFormData);
@@ -135,6 +135,22 @@ export function LeadForm() {
           owner_id: lead.owner_id,
           organization_id: lead.organization_id
         });
+
+        // Fetch custom fields for this lead
+        const { data: customFieldValues, error: customFieldsError } = await supabase
+          .from('custom_field_values')
+          .select('field_id, value')
+          .eq('entity_id', id);
+
+        if (customFieldsError) throw customFieldsError;
+
+        // Convert custom field values to a key-value pair object
+        const customFieldsData = customFieldValues?.reduce((acc, field) => {
+          acc[field.field_id] = field.value;
+          return acc;
+        }, {} as Record<string, any>) || {};
+
+        setCustomFields(customFieldsData);
       }
     } catch (err) {
       console.error('Error fetching lead:', err);
@@ -185,26 +201,66 @@ export function LeadForm() {
     setError(null);
 
     try {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error('Not authenticated');
+
+      let leadId = id;
+
       if (id) {
+        // Update existing lead
         const { error: updateError } = await supabase
           .from('leads')
           .update({
             ...formData,
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
+            updated_by: userData.user.id
           })
           .eq('id', id);
 
         if (updateError) throw updateError;
       } else {
-        const { error: insertError } = await supabase
+        // Create new lead
+        const { data: newLead, error: insertError } = await supabase
           .from('leads')
           .insert([{
             ...formData,
             created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }]);
+            created_by: userData.user.id,
+            updated_at: new Date().toISOString(),
+            updated_by: userData.user.id
+          }])
+          .select()
+          .single();
 
         if (insertError) throw insertError;
+
+        // Set the new lead ID for custom fields
+        if (newLead) {
+          leadId = newLead.id;
+        }
+      }
+
+      // Save custom field values
+      if (leadId && userData.user) {
+        for (const [fieldId, value] of Object.entries(customFields)) {
+          const { error: valueError } = await supabase
+            .from('custom_field_values')
+            .upsert({
+              organization_id: formData.organization_id,
+              entity_id: leadId,
+              field_id: fieldId,
+              value,
+              created_by: userData.user.id,
+              updated_by: userData.user.id,
+              updated_at: new Date().toISOString()
+            }, {
+              onConflict: 'organization_id,field_id,entity_id'
+            });
+
+          if (valueError) {
+            console.error('Error saving custom field value:', valueError);
+          }
+        }
       }
 
       navigate('/admin/leads');
@@ -260,7 +316,7 @@ export function LeadForm() {
               <input
                 type="text"
                 value={formData.first_name}
-                onChange={(e) => setFormData(prev => ({ ...prev, first_name: e.target.value }))}
+                onChange={e => setFormData(prev => ({ ...prev, first_name: e.target.value }))}
                 className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
                 required
               />
@@ -276,7 +332,7 @@ export function LeadForm() {
               <input
                 type="text"
                 value={formData.last_name}
-                onChange={(e) => setFormData(prev => ({ ...prev, last_name: e.target.value }))}
+                onChange={e => setFormData(prev => ({ ...prev, last_name: e.target.value }))}
                 className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
                 required
               />
@@ -292,7 +348,7 @@ export function LeadForm() {
               <input
                 type="email"
                 value={formData.email}
-                onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                onChange={e => setFormData(prev => ({ ...prev, email: e.target.value }))}
                 className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
                 required
               />
@@ -308,7 +364,7 @@ export function LeadForm() {
               <input
                 type="tel"
                 value={formData.phone}
-                onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                onChange={e => setFormData(prev => ({ ...prev, phone: e.target.value }))}
                 className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
               />
             </div>
@@ -323,7 +379,7 @@ export function LeadForm() {
               <input
                 type="text"
                 value={formData.company}
-                onChange={(e) => setFormData(prev => ({ ...prev, company: e.target.value }))}
+                onChange={e => setFormData(prev => ({ ...prev, company: e.target.value }))}
                 className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
               />
             </div>
@@ -338,7 +394,7 @@ export function LeadForm() {
               <input
                 type="url"
                 value={formData.website}
-                onChange={(e) => setFormData(prev => ({ ...prev, website: e.target.value }))}
+                onChange={e => setFormData(prev => ({ ...prev, website: e.target.value }))}
                 className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
                 placeholder="https://"
               />
@@ -351,7 +407,7 @@ export function LeadForm() {
             </label>
             <select
               value={formData.status}
-              onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
+              onChange={e => setFormData(prev => ({ ...prev, status: e.target.value }))}
               className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
               required
             >
@@ -370,7 +426,7 @@ export function LeadForm() {
             </label>
             <select
               value={formData.lead_source}
-              onChange={(e) => setFormData(prev => ({ ...prev, lead_source: e.target.value }))}
+              onChange={e => setFormData(prev => ({ ...prev, lead_source: e.target.value }))}
               className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
             >
               <option value="">Select Source</option>
@@ -389,7 +445,7 @@ export function LeadForm() {
             <input
               type="text"
               value={formData.product_interest}
-              onChange={(e) => setFormData(prev => ({ ...prev, product_interest: e.target.value }))}
+              onChange={e => setFormData(prev => ({ ...prev, product_interest: e.target.value }))}
               className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
             />
           </div>
@@ -411,7 +467,7 @@ export function LeadForm() {
             </label>
             <textarea
               value={formData.description}
-              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+              onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
               rows={4}
               className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
             />
@@ -422,7 +478,7 @@ export function LeadForm() {
               <input
                 type="checkbox"
                 checked={formData.email_opt_out}
-                onChange={(e) => setFormData(prev => ({ ...prev, email_opt_out: e.target.checked }))}
+                onChange={e => setFormData(prev => ({ ...prev, email_opt_out: e.target.checked }))}
                 className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
               />
               <span className="text-sm text-gray-700">Opt out of email communications</span>
