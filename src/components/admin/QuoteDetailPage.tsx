@@ -3,7 +3,7 @@ import { useNavigate, useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
   ArrowLeft, Building2, Mail, Phone, Calendar,
-  Edit, AlertCircle, FileDown, DollarSign, User,
+  Edit, AlertCircle, FileText, DollarSign, User,
   CheckCircle, X, Send, Package, ShoppingBag
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -110,7 +110,7 @@ export function QuoteDetailPage() {
             type,
             status,
             payment_terms,
-            customer:customers(
+            customer:customers!vendors_customer_id_fkey(
               first_name,
               last_name,
               email,
@@ -179,8 +179,6 @@ export function QuoteDetailPage() {
           user_id_param: userId 
         });
   
-      console.log('Supabase Function Response:', data);
-  
       if (error) {
         console.error('Supabase RPC Error:', error);
         throw error;
@@ -203,8 +201,6 @@ export function QuoteDetailPage() {
       setCreatingOrder(false);
     }
   };
-
-
 
   // Get style for status badge
   const getStatusStyle = (status: string) => {

@@ -9,25 +9,21 @@ import { cn } from '../../lib/utils';
 
 type PicklistValue = {
   id: string;
-  type: string;
   value: string;
   label: string;
-  description: string | null;
   is_default: boolean;
   is_active: boolean;
-  display_order: number;
-  color: string | null;
-  text_color: string | null;
-  created_at: string;
-  organization_id: string;
+  color?: string;
+  text_color?: string;
 };
 
 // Define available tables and their picklist fields
 const PICKLIST_FIELDS = {
-  Portfolio: {
-    label: 'Portfolio',
+  Lead: {
+    label: 'Lead',
     fields: {
-      category: 'Category'
+      status: 'Status',
+      source: 'Source'
     }
   },
   Case: {
@@ -64,6 +60,12 @@ const PICKLIST_FIELDS = {
       type: 'Type',
       status: 'Status'
     }
+  },
+  Portfolio: {
+    label: 'Portfolio',
+    fields: {
+      category: 'Category'
+    }
   }
 } as const;
 
@@ -72,7 +74,8 @@ type TableKey = keyof typeof PICKLIST_FIELDS;
 
 // Create mapping for picklist types
 const PICKLIST_TYPE_MAPPING = {
-  'Portfolio.category': 'portfolio_category',
+  'Lead.status': 'lead_status',
+  'Lead.source': 'lead_source',
   'Case.type': 'case_type',
   'Case.status': 'case_status',
   'Quote.status': 'quote_status',
@@ -82,7 +85,8 @@ const PICKLIST_TYPE_MAPPING = {
   'Product.stock_unit': 'product_stock_unit',
   'Product.weight_unit': 'product_weight_unit',
   'Account.type': 'account_type',
-  'Account.status': 'account_status'
+  'Account.status': 'account_status',
+  'Portfolio.category': 'portfolio_category'
 } as const;
 
 export function PicklistManagementPage() {
@@ -90,8 +94,8 @@ export function PicklistManagementPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedTable, setSelectedTable] = useState<TableKey>('Portfolio');
-  const [selectedField, setSelectedField] = useState<string>('category');
+  const [selectedTable, setSelectedTable] = useState<TableKey>('Lead');
+  const [selectedField, setSelectedField] = useState<string>('status');
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -142,7 +146,7 @@ export function PicklistManagementPage() {
       setValues(data || []);
     } catch (err) {
       console.error('Error fetching picklist values:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load picklist values');
+      setError('Failed to load picklist values');
     } finally {
       setLoading(false);
     }
