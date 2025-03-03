@@ -1,14 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Save, X, Plus, Trash2, Search, Building2, Package, Scale,
-  AlertCircle, Calendar, DollarSign, User, Mail, Phone 
-} from 'lucide-react';
+import { Save, X, Plus, Trash2, Search, Building2, Package, Scale,
+  AlertCircle, Calendar, DollarSign, User, Mail, Phone } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
 import { CustomFieldsForm } from './CustomFieldsForm';
+import { UserSearch } from './UserSearch';
 
 type Customer = {
   customer_id: string;
@@ -132,7 +131,6 @@ export function QuoteForm() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [id, organizations]);
 
-  // Filter customers based on search
   useEffect(() => {
     if (customerSearch) {
       const searchTerm = customerSearch.toLowerCase();
@@ -148,7 +146,6 @@ export function QuoteForm() {
     }
   }, [customerSearch, customers]);
 
-  // Filter vendors based on search
   useEffect(() => {
     if (vendorSearch) {
       const searchTerm = vendorSearch.toLowerCase();
@@ -163,8 +160,6 @@ export function QuoteForm() {
     }
   }, [vendorSearch, vendors]);
 
-  // Filter products based on search
-  // Filter products dynamically as user types
   useEffect(() => {
     if (productSearch.trim()) {
       const searchTerm = productSearch.toLowerCase();
@@ -173,20 +168,18 @@ export function QuoteForm() {
         product.description?.toLowerCase().includes(searchTerm)
       );
       setFilteredProducts(filtered);
-      setShowProductDropdown(true); // Ensure dropdown is visible while searching
+      setShowProductDropdown(true);
     } else {
       setFilteredProducts([]);
       setShowProductDropdown(false);
     }
   }, [productSearch, products]);
-  
-  // Fetch products only if not already loaded
+
   useEffect(() => {
     if (!products.length) {
       fetchProducts();
     }
   }, []);
-
 
   const fetchPicklists = async () => {
     try {
@@ -222,7 +215,7 @@ export function QuoteForm() {
           *,
           vendor:vendors(*),
           customer:customers(*),
-          items:quote_dtl(*)
+          quote_dtl(*)
         `)
         .eq('quote_id', id)
         .single();
@@ -234,13 +227,34 @@ export function QuoteForm() {
           vendor_id: quote.vendor_id,
           status: quote.status,
           notes: quote.notes || '',
-          items: quote.items,
+          items: quote.quote_dtl.map((item: any) => ({
+            item_name: item.item_name,
+            item_desc: item.item_desc,
+            quantity: item.quantity,
+            unit_price: item.unit_price
+          })),
           organization_id: quote.organization_id
         });
         setSelectedCustomer(quote.customer);
         if (quote.vendor) {
           setSelectedVendor(quote.vendor);
         }
+
+        // Fetch custom fields for this quote
+        const { data: customFieldValues, error: customFieldsError } = await supabase
+          .from('custom_field_values')
+          .select('field_id, value')
+          .eq('entity_id', id);
+
+        if (customFieldsError) throw customFieldsError;
+
+        // Convert custom field values to a key-value pair object
+        const customFieldsData = customFieldValues?.reduce((acc, field) => {
+          acc[field.field_id] = field.value;
+          return acc;
+        }, {} as Record<string, any>) || {};
+
+        setCustomFields(customFieldsData);
       }
     } catch (err) {
       console.error('Error fetching quote:', err);
@@ -383,16 +397,6 @@ export function QuoteForm() {
     return formData.items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
   };
 
-  // Get style for status badge
-  const getStatusStyle = (status: string) => {
-    const statusValue = quoteStatuses.find(s => s.value === status);
-    if (!statusValue?.color) return {};
-    return {
-      backgroundColor: statusValue.color,
-      color: statusValue.text_color || '#FFFFFF'
-    };
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.customer_id) {
@@ -408,22 +412,24 @@ export function QuoteForm() {
     setError(null);
 
     try {
-      const quoteData = {
-        customer_id: formData.customer_id,
-        vendor_id: formData.vendor_id,
-        status: formData.status,
-        notes: formData.notes || null,
-        total_amount: calculateTotal(),
-        organization_id: formData.organization_id,
-        updated_at: new Date().toISOString(),
-        updated_by: user?.id
-      };
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error('Not authenticated');
+
+      let quoteId = id; // Use let since we might update it
 
       if (id) {
         // Update existing quote
         const { error: updateError } = await supabase
           .from('quote_hdr')
-          .update(quoteData)
+          .update({
+            customer_id: formData.customer_id,
+            vendor_id: formData.vendor_id,
+            status: formData.status,
+            notes: formData.notes || null,
+            total_amount: calculateTotal(),
+            updated_at: new Date().toISOString(),
+            updated_by: userData.user.id
+          })
           .eq('quote_id', id);
 
         if (updateError) throw updateError;
@@ -456,51 +462,63 @@ export function QuoteForm() {
         const { data: newQuote, error: insertError } = await supabase
           .from('quote_hdr')
           .insert([{
-            ...quoteData,
-            created_by: user?.id,
-            created_at: new Date().toISOString()
+            customer_id: formData.customer_id,
+            vendor_id: formData.vendor_id,
+            status: formData.status,
+            notes: formData.notes || null,
+            total_amount: calculateTotal(),
+            organization_id: formData.organization_id,
+            created_by: userData.user.id,
+            created_at: new Date().toISOString(),
+            updated_by: userData.user.id,
+            updated_at: new Date().toISOString()
           }])
           .select()
           .single();
 
         if (insertError) throw insertError;
 
-        // Insert items
-        const { error: itemsError } = await supabase
-          .from('quote_dtl')
-          .insert(
-            formData.items.map(({ item_name, item_desc, quantity, unit_price }) => ({
-              quote_id: newQuote.quote_id,
-              item_name,
-              item_desc,
-              quantity,
-              unit_price,
-              organization_id: formData.organization_id
-            }))
-          );
+        // Set the new quote ID for custom fields
+        if (newQuote) {
+          quoteId = newQuote.quote_id;
 
-        if (itemsError) throw itemsError;
+          // Insert items
+          const { error: itemsError } = await supabase
+            .from('quote_dtl')
+            .insert(
+              formData.items.map(({ item_name, item_desc, quantity, unit_price }) => ({
+                quote_id: quoteId,
+                item_name,
+                item_desc,
+                quantity,
+                unit_price,
+                organization_id: formData.organization_id
+              }))
+            );
 
-        // Save custom field values
-        if (user) {
-          for (const [fieldId, value] of Object.entries(customFields)) {
-            const { error: valueError } = await supabase
-              .from('custom_field_values')
-              .upsert({
-                organization_id: formData.organization_id,
-                entity_id: newQuote.quote_id,
-                field_id: fieldId,
-                value,
-                created_by: user.id,
-                updated_by: user.id,
-                updated_at: new Date().toISOString()
-              }, {
-                onConflict: 'organization_id,field_id,entity_id'
-              });
+          if (itemsError) throw itemsError;
+        }
+      }
 
-            if (valueError) {
-              console.error('Error saving custom field value:', valueError);
-            }
+      // Save custom field values
+      if (userData.user) {
+        for (const [fieldId, value] of Object.entries(customFields)) {
+          const { error: valueError } = await supabase
+            .from('custom_field_values')
+            .upsert({
+              organization_id: formData.organization_id,
+              entity_id: quoteId,
+              field_id: fieldId,
+              value,
+              created_by: userData.user.id,
+              updated_by: userData.user.id,
+              updated_at: new Date().toISOString()
+            }, {
+              onConflict: 'organization_id,field_id,entity_id'
+            });
+
+          if (valueError) {
+            console.error('Error saving custom field value:', valueError);
           }
         }
       }
@@ -740,9 +758,10 @@ export function QuoteForm() {
             <select
               value={formData.status}
               onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
-              className="text-sm font-medium rounded-full px-3 py-1"
-              style={getStatusStyle(formData.status)}
+              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+              required
             >
+              <option value="">Select Status</option>
               {quoteStatuses.map(status => (
                 <option key={status.id} value={status.value}>
                   {status.label}
@@ -832,7 +851,7 @@ export function QuoteForm() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Description
-                    </label>
+                    </label> ```tsx
                     <input
                       type="text"
                       value={item.item_desc || ''}
@@ -859,7 +878,7 @@ export function QuoteForm() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Unit Price *
-                    </label> 
+                    </label>
                     <input
                       type="number"
                       min="0"
@@ -951,5 +970,3 @@ export function QuoteForm() {
     </motion.div>
   );
 }
-
-
