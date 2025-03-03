@@ -39,6 +39,9 @@ import { InventoryAlertsPage } from './components/admin/InventoryAlertsPage';
 import { SettingsPage } from './components/admin/SettingsPage';
 import { UserOrganizationsPage } from './components/admin/UserOrganizationsPage';
 import { UsersPage } from './components/admin/UsersPage';
+import { LeadsPage } from './components/admin/LeadsPage';
+import { LeadForm } from './components/admin/LeadForm';
+import { LeadDetailPage } from './components/admin/LeadDetailPage';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { PublicRoute } from './components/auth/PublicRoute';
 import { AuthProvider } from './contexts/AuthContext';
@@ -117,6 +120,10 @@ function App() {
               <Route path="vendors/:id/edit" element={<VendorForm />} />
               <Route path="inventory" element={<InventoryPage />} />
               <Route path="inventory/alerts" element={<InventoryAlertsPage />} />
+              <Route path="leads" element={<LeadsPage />} />
+              <Route path="leads/new" element={<LeadForm />} />
+              <Route path="leads/:id" element={<LeadDetailPage />} />
+              <Route path="leads/:id/edit" element={<LeadForm />} />
               <Route path="user-organizations" element={<UserOrganizationsPage />} />
               <Route path="users" element={<UsersPage />} />
               <Route path="settings" element={<SettingsPage />} />

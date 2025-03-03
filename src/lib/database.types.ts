@@ -126,6 +126,80 @@ export interface Database {
   }
   public: {
     Tables: {
+      leads: {
+        Row: {
+          id: string
+          organization_id: string
+          customer_id: string | null
+          first_name: string
+          last_name: string
+          email: string
+          company: string | null
+          website: string | null
+          phone: string | null
+          description: string | null
+          product_interest: string | null
+          email_opt_out: boolean
+          status: string
+          lead_source: string | null
+          owner_id: string | null
+          is_converted: boolean
+          converted_at: string | null
+          converted_by: string | null
+          created_at: string
+          created_by: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          id?: string
+          organization_id: string
+          customer_id?: string | null
+          first_name: string
+          last_name: string
+          email: string
+          company?: string | null
+          website?: string | null
+          phone?: string | null
+          description?: string | null
+          product_interest?: string | null
+          email_opt_out?: boolean
+          status: string
+          lead_source?: string | null
+          owner_id?: string | null
+          is_converted?: boolean
+          converted_at?: string | null
+          converted_by?: string | null
+          created_at?: string
+          created_by: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          id?: string
+          organization_id?: string
+          customer_id?: string | null
+          first_name?: string
+          last_name?: string
+          email?: string
+          company?: string | null
+          website?: string | null
+          phone?: string | null
+          description?: string | null
+          product_interest?: string | null
+          email_opt_out?: boolean
+          status?: string
+          lead_source?: string | null
+          owner_id?: string | null
+          is_converted?: boolean
+          converted_at?: string | null
+          converted_by?: string | null
+          created_at?: string
+          created_by?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+      }
       organizations: {
         Row: {
           id: string

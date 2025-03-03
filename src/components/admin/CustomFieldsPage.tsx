@@ -10,7 +10,7 @@ import { cn } from '../../lib/utils';
 
 type CustomField = {
   id: string;
-  entity_type: 'case' | 'vendor' | 'customer' | 'product' | 'order' | 'quote';
+  entity_type: 'case' | 'vendor' | 'customer' | 'product' | 'order' | 'quote' | 'lead';
   field_name: string;
   field_type: 'text' | 'number' | 'date' | 'boolean' | 'select' | 'multi_select' | 'url' | 'email' | 'phone' | 'currency';
   field_label: string;
@@ -27,6 +27,7 @@ type CustomField = {
 };
 
 const ENTITY_TYPES = [
+  { value: 'lead', label: 'Leads' },
   { value: 'case', label: 'Cases' },
   { value: 'vendor', label: 'Accounts' },
   { value: 'customer', label: 'Customers' },
@@ -49,7 +50,7 @@ const FIELD_TYPES = [
 ];
 
 const initialFormData = {
-  entity_type: 'case' as const,
+  entity_type: 'lead' as const,
   field_name: '',
   field_type: 'text' as const,
   field_label: '',
@@ -118,8 +119,8 @@ export function CustomFieldsPage() {
         options: formData.field_type === 'select' || formData.field_type === 'multi_select'
           ? formData.options
           : null,
-        created_by: user.id, // Add created_by
-        updated_by: user.id  // Add updated_by
+        created_by: user.id,
+        updated_by: user.id
       };
 
       if (editingId) {
@@ -193,33 +194,6 @@ export function CustomFieldsPage() {
     } catch (err) {
       console.error('Error deleting custom field:', err);
       setError(err instanceof Error ? err.message : 'Failed to delete custom field');
-    } finally {
-      setProcessingAction(null);
-    }
-  };
-
-  const handleStatusToggle = async (id: string, currentStatus: 'active' | 'inactive') => {
-    if (!user) {
-      setError('You must be logged in to perform this action');
-      return;
-    }
-
-    try {
-      setProcessingAction(id);
-      const { error } = await supabase
-        .from('custom_fields')
-        .update({ 
-          status: currentStatus === 'active' ? 'inactive' : 'active',
-          updated_at: new Date().toISOString(),
-          updated_by: user.id
-        })
-        .eq('id', id);
-
-      if (error) throw error;
-      await fetchFields();
-    } catch (err) {
-      console.error('Error updating custom field status:', err);
-      setError(err instanceof Error ? err.message : 'Failed to update status');
     } finally {
       setProcessingAction(null);
     }
@@ -606,18 +580,14 @@ export function CustomFieldsPage() {
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <button
-                      onClick={() => handleStatusToggle(field.id, field.status)}
-                      disabled={processingAction === field.id}
-                      className={cn(
-                        "px-2 py-1 text-xs font-medium rounded-full",
-                        field.status === 'active'
-                          ? "bg-green-100 text-green-800"
-                          : "bg-gray-100 text-gray-800"
-                      )}
-                    >
-                      {field.status === 'active' ? 'Active' : 'Inactive'}
-                    </button>
+                    <span className={cn(
+                      "px-2 py-1 text-xs font-medium rounded-full",
+                      field.status === 'active'
+                        ? "bg-green-100 text-green-800"
+                        : "bg-gray-100 text-gray-800"
+                    )}>
+                      {field.status}
+                    </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex justify-end space-x-2">
