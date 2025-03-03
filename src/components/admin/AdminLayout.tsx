@@ -5,7 +5,7 @@ import {
   FileText, Image, LogOut, Users, Package, Tag, Quote, MessageSquare, 
   LayoutDashboard, ChevronLeft, ChevronRight, Settings, ShoppingBag, 
   Building2, Truck, ClipboardList, BoxSelect as BoxSeam, UserCog, Home,
-  UserPlus
+  UserPlus, UserCheck
 } from 'lucide-react';
 import { getCurrentUser, signOut } from '../../lib/auth';
 import { cn } from '../../lib/utils';
@@ -53,6 +53,7 @@ export function AdminLayout() {
     { path: '/admin/posts', icon: FileText, label: 'Blog Posts' },
     { path: '/admin/portfolio', icon: Image, label: 'Portfolio' },
     { path: '/admin/cases', icon: MessageSquare, label: 'Cases' },
+    { path: '/admin/leads', icon: UserCheck, label: 'Leads' },
     { path: '/admin/quotes', icon: Quote, label: 'Quotes' },
     { path: '/admin/orders', icon: ShoppingBag, label: 'Orders' },
     { path: '/admin/purchase-orders', icon: Truck, label: 'Purchase Orders' },

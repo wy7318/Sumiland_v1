@@ -131,7 +131,7 @@ export function OrderDetailPage() {
             type,
             status,
             payment_terms,
-            customer:customers(
+            customer:customers!vendors_customer_id_fkey(
               first_name,
               last_name,
               email,
@@ -306,7 +306,7 @@ export function OrderDetailPage() {
                 <h1 className="text-2xl font-bold">{order.order_number}</h1>
                 {order.quote_id && order.quote_number && (
                   <Link
-                    to={`/admin/quotes/${order.quote_id}/edit`}
+                    to={`/admin/quotes/${order.quote_id}`}
                     className="inline-flex items-center text-sm text-primary-600 hover:text-primary-700"
                   >
                     <FileText className="w-4 h-4 mr-1" />

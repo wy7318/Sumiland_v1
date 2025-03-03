@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Save, X, AlertCircle } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Save, X, AlertCircle, Mail, Phone, Building2, User, Search } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { CustomFieldsForm } from './CustomFieldsForm';
 
 type CustomerFormData = {
   first_name: string;
@@ -17,6 +18,7 @@ type CustomerFormData = {
   zip_code: string;
   country: string;
   company: string;
+  vendor_id: string | null;
 };
 
 const initialFormData: CustomerFormData = {
@@ -30,7 +32,15 @@ const initialFormData: CustomerFormData = {
   state: '',
   zip_code: '',
   country: '',
-  company: ''
+  company: '',
+  vendor_id: null
+};
+
+type Vendor = {
+  id: string;
+  name: string;
+  type: string;
+  status: string;
 };
 
 export function CustomerForm() {
@@ -40,6 +50,16 @@ export function CustomerForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState<CustomerFormData>(initialFormData);
+  const [customFields, setCustomFields] = useState<Record<string, any>>({});
+  
+  // Search states
+  const [vendorSearch, setVendorSearch] = useState('');
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [filteredVendors, setFilteredVendors] = useState<Vendor[]>([]);
+  const [showVendorDropdown, setShowVendorDropdown] = useState(false);
+  const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
+  
+  const vendorSearchRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (id) {
@@ -47,11 +67,62 @@ export function CustomerForm() {
     }
   }, [id]);
 
+  // Filter vendors based on search
+  useEffect(() => {
+    if (vendorSearch) {
+      const searchTerm = vendorSearch.toLowerCase();
+      const filtered = vendors.filter(vendor => 
+        vendor.name.toLowerCase().includes(searchTerm) ||
+        vendor.type.toLowerCase().includes(searchTerm)
+      );
+      setFilteredVendors(filtered);
+    } else {
+      setFilteredVendors([]);
+    }
+  }, [vendorSearch, vendors]);
+
+  // Click outside handler
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (vendorSearchRef.current && !vendorSearchRef.current.contains(event.target as Node)) {
+        setShowVendorDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const fetchVendors = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('vendors')
+        .select('id, name, type, status')
+        .eq('status', 'active')
+        .in('organization_id', organizations.map(org => org.id))
+        .order('name');
+
+      if (error) throw error;
+      setVendors(data || []);
+    } catch (err) {
+      console.error('Error fetching vendors:', err);
+      setError('Failed to load vendors');
+    }
+  };
+
   const fetchCustomer = async () => {
     try {
       const { data: customer, error } = await supabase
         .from('customers')
-        .select('*')
+        .select(`
+          *,
+          vendor:vendors!customers_vendor_id_fkey(
+            id,
+            name,
+            type,
+            status
+          )
+        `)
         .eq('customer_id', id)
         .in('organization_id', organizations.map(org => org.id))
         .single();
@@ -69,14 +140,25 @@ export function CustomerForm() {
           state: customer.state || '',
           zip_code: customer.zip_code || '',
           country: customer.country || '',
-          company: customer.company || ''
+          company: customer.company || '',
+          vendor_id: customer.vendor_id
         });
+        if (customer.vendor) {
+          setSelectedVendor(customer.vendor);
+        }
       }
     } catch (err) {
       console.error('Error fetching customer:', err);
-      setError('Failed to load customer or you do not have access');
+      setError('Failed to load customer');
       navigate('/admin/customers');
     }
+  };
+
+  const handleVendorSelect = (vendor: Vendor) => {
+    setSelectedVendor(vendor);
+    setFormData(prev => ({ ...prev, vendor_id: vendor.id }));
+    setVendorSearch('');
+    setShowVendorDropdown(false);
   };
 
   const validateForm = (): boolean => {
@@ -168,6 +250,14 @@ export function CustomerForm() {
     }
   };
 
+  if (organizations.length === 0) {
+    return (
+      <div className="bg-yellow-50 text-yellow-800 p-4 rounded-lg">
+        You need to be part of an organization to manage customers.
+      </div>
+    );
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -196,80 +286,171 @@ export function CustomerForm() {
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <label htmlFor="first_name" className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               First Name *
             </label>
-            <input
-              type="text"
-              id="first_name"
-              value={formData.first_name}
-              onChange={(e) => setFormData(prev => ({ ...prev, first_name: e.target.value }))}
-              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-              required
-            />
+            <div className="relative">
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <input
+                type="text"
+                value={formData.first_name}
+                onChange={(e) => setFormData(prev => ({ ...prev, first_name: e.target.value }))}
+                className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                required
+              />
+            </div>
           </div>
 
           <div>
-            <label htmlFor="last_name" className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               Last Name *
             </label>
-            <input
-              type="text"
-              id="last_name"
-              value={formData.last_name}
-              onChange={(e) => setFormData(prev => ({ ...prev, last_name: e.target.value }))}
-              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-              required
-            />
+            <div className="relative">
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <input
+                type="text"
+                value={formData.last_name}
+                onChange={(e) => setFormData(prev => ({ ...prev, last_name: e.target.value }))}
+                className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                required
+              />
+            </div>
           </div>
 
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               Email *
             </label>
-            <input
-              type="email"
-              id="email"
-              value={formData.email}
-              onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-              required
-            />
+            <div className="relative">
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <input
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                required
+              />
+            </div>
           </div>
 
           <div>
-            <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               Phone
             </label>
-            <input
-              type="tel"
-              id="phone"
-              value={formData.phone}
-              onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-            />
+            <div className="relative">
+              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <input
+                type="tel"
+                value={formData.phone}
+                onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+              />
+            </div>
           </div>
 
           <div className="md:col-span-2">
-            <label htmlFor="company" className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               Company
             </label>
-            <input
-              type="text"
-              id="company"
-              value={formData.company}
-              onChange={(e) => setFormData(prev => ({ ...prev, company: e.target.value }))}
-              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-            />
+            <div className="relative">
+              <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <input
+                type="text"
+                value={formData.company}
+                onChange={(e) => setFormData(prev => ({ ...prev, company: e.target.value }))}
+                className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+              />
+            </div>
+          </div>
+
+          <div ref={vendorSearchRef} className="md:col-span-2 relative">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Account
+            </label>
+            {selectedVendor ? (
+              <div className="flex items-center justify-between p-2 border rounded-lg">
+                <div className="flex items-center">
+                  <Building2 className="w-5 h-5 text-gray-400 mr-2" />
+                  <div>
+                    <p className="font-medium">{selectedVendor.name}</p>
+                    <p className="text-sm text-gray-500">Type: {selectedVendor.type}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedVendor(null);
+                    setFormData(prev => ({ ...prev, vendor_id: null }));
+                  }}
+                  className="p-1 hover:bg-gray-100 rounded-full"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="text"
+                  value={vendorSearch}
+                  onChange={(e) => {
+                    setVendorSearch(e.target.value);
+                    setShowVendorDropdown(true);
+                    if (!vendors.length) {
+                      fetchVendors();
+                    }
+                  }}
+                  onFocus={() => {
+                    setShowVendorDropdown(true);
+                    if (!vendors.length) {
+                      fetchVendors();
+                    }
+                  }}
+                  placeholder="Search accounts..."
+                  className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                />
+              </div>
+            )}
+
+            <AnimatePresence>
+              {showVendorDropdown && vendorSearch && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="absolute z-10 w-full mt-1 bg-white rounded-lg shadow-lg border border-gray-200"
+                >
+                  {filteredVendors.length > 0 ? (
+                    <ul className="py-1 max-h-60 overflow-auto">
+                      {filteredVendors.map(vendor => (
+                        <li
+                          key={vendor.id}
+                          onClick={() => handleVendorSelect(vendor)}
+                          className="px-4 py-2 hover:bg-gray-50 cursor-pointer"
+                        >
+                          <div className="font-medium">{vendor.name}</div>
+                          <div className="text-sm text-gray-500">
+                            Type: {vendor.type}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="p-4 text-gray-500">
+                      No accounts found
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           <div className="md:col-span-2">
-            <label htmlFor="address_line1" className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               Address Line 1
             </label>
             <input
               type="text"
-              id="address_line1"
               value={formData.address_line1}
               onChange={(e) => setFormData(prev => ({ ...prev, address_line1: e.target.value }))}
               className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
@@ -277,12 +458,11 @@ export function CustomerForm() {
           </div>
 
           <div className="md:col-span-2">
-            <label htmlFor="address_line2" className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               Address Line 2
             </label>
             <input
               type="text"
-              id="address_line2"
               value={formData.address_line2}
               onChange={(e) => setFormData(prev => ({ ...prev, address_line2: e.target.value }))}
               className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
@@ -290,12 +470,11 @@ export function CustomerForm() {
           </div>
 
           <div>
-            <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               City
             </label>
             <input
               type="text"
-              id="city"
               value={formData.city}
               onChange={(e) => setFormData(prev => ({ ...prev, city: e.target.value }))}
               className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
@@ -303,12 +482,11 @@ export function CustomerForm() {
           </div>
 
           <div>
-            <label htmlFor="state" className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               State
             </label>
             <input
               type="text"
-              id="state"
               value={formData.state}
               onChange={(e) => setFormData(prev => ({ ...prev, state: e.target.value }))}
               className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
@@ -316,12 +494,11 @@ export function CustomerForm() {
           </div>
 
           <div>
-            <label htmlFor="zip_code" className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               ZIP Code
             </label>
             <input
               type="text"
-              id="zip_code"
               value={formData.zip_code}
               onChange={(e) => setFormData(prev => ({ ...prev, zip_code: e.target.value }))}
               className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
@@ -329,18 +506,25 @@ export function CustomerForm() {
           </div>
 
           <div>
-            <label htmlFor="country" className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               Country
             </label>
             <input
               type="text"
-              id="country"
               value={formData.country}
               onChange={(e) => setFormData(prev => ({ ...prev, country: e.target.value }))}
               className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
             />
           </div>
         </div>
+
+        <CustomFieldsForm
+          entityType="customer"
+          entityId={id}
+          organizationId={organizations[0]?.id}
+          onChange={(values) => setCustomFields(values)}
+          className="border-t border-gray-200 pt-6"
+        />
 
         <div className="flex justify-end space-x-4">
           <button
@@ -353,7 +537,7 @@ export function CustomerForm() {
           <button
             type="submit"
             disabled={loading}
-            className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary -700 disabled:opacity-50 flex items-center"
+            className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center"
           >
             <Save className="w-4 h-4 mr-2" />
             {loading ? 'Saving...' : 'Save Customer'}

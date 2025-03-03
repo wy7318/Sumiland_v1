@@ -34,6 +34,7 @@ import { PurchaseOrderForm } from './components/admin/PurchaseOrderForm';
 import { PurchaseOrderDetailPage } from './components/admin/PurchaseOrderDetailPage';
 import { VendorsPage } from './components/admin/VendorsPage';
 import { VendorForm } from './components/admin/VendorForm';
+import { VendorDetailPage } from './components/admin/VendorDetailPage';
 import { InventoryPage } from './components/admin/InventoryPage';
 import { InventoryAlertsPage } from './components/admin/InventoryAlertsPage';
 import { SettingsPage } from './components/admin/SettingsPage';
@@ -42,6 +43,11 @@ import { UsersPage } from './components/admin/UsersPage';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { PublicRoute } from './components/auth/PublicRoute';
 import { AuthProvider } from './contexts/AuthContext';
+import { LeadsPage } from './components/admin/LeadsPage';
+import { LeadForm } from './components/admin/LeadForm';
+import { LeadDetailPage } from './components/admin/LeadDetailPage';
+import { CustomerDetailPage } from './components/admin/CustomerDetailPage';
+
 
 function App() {
   const { scrollYProgress } = useScroll();
@@ -94,12 +100,17 @@ function App() {
               <Route path="cases/new" element={<CaseForm />} />
               <Route path="cases/:id" element={<CaseDetailPage />} />
               <Route path="cases/:id/edit" element={<CaseForm />} />
+              <Route path="leads" element={<LeadsPage />} />
+              <Route path="leads/new" element={<LeadForm />} />
+              <Route path="leads/:id" element={<LeadDetailPage />} />
+              <Route path="leads/:id/edit" element={<LeadForm />} />
               <Route path="products" element={<ProductsPage />} />
               <Route path="products/new" element={<ProductForm />} />
               <Route path="products/:id/edit" element={<ProductForm />} />
               <Route path="categories" element={<CategoriesPage />} />
               <Route path="customers" element={<CustomersPage />} />
               <Route path="customers/new" element={<CustomerForm />} />
+              <Route path="customers/:id" element={<CustomerDetailPage />} />
               <Route path="customers/:id/edit" element={<CustomerForm />} />
               <Route path="quotes" element={<QuotesPage />} />
               <Route path="quotes/new" element={<QuoteForm />} />
@@ -114,6 +125,7 @@ function App() {
               <Route path="purchase-orders/:id/edit" element={<PurchaseOrderForm />} />
               <Route path="vendors" element={<VendorsPage />} />
               <Route path="vendors/new" element={<VendorForm />} />
+              <Route path="vendors/:id" element={<VendorDetailPage />} />
               <Route path="vendors/:id/edit" element={<VendorForm />} />
               <Route path="inventory" element={<InventoryPage />} />
               <Route path="inventory/alerts" element={<InventoryAlertsPage />} />

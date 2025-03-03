@@ -176,7 +176,13 @@ export function VendorForm() {
         .from('vendors')
         .select(`
           *,
-          customer:customers(*)
+          customer:customers!vendors_customer_id_fkey(
+            first_name,
+            last_name,
+            email,
+            phone,
+            company
+          )
         `)
         .eq('id', id)
         .in('organization_id', organizations.map(org => org.id))

@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
     Plus, Search, Building2, Mail, Phone, User, Edit,
-    Trash2, AlertCircle, FileDown, Filter, ChevronDown, ChevronUp
+    Trash2, AlertCircle, FileDown, Filter, ChevronDown, ChevronUp,
+    Eye
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
@@ -22,9 +23,9 @@ type PicklistValue = {
 type Vendor = {
     id: string;
     name: string;
-    type: string; // Will use picklist values for account_type
+    type: string;
     customer_id: string | null;
-    status: string; // Will use picklist values for account_status
+    status: string;
     payment_terms: string | null;
     notes: string | null;
     created_at: string;
@@ -104,15 +105,15 @@ export function VendorsPage() {
             const { data, error } = await supabase
                 .from('vendors')
                 .select(`
-          *,
-          customer:customers(
-            first_name,
-            last_name,
-            email,
-            phone,
-            company
-          )
-        `)
+                    *,
+                    customer:customers!vendors_customer_id_fkey(
+                        first_name,
+                        last_name,
+                        email,
+                        phone,
+                        company
+                    )
+                `)
                 .in('organization_id', organizations.map(org => org.id))
                 .order('created_at', { ascending: false });
 
@@ -124,13 +125,6 @@ export function VendorsPage() {
         } finally {
             setLoading(false);
         }
-    };
-
-    const handleSort = (key: SortConfig['key']) => {
-        setSortConfig(current => ({
-            key,
-            direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc'
-        }));
     };
 
     const handleStatusChange = async (vendorId: string, newStatus: string) => {
@@ -424,7 +418,19 @@ export function VendorsPage() {
                                 </th>
                                 <th
                                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                                    onClick={() => handleSort('name')}
+                                    onClick={() => {
+                                        if (sortConfig.key === 'name') {
+                                            setSortConfig({
+                                                key: 'name',
+                                                direction: sortConfig.direction === 'asc' ? 'desc' : 'asc'
+                                            });
+                                        } else {
+                                            setSortConfig({
+                                                key: 'name',
+                                                direction: 'asc'
+                                            });
+                                        }
+                                    }}
                                 >
                                     <div className="flex items-center">
                                         <span>Name</span>
@@ -437,7 +443,19 @@ export function VendorsPage() {
                                 </th>
                                 <th
                                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                                    onClick={() => handleSort('type')}
+                                    onClick={() => {
+                                        if (sortConfig.key === 'type') {
+                                            setSortConfig({
+                                                key: 'type',
+                                                direction: sortConfig.direction === 'asc' ? 'desc' : 'asc'
+                                            });
+                                        } else {
+                                            setSortConfig({
+                                                key: 'type',
+                                                direction: 'asc'
+                                            });
+                                        }
+                                    }}
                                 >
                                     <div className="flex items-center">
                                         <span>Type</span>
@@ -450,7 +468,19 @@ export function VendorsPage() {
                                 </th>
                                 <th
                                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                                    onClick={() => handleSort('customer.name')}
+                                    onClick={() => {
+                                        if (sortConfig.key === 'customer.name') {
+                                            setSortConfig({
+                                                key: 'customer.name',
+                                                direction: sortConfig.direction === 'asc' ? 'desc' : 'asc'
+                                            });
+                                        } else {
+                                            setSortConfig({
+                                                key: 'customer.name',
+                                                direction: 'asc'
+                                            });
+                                        }
+                                    }}
                                 >
                                     <div className="flex items-center">
                                         <span>Contact</span>
@@ -469,7 +499,19 @@ export function VendorsPage() {
                                 </th>
                                 <th
                                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                                    onClick={() => handleSort('created_at')}
+                                    onClick={() => {
+                                        if (sortConfig.key === 'created_at') {
+                                            setSortConfig({
+                                                key: 'created_at',
+                                                direction: sortConfig.direction === 'asc' ? 'desc' : 'asc'
+                                            });
+                                        } else {
+                                            setSortConfig({
+                                                key: 'created_at',
+                                                direction: 'desc'
+                                            });
+                                        }
+                                    }}
                                 >
                                     <div className="flex items-center">
                                         <span>Created</span>
@@ -598,6 +640,12 @@ export function VendorsPage() {
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                         <div className="flex justify-end space-x-2">
+                                            <Link
+                                                to={`/admin/vendors/${vendor.id}`}
+                                                className="text-primary-600 hover:text-primary-900"
+                                            >
+                                                <Eye className="w-5 h-5" />
+                                            </Link>
                                             <Link
                                                 to={`/admin/vendors/${vendor.id}/edit`}
                                                 className="text-blue-600 hover:text-blue-900"

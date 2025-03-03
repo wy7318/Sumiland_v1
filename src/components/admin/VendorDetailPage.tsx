@@ -3,68 +3,46 @@ import { useNavigate, useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
   ArrowLeft, Building2, Mail, Phone, Calendar,
-  Edit, AlertCircle, FileText, DollarSign, User,
-  CheckCircle, X, Send, Reply
+  Edit, AlertCircle, Send, Reply, X, User,
+  Globe, CheckCircle
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { cn } from '../../lib/utils';
 import { CustomFieldsSection } from './CustomFieldsSection';
 
-type Case = {
+type Vendor = {
   id: string;
-  title: string;
+  name: string;
   type: string;
-  sub_type: string | null;
   status: string;
-  contact_id: string;
-  owner_id: string | null;
-  description: string;
-  resume_url: string | null;
-  created_at: string;
-  organization_id: string;
-  contact: {
+  payment_terms: string | null;
+  customer: {
     first_name: string;
     last_name: string;
     email: string;
     phone: string | null;
     company: string | null;
-    vendor_id: string | null;
-    vendor: {
-      id: string;
-      name: string;
-      type: string;
-      status: string;
-      payment_terms: string | null;
-      customer: {
-        first_name: string;
-        last_name: string;
-        email: string;
-        phone: string | null;
-        company: string | null;
-      } | null;
-      shipping_address_line1: string | null;
-      shipping_address_line2: string | null;
-      shipping_city: string | null;
-      shipping_state: string | null;
-      shipping_country: string | null;
-      billing_address_line1: string | null;
-      billing_address_line2: string | null;
-      billing_city: string | null;
-      billing_state: string | null;
-      billing_country: string | null;
-    } | null;
-  };
-  owner: {
-    id: string;
-    name: string;
   } | null;
+  shipping_address_line1: string | null;
+  shipping_address_line2: string | null;
+  shipping_city: string | null;
+  shipping_state: string | null;
+  shipping_country: string | null;
+  billing_address_line1: string | null;
+  billing_address_line2: string | null;
+  billing_city: string | null;
+  billing_state: string | null;
+  billing_country: string | null;
+  organization_id: string;
+  notes: string | null;
+  created_at: string;
 };
 
 type Feed = {
   id: string;
   content: string;
   parent_id: string | null;
-  parent_type: 'Case';
+  parent_type: 'Vendor';
   reference_id: string;
   created_by: string;
   created_at: string;
@@ -86,145 +64,92 @@ type PicklistValue = {
   text_color: string | null;
 };
 
-export function CaseDetailPage() {
+export function VendorDetailPage() {
   const navigate = useNavigate();
   const { id } = useParams();
-  const [caseData, setCaseData] = useState<Case | null>(null);
+  const [vendor, setVendor] = useState<Vendor | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [staff, setStaff] = useState<any[]>([]);
   const [feeds, setFeeds] = useState<Feed[]>([]);
   const [newComment, setNewComment] = useState('');
   const [replyTo, setReplyTo] = useState<Feed | null>(null);
   const [editingFeed, setEditingFeed] = useState<Feed | null>(null);
-  const [caseTypes, setCaseTypes] = useState<PicklistValue[]>([]);
-  const [caseStatuses, setCaseStatuses] = useState<PicklistValue[]>([]);
+  const [accountTypes, setAccountTypes] = useState<PicklistValue[]>([]);
+  const [accountStatuses, setAccountStatuses] = useState<PicklistValue[]>([]);
 
   useEffect(() => {
+    fetchPicklists();
     if (id) {
-      fetchCase();
-      fetchPicklists();
+      fetchVendor();
     }
   }, [id]);
 
   useEffect(() => {
-    if (caseData) {
-      fetchStaff();
+    if (vendor) {
       fetchFeeds();
     }
-  }, [caseData]);
+  }, [vendor]);
 
   const fetchPicklists = async () => {
     try {
-      // Fetch case types
+      // Fetch account types
       const { data: typeData, error: typeError } = await supabase
         .from('picklist_values')
         .select('id, value, label, is_default, is_active, color, text_color')
-        .eq('type', 'case_type')
+        .eq('type', 'account_type')
         .eq('is_active', true)
-        .order('display_order', { ascending: true })
-        .order('label', { ascending: true });
+        .order('display_order', { ascending: true });
 
       if (typeError) throw typeError;
-      setCaseTypes(typeData || []);
+      setAccountTypes(typeData || []);
 
-      // Fetch case statuses
+      // Fetch account statuses
       const { data: statusData, error: statusError } = await supabase
         .from('picklist_values')
         .select('id, value, label, is_default, is_active, color, text_color')
-        .eq('type', 'case_status')
+        .eq('type', 'account_status')
         .eq('is_active', true)
-        .order('display_order', { ascending: true })
-        .order('label', { ascending: true });
+        .order('display_order', { ascending: true });
 
       if (statusError) throw statusError;
-      setCaseStatuses(statusData || []);
+      setAccountStatuses(statusData || []);
     } catch (err) {
       console.error('Error fetching picklists:', err);
       setError('Failed to load picklist values');
     }
   };
 
-  const fetchCase = async () => {
+  const fetchVendor = async () => {
     try {
       if (!id) return;
 
-      const { data: caseData, error } = await supabase
-        .from('cases')
+      const { data: vendor, error } = await supabase
+        .from('vendors')
         .select(`
           *,
-          contact:customers!cases_contact_id_fkey(
-            *,
-            vendor:vendors!customers_vendor_id_fkey(
-              id,
-              name,
-              type,
-              status,
-              payment_terms,
-              customer:customers!vendors_customer_id_fkey(
-                first_name,
-                last_name,
-                email,
-                phone,
-                company
-              ),
-              shipping_address_line1,
-              shipping_address_line2,
-              shipping_city,
-              shipping_state,
-              shipping_country,
-              billing_address_line1,
-              billing_address_line2,
-              billing_city,
-              billing_state,
-              billing_country
-            )
-          ),
-          owner:profiles!cases_owner_id_fkey(
-            id,
-            name
+          customer:customers!vendors_customer_id_fkey(
+            first_name,
+            last_name,
+            email,
+            phone,
+            company
           )
         `)
         .eq('id', id)
         .single();
 
       if (error) throw error;
-      setCaseData(caseData);
+      setVendor(vendor);
+    } catch (err) {
+      console.error('Error fetching vendor:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load vendor');
+    } finally {
       setLoading(false);
-    } catch (err) {
-      console.error('Error fetching case:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load case');
-      navigate('/admin/cases');
-    }
-  };
-
-  const fetchStaff = async () => {
-    if (!caseData) return;
-
-    try {
-      // Get all users from the same organization
-      const { data: userOrgs, error: userOrgsError } = await supabase
-        .from('user_organizations')
-        .select('user_id')
-        .eq('organization_id', caseData.organization_id);
-
-      if (userOrgsError) throw userOrgsError;
-
-      // Get profiles for these users
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('*')
-        .in('id', userOrgs?.map(uo => uo.user_id) || []);
-
-      if (profilesError) throw profilesError;
-      setStaff(profiles || []);
-    } catch (err) {
-      console.error('Error fetching staff:', err);
     }
   };
 
   const fetchFeeds = async () => {
-    if (!id || !caseData) return;
+    if (!id || !vendor) return;
 
     try {
       const { data, error } = await supabase
@@ -234,9 +159,9 @@ export function CaseDetailPage() {
           profile:profiles!feeds_created_by_fkey(name)
         `)
         .eq('reference_id', id)
-        .eq('parent_type', 'Case')
+        .eq('parent_type', 'Vendor')
         .eq('status', 'Active')
-        .eq('organization_id', caseData.organization_id)
+        .eq('organization_id', vendor.organization_id)
         .order('created_at', { ascending: true });
 
       if (error) throw error;
@@ -248,10 +173,10 @@ export function CaseDetailPage() {
 
   const handleStatusChange = async (newStatus: string) => {
     try {
-      if (!id || !caseData) return;
+      if (!id || !vendor) return;
 
       const { error } = await supabase
-        .from('cases')
+        .from('vendors')
         .update({
           status: newStatus,
           updated_at: new Date().toISOString()
@@ -259,37 +184,16 @@ export function CaseDetailPage() {
         .eq('id', id);
 
       if (error) throw error;
-      await fetchCase();
+      await fetchVendor();
     } catch (err) {
       console.error('Error updating status:', err);
       setError(err instanceof Error ? err.message : 'Failed to update status');
     }
   };
 
-  const handleAssign = async (userId: string) => {
-    try {
-      if (!id || !caseData) return;
-
-      const { error } = await supabase
-        .from('cases')
-        .update({
-          owner_id: userId,
-          status: caseStatuses.find(s => s.value === 'Assigned')?.value || 'Assigned',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', id);
-
-      if (error) throw error;
-      await fetchCase();
-    } catch (err) {
-      console.error('Error assigning case:', err);
-      setError(err instanceof Error ? err.message : 'Failed to assign case');
-    }
-  };
-
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newComment.trim() || !caseData) return;
+    if (!newComment.trim() || !vendor) return;
 
     try {
       const { data: userData } = await supabase.auth.getUser();
@@ -300,9 +204,9 @@ export function CaseDetailPage() {
         .insert([{
           content: newComment.trim(),
           parent_id: replyTo?.id || null,
-          parent_type: 'Case',
+          parent_type: 'Vendor',
           reference_id: id,
-          organization_id: caseData.organization_id,
+          organization_id: vendor.organization_id,
           created_by: userData.user.id,
           created_at: new Date().toISOString(),
           status: 'Active'
@@ -319,7 +223,7 @@ export function CaseDetailPage() {
 
   const handleUpdateComment = async (feedId: string, content: string) => {
     try {
-      if (!caseData) return;
+      if (!vendor) return;
 
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error('Not authenticated');
@@ -333,7 +237,7 @@ export function CaseDetailPage() {
         })
         .eq('id', feedId)
         .eq('created_by', userData.user.id)
-        .eq('organization_id', caseData.organization_id);
+        .eq('organization_id', vendor.organization_id);
 
       if (error) throw error;
       setEditingFeed(null);
@@ -360,8 +264,9 @@ export function CaseDetailPage() {
     }
   };
 
+  // Get style for status badge
   const getStatusStyle = (status: string) => {
-    const statusValue = caseStatuses.find(s => s.value === status);
+    const statusValue = accountStatuses.find(s => s.value === status);
     if (!statusValue?.color) return {};
     return {
       backgroundColor: statusValue.color,
@@ -369,8 +274,9 @@ export function CaseDetailPage() {
     };
   };
 
+  // Get style for type badge
   const getTypeStyle = (type: string) => {
-    const typeValue = caseTypes.find(t => t.value === type);
+    const typeValue = accountTypes.find(t => t.value === type);
     if (!typeValue?.color) return {};
     return {
       backgroundColor: typeValue.color,
@@ -378,19 +284,9 @@ export function CaseDetailPage() {
     };
   };
 
-  const getTypeLabel = (typeValue: string) => {
-    const type = caseTypes.find(t => t.value === typeValue);
-    return type?.label || typeValue;
-  };
-
-  const getStatusLabel = (statusValue: string) => {
-    const status = caseStatuses.find(s => s.value === statusValue);
-    return status?.label || statusValue;
-  };
-
   const renderFeedItem = (feed: Feed, isReply = false) => {
     const isEditing = editingFeed?.id === feed.id;
-    const isOwner = feed.created_by === caseData?.owner_id;
+    const isOwner = feed.created_by === vendor?.id;
     const replies = feeds.filter(f => f.parent_id === feed.id);
 
     return (
@@ -500,11 +396,11 @@ export function CaseDetailPage() {
     );
   }
 
-  if (error || !caseData) {
+  if (error || !vendor) {
     return (
       <div className="bg-red-50 text-red-600 p-4 rounded-lg flex items-center">
         <AlertCircle className="w-5 h-5 mr-2" />
-        {error || 'Case not found'}
+        {error || 'Vendor not found'}
       </div>
     );
   }
@@ -513,18 +409,18 @@ export function CaseDetailPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <button
-          onClick={() => navigate('/admin/cases')}
+          onClick={() => navigate('/admin/vendors')}
           className="inline-flex items-center text-gray-600 hover:text-gray-900"
         >
           <ArrowLeft className="w-5 h-5 mr-2" />
-          Back to Cases
+          Back to Accounts
         </button>
         <Link
-          to={`/admin/cases/${id}/edit`}
+          to={`/admin/vendors/${id}/edit`}
           className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
         >
           <Edit className="w-4 h-4 mr-2" />
-          Edit Case
+          Edit Account
         </Link>
       </div>
 
@@ -532,19 +428,21 @@ export function CaseDetailPage() {
         <div className="p-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
             <div>
-              <h1 className="text-2xl font-bold mb-2">{caseData.title}</h1>
-              <div className="flex items-center gap-4 text-sm text-gray-500">
-                <span className="flex items-center">
-                  <Calendar className="w-4 h-4 mr-1" />
-                  {new Date(caseData.created_at).toLocaleDateString()}
+              <h1 className="text-2xl font-bold mb-2">{vendor.name}</h1>
+              <div className="flex items-center gap-4">
+                <span
+                  className="px-2 py-1 text-xs font-medium rounded-full"
+                  style={getTypeStyle(vendor.type)}
+                >
+                  {accountTypes.find(t => t.value === vendor.type)?.label || vendor.type}
                 </span>
                 <select
-                  value={caseData.status}
+                  value={vendor.status}
                   onChange={(e) => handleStatusChange(e.target.value)}
                   className="text-sm font-medium rounded-full px-3 py-1"
-                  style={getStatusStyle(caseData.status)}
+                  style={getStatusStyle(vendor.status)}
                 >
-                  {caseStatuses.map(status => (
+                  {accountStatuses.map(status => (
                     <option key={status.id} value={status.value}>
                       {status.label}
                     </option>
@@ -555,171 +453,131 @@ export function CaseDetailPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Account Information */}
-            {caseData.contact.vendor && (
+            {/* Contact Information */}
+            {vendor.customer && (
               <div>
-                <h2 className="text-lg font-semibold mb-4">Account Information</h2>
+                <h2 className="text-lg font-semibold mb-4">Contact Information</h2>
                 <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <Building2 className="w-5 h-5 text-gray-400 mr-3" />
-                      <div>
-                        <div className="font-medium">{caseData.contact.vendor.name}</div>
+                  <div className="flex items-center">
+                    <User className="w-5 h-5 text-gray-400 mr-3" />
+                    <div>
+                      <div className="font-medium">
+                        {vendor.customer.first_name} {vendor.customer.last_name}
+                      </div>
+                      {vendor.customer.company && (
                         <div className="text-sm text-gray-500">
-                          Type: {caseData.contact.vendor.type}
-                        </div>
-                      </div>
-                    </div>
-                    <Link
-                      to={`/admin/vendors/${caseData.contact.vendor.id}`}
-                      className="text-primary-600 hover:text-primary-700 text-sm"
-                    >
-                      View Details
-                    </Link>
-                  </div>
-                  {caseData.contact.vendor.customer && (
-                    <div className="space-y-2">
-                      <div className="flex items-center">
-                        <User className="w-4 h-4 text-gray-400 mr-2" />
-                        <span className="text-sm text-gray-600">
-                          Contact: {caseData.contact.vendor.customer.first_name} {caseData.contact.vendor.customer.last_name}
-                        </span>
-                      </div>
-                      <div className="flex items-center">
-                        <Mail className="w-4 h-4 text-gray-400 mr-2" />
-                        <a
-                          href={`mailto:${caseData.contact.vendor.customer.email}`}
-                          className="text-sm text-primary-600 hover:text-primary-700"
-                        >
-                          {caseData.contact.vendor.customer.email}
-                        </a>
-                      </div>
-                      {caseData.contact.vendor.customer.phone && (
-                        <div className="flex items-center">
-                          <Phone className="w-4 h-4 text-gray-400 mr-2" />
-                          <a
-                            href={`tel:${caseData.contact.vendor.customer.phone}`}
-                            className="text-sm text-primary-600 hover:text-primary-700"
-                          >
-                            {caseData.contact.vendor.customer.phone}
-                          </a>
+                          {vendor.customer.company}
                         </div>
                       )}
+                    </div>
+                  </div>
+                  <div className="flex items-center">
+                    <Mail className="w-5 h-5 text-gray-400 mr-3" />
+                    <a
+                      href={`mailto:${vendor.customer.email}`}
+                      className="text-primary-600 hover:text-primary-700"
+                    >
+                      {vendor.customer.email}
+                    </a>
+                  </div>
+                  {vendor.customer.phone && (
+                    <div className="flex items-center">
+                      <Phone className="w-5 h-5 text-gray-400 mr-3" />
+                      <a
+                        href={`tel:${vendor.customer.phone}`}
+                        className="text-primary-600 hover:text-primary-700"
+                      >
+                        {vendor.customer.phone}
+                      </a>
                     </div>
                   )}
                 </div>
               </div>
             )}
 
-            {/* Customer Information */}
+            {/* Account Details */}
             <div>
-              <h2 className="text-lg font-semibold mb-4">Customer Information</h2>
+              <h2 className="text-lg font-semibold mb-4">Account Details</h2>
               <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-                <div className="flex items-center">
-                  <User className="w-5 h-5 text-gray-400 mr-3" />
+                {vendor.payment_terms && (
                   <div>
-                    <div className="font-medium">
-                      {caseData.contact.first_name} {caseData.contact.last_name}
+                    <div className="text-sm font-medium text-gray-500 mb-1">Payment Terms</div>
+                    <div className="text-gray-700">{vendor.payment_terms}</div>
+                  </div>
+                )}
+                <div>
+                  <div className="text-sm font-medium text-gray-500 mb-1">Created</div>
+                  <div className="text-gray-700">
+                    {new Date(vendor.created_at).toLocaleDateString()}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Shipping Address */}
+            {(vendor.shipping_address_line1 || vendor.shipping_city || vendor.shipping_state || vendor.shipping_country) && (
+              <div>
+                <h2 className="text-lg font-semibold mb-4">Shipping Address</h2>
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="space-y-1">
+                    {vendor.shipping_address_line1 && (
+                      <div>{vendor.shipping_address_line1}</div>
+                    )}
+                    {vendor.shipping_address_line2 && (
+                      <div>{vendor.shipping_address_line2}</div>
+                    )}
+                    <div>
+                      {[
+                        vendor.shipping_city,
+                        vendor.shipping_state,
+                        vendor.shipping_country
+                      ].filter(Boolean).join(', ')}
                     </div>
-                    {caseData.contact.company && (
-                      <div className="text-sm text-gray-500">
-                        {caseData.contact.company}
-                      </div>
-                    )}
                   </div>
                 </div>
-                {caseData.contact.email && (
-                  <div className="flex items-center">
-                    <Mail className="w-5 h-5 text-gray-400 mr-3" />
-                    <a
-                      href={`mailto:${caseData.contact.email}`}
-                      className="text-primary-600 hover:text-primary-700"
-                    >
-                      {caseData.contact.email}
-                    </a>
-                  </div>
-                )}
-                {caseData.contact.phone && (
-                  <div className="flex items-center">
-                    <Phone className="w-5 h-5 text-gray-400 mr-3" />
-                    <a
-                      href={`tel:${caseData.contact.phone}`}
-                      className="text-primary-600 hover:text-primary-700"
-                    >
-                      {caseData.contact.phone}
-                    </a>
-                  </div>
-                )}
               </div>
-            </div>
+            )}
 
-            <div>
-              <h2 className="text-lg font-semibold mb-4">Case Details</h2>
-              <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-                <div>
-                  <div className="text-sm font-medium text-gray-500 mb-1">Type</div>
-                  <div className="flex items-center">
-                    <span
-                      className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
-                      style={getTypeStyle(caseData.type)}
-                    >
-                      {getTypeLabel(caseData.type)}
-                    </span>
-                    {caseData.sub_type && (
-                      <span className="ml-2 text-gray-500">
-                        / {caseData.sub_type.replace(/_/g, ' ')}
-                      </span>
+            {/* Billing Address */}
+            {(vendor.billing_address_line1 || vendor.billing_city || vendor.billing_state || vendor.billing_country) && (
+              <div>
+                <h2 className="text-lg font-semibold mb-4">Billing Address</h2>
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="space-y-1">
+                    {vendor.billing_address_line1 && (
+                      <div>{vendor.billing_address_line1}</div>
                     )}
+                    {vendor.billing_address_line2 && (
+                      <div>{vendor.billing_address_line2}</div>
+                    )}
+                    <div>
+                      {[
+                        vendor.billing_city,
+                        vendor.billing_state,
+                        vendor.billing_country
+                      ].filter(Boolean).join(', ')}
+                    </div>
                   </div>
                 </div>
-                <div>
-                  <div className="text-sm font-medium text-gray-500 mb-1">Description</div>
-                  <p className="text-gray-700 whitespace-pre-wrap">{caseData.description}</p>
-                </div>
-                {caseData.resume_url && (
-                  <div>
-                    <div className="text-sm font-medium text-gray-500 mb-1">Resume</div>
-                    <a
-                      href={caseData.resume_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
-                    >
-                      <FileText className="w-4 h-4 mr-2" />
-                      View Resume
-                    </a>
-                  </div>
-                )}
               </div>
-            </div>
+            )}
 
-            <div>
-              <h2 className="text-lg font-semibold mb-4">Assignment</h2>
-              <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-                <div>
-                  <div className="text-sm font-medium text-gray-500 mb-1">Assigned To</div>
-                  <select
-                    value={caseData.owner_id || ''}
-                    onChange={(e) => handleAssign(e.target.value)}
-                    className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-                  >
-                    <option value="">Unassigned</option>
-                    {staff.map((member) => (
-                      <option key={member.id} value={member.id}>
-                        {member.name}
-                      </option>
-                    ))}
-                  </select>
+            {/* Notes */}
+            {vendor.notes && (
+              <div className="md:col-span-2">
+                <h2 className="text-lg font-semibold mb-4">Notes</h2>
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <p className="text-gray-700 whitespace-pre-wrap">{vendor.notes}</p>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Add Custom Fields section */}
             <div className="md:col-span-2">
               <CustomFieldsSection
-                entityType="case"
+                entityType="vendor"
                 entityId={id}
-                organizationId={caseData.organization_id}
+                organizationId={vendor.organization_id}
                 className="bg-gray-50 rounded-lg p-4"
               />
             </div>
