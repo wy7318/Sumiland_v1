@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Plus, Search, Download, Edit, Trash2, ChevronDown, ChevronUp, 
-  Check, X, FileSpreadsheet, AlertCircle 
+  Check, X, FileSpreadsheet, AlertCircle, Eye, Building2
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
@@ -25,6 +25,11 @@ type Customer = {
   organization_id: string;
   created_at: string;
   updated_at: string;
+  vendor_id: string | null;
+  vendor: {
+    name: string;
+    type: string;
+  } | null;
 };
 
 export function CustomersPage() {
@@ -46,10 +51,16 @@ export function CustomersPage() {
       setLoading(true);
       const { data, error } = await supabase
         .from('customers')
-        .select('*')
+        .select(`
+          *,
+          vendor:vendors!customers_vendor_id_fkey(
+            name,
+            type
+          )
+        `)
         .in('organization_id', organizations.map(org => org.id))
         .order('created_at', { ascending: false });
-
+  
       if (error) throw error;
       setCustomers(data || []);
     } catch (err) {
@@ -59,6 +70,7 @@ export function CustomersPage() {
       setLoading(false);
     }
   };
+
 
   const handleDelete = async (customerId: string) => {
     try {
@@ -92,6 +104,8 @@ export function CustomersPage() {
       'Email',
       'Phone',
       'Company',
+      'Account',
+      'Account Type',
       'Address',
       'City',
       'State',
@@ -106,6 +120,8 @@ export function CustomersPage() {
       customer.email,
       customer.phone || '',
       customer.company || '',
+      customer.vendor?.name || '',
+      customer.vendor?.type || '',
       `${customer.address_line1 || ''} ${customer.address_line2 || ''}`,
       customer.city || '',
       customer.state || '',
@@ -133,7 +149,8 @@ export function CustomersPage() {
       customer.last_name.toLowerCase().includes(searchString) ||
       customer.email.toLowerCase().includes(searchString) ||
       customer.company?.toLowerCase().includes(searchString) ||
-      customer.phone?.toLowerCase().includes(searchString)
+      customer.phone?.toLowerCase().includes(searchString) ||
+      customer.vendor?.name.toLowerCase().includes(searchString)
     );
   });
 
@@ -213,6 +230,9 @@ export function CustomersPage() {
                   Company
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Account
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Location
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -243,6 +263,23 @@ export function CustomersPage() {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
+                    {customer.vendor ? (
+                      <div className="flex items-center space-x-2">
+                        <Building2 className="w-4 h-4 text-gray-400" />
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">
+                            {customer.vendor.name}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {customer.vendor.type}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-500">
                       {customer.city}, {customer.state}
                     </div>
@@ -252,6 +289,12 @@ export function CustomersPage() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex justify-end space-x-2">
+                      <Link
+                        to={`/admin/customers/${customer.customer_id}`}
+                        className="text-primary-600 hover:text-primary-900"
+                      >
+                        <Eye className="w-5 h-5" />
+                      </Link>
                       <Link
                         to={`/admin/customers/${customer.customer_id}/edit`}
                         className="text-blue-600 hover:text-blue-900"

@@ -3,35 +3,17 @@ import { useNavigate, useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
   ArrowLeft, Building2, Mail, Phone, Calendar,
-  Edit, AlertCircle, FileText, Download, Clock, Calendar as CalendarIcon,
-  CheckCircle, X, Send, Reply, User
+  Edit, AlertCircle, Send, Reply, X, User,
+  Globe, CheckCircle
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { cn } from '../../lib/utils';
 import { CustomFieldsSection } from './CustomFieldsSection';
 import { UserSearch } from './UserSearch';
+import type { Database } from '../../lib/database.types';
 
-type Case = {
-  id: string;
-  title: string;
-  type: string;
-  sub_type: string | null;
-  status: string;
-  contact_id: string;
-  owner_id: string | null;
-  description: string;
-  resume_url: string | null;
-  created_at: string;
-  organization_id: string;
-  contact: {
-    first_name: string;
-    last_name: string;
-    email: string;
-    phone: string | null;
-    company: string | null;
-  };
+type Lead = Database['public']['Tables']['leads']['Row'] & {
   owner: {
-    id: string;
     name: string;
   } | null;
 };
@@ -40,7 +22,7 @@ type Feed = {
   id: string;
   content: string;
   parent_id: string | null;
-  parent_type: 'Case';
+  parent_type: 'Lead';
   reference_id: string;
   created_by: string;
   created_at: string;
@@ -62,90 +44,86 @@ type PicklistValue = {
   text_color: string | null;
 };
 
-export function CaseDetailPage() {
+export function LeadDetailPage() {
   const navigate = useNavigate();
   const { id } = useParams();
-  const [caseData, setCaseData] = useState<Case | null>(null);
+  const [lead, setLead] = useState<Lead | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [feeds, setFeeds] = useState<Feed[]>([]);
   const [newComment, setNewComment] = useState('');
   const [replyTo, setReplyTo] = useState<Feed | null>(null);
   const [editingFeed, setEditingFeed] = useState<Feed | null>(null);
-  const [caseTypes, setCaseTypes] = useState<PicklistValue[]>([]);
-  const [caseStatuses, setCaseStatuses] = useState<PicklistValue[]>([]);
+  const [leadStatuses, setLeadStatuses] = useState<PicklistValue[]>([]);
+  const [leadSources, setLeadSources] = useState<PicklistValue[]>([]);
 
   useEffect(() => {
     fetchPicklists();
     if (id) {
-      fetchCase();
+      fetchLead();
     }
   }, [id]);
 
   useEffect(() => {
-    if (caseData) {
+    if (lead) {
       fetchFeeds();
     }
-  }, [caseData]);
+  }, [lead]);
 
   const fetchPicklists = async () => {
     try {
-      // Fetch case types
-      const { data: typeData, error: typeError } = await supabase
-        .from('picklist_values')
-        .select('id, value, label, is_default, is_active, color, text_color')
-        .eq('type', 'case_type')
-        .eq('is_active', true)
-        .order('display_order', { ascending: true });
-
-      if (typeError) throw typeError;
-      setCaseTypes(typeData || []);
-
-      // Fetch case statuses
+      // Fetch lead statuses
       const { data: statusData, error: statusError } = await supabase
         .from('picklist_values')
         .select('id, value, label, is_default, is_active, color, text_color')
-        .eq('type', 'case_status')
+        .eq('type', 'lead_status')
         .eq('is_active', true)
         .order('display_order', { ascending: true });
 
       if (statusError) throw statusError;
-      setCaseStatuses(statusData || []);
+      setLeadStatuses(statusData || []);
+
+      // Fetch lead sources
+      const { data: sourceData, error: sourceError } = await supabase
+        .from('picklist_values')
+        .select('id, value, label, is_default, is_active, color, text_color')
+        .eq('type', 'lead_source')
+        .eq('is_active', true)
+        .order('display_order', { ascending: true });
+
+      if (sourceError) throw sourceError;
+      setLeadSources(sourceData || []);
     } catch (err) {
       console.error('Error fetching picklists:', err);
       setError('Failed to load picklist values');
     }
   };
 
-  const fetchCase = async () => {
+  const fetchLead = async () => {
     try {
       if (!id) return;
 
-      const { data: caseData, error } = await supabase
-        .from('cases')
+      const { data: lead, error } = await supabase
+        .from('leads')
         .select(`
           *,
-          contact:customers(*),
-          owner:profiles!cases_owner_id_fkey(
-            id,
-            name
-          )
+          owner:profiles!leads_owner_id_fkey(name)
         `)
         .eq('id', id)
         .single();
 
       if (error) throw error;
-      setCaseData(caseData);
+      setLead(lead);
     } catch (err) {
-      console.error('Error fetching case:', err);
-      setError('Failed to load case');
+      console.error('Error fetching lead:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load lead');
     } finally {
       setLoading(false);
     }
   };
 
   const fetchFeeds = async () => {
-    if (!id || !caseData) return;
+    if (!id || !lead) return;
 
     try {
       const { data, error } = await supabase
@@ -155,9 +133,9 @@ export function CaseDetailPage() {
           profile:profiles!feeds_created_by_fkey(name)
         `)
         .eq('reference_id', id)
-        .eq('parent_type', 'Case')
+        .eq('parent_type', 'Lead')
         .eq('status', 'Active')
-        .eq('organization_id', caseData.organization_id)
+        .eq('organization_id', lead.organization_id)
         .order('created_at', { ascending: true });
 
       if (error) throw error;
@@ -169,10 +147,10 @@ export function CaseDetailPage() {
 
   const handleStatusChange = async (newStatus: string) => {
     try {
-      if (!id || !caseData) return;
+      if (!id || !lead) return;
 
       const { error } = await supabase
-        .from('cases')
+        .from('leads')
         .update({
           status: newStatus,
           updated_at: new Date().toISOString()
@@ -180,7 +158,7 @@ export function CaseDetailPage() {
         .eq('id', id);
 
       if (error) throw error;
-      await fetchCase();
+      await fetchLead();
     } catch (err) {
       console.error('Error updating status:', err);
       setError(err instanceof Error ? err.message : 'Failed to update status');
@@ -189,10 +167,10 @@ export function CaseDetailPage() {
 
   const handleAssign = async (userId: string | null) => {
     try {
-      if (!id || !caseData) return;
+      if (!id || !lead) return;
 
       const { error } = await supabase
-        .from('cases')
+        .from('leads')
         .update({
           owner_id: userId,
           updated_at: new Date().toISOString()
@@ -200,16 +178,16 @@ export function CaseDetailPage() {
         .eq('id', id);
 
       if (error) throw error;
-      await fetchCase();
+      await fetchLead();
     } catch (err) {
-      console.error('Error assigning case:', err);
-      setError(err instanceof Error ? err.message : 'Failed to assign case');
+      console.error('Error assigning lead:', err);
+      setError(err instanceof Error ? err.message : 'Failed to assign lead');
     }
   };
 
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newComment.trim() || !caseData) return;
+    if (!newComment.trim() || !lead) return;
 
     try {
       const { data: userData } = await supabase.auth.getUser();
@@ -220,9 +198,9 @@ export function CaseDetailPage() {
         .insert([{
           content: newComment.trim(),
           parent_id: replyTo?.id || null,
-          parent_type: 'Case',
+          parent_type: 'Lead',
           reference_id: id,
-          organization_id: caseData.organization_id,
+          organization_id: lead.organization_id,
           created_by: userData.user.id,
           created_at: new Date().toISOString(),
           status: 'Active'
@@ -239,7 +217,7 @@ export function CaseDetailPage() {
 
   const handleUpdateComment = async (feedId: string, content: string) => {
     try {
-      if (!caseData) return;
+      if (!lead) return;
 
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error('Not authenticated');
@@ -253,7 +231,7 @@ export function CaseDetailPage() {
         })
         .eq('id', feedId)
         .eq('created_by', userData.user.id)
-        .eq('organization_id', caseData.organization_id);
+        .eq('organization_id', lead.organization_id);
 
       if (error) throw error;
       setEditingFeed(null);
@@ -282,21 +260,11 @@ export function CaseDetailPage() {
 
   // Get style for status badge
   const getStatusStyle = (status: string) => {
-    const statusValue = caseStatuses.find(s => s.value === status);
+    const statusValue = leadStatuses.find(s => s.value === status);
     if (!statusValue?.color) return {};
     return {
       backgroundColor: statusValue.color,
       color: statusValue.text_color || '#FFFFFF'
-    };
-  };
-
-  // Get style for type badge
-  const getTypeStyle = (type: string) => {
-    const typeValue = caseTypes.find(t => t.value === type);
-    if (!typeValue?.color) return {};
-    return {
-      backgroundColor: typeValue.color,
-      color: typeValue.text_color || '#FFFFFF'
     };
   };
 
@@ -331,7 +299,7 @@ export function CaseDetailPage() {
               </div>
             </div>
           </div>
-          {feed.created_by === caseData?.id && !isEditing && (
+          {feed.created_by === lead?.id && !isEditing && (
             <div className="relative group">
               <button className="p-1 rounded-full hover:bg-gray-100">
                 <X className="w-4 h-4 text-gray-500" />
@@ -411,11 +379,11 @@ export function CaseDetailPage() {
     );
   }
 
-  if (error || !caseData) {
+  if (error || !lead) {
     return (
       <div className="bg-red-50 text-red-600 p-4 rounded-lg flex items-center">
         <AlertCircle className="w-5 h-5 mr-2" />
-        {error || 'Case not found'}
+        {error || 'Lead not found'}
       </div>
     );
   }
@@ -424,18 +392,18 @@ export function CaseDetailPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <button
-          onClick={() => navigate('/admin/cases')}
+          onClick={() => navigate('/admin/leads')}
           className="inline-flex items-center text-gray-600 hover:text-gray-900"
         >
           <ArrowLeft className="w-5 h-5 mr-2" />
-          Back to Cases
+          Back to Leads
         </button>
         <Link
-          to={`/admin/cases/${id}/edit`}
+          to={`/admin/leads/${id}/edit`}
           className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
         >
           <Edit className="w-4 h-4 mr-2" />
-          Edit Case
+          Edit Lead
         </Link>
       </div>
 
@@ -443,31 +411,27 @@ export function CaseDetailPage() {
         <div className="p-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
             <div>
-              <h1 className="text-2xl font-bold mb-2">{caseData.title}</h1>
+              <h1 className="text-2xl font-bold mb-2">
+                {lead.first_name} {lead.last_name}
+              </h1>
               <div className="flex items-center gap-4">
-                <span
-                  className="px-2 py-1 text-xs font-medium rounded-full"
-                  style={getTypeStyle(caseData.type)}
-                >
-                  {caseTypes.find(t => t.value === caseData.type)?.label || caseData.type}
-                  {caseData.sub_type && (
-                    <span className="ml-1 text-xs">
-                      / {caseData.sub_type.replace(/_/g, ' ')}
-                    </span>
-                  )}
-                </span>
                 <select
-                  value={caseData.status}
+                  value={lead.status}
                   onChange={(e) => handleStatusChange(e.target.value)}
                   className="text-sm font-medium rounded-full px-3 py-1"
-                  style={getStatusStyle(caseData.status)}
+                  style={getStatusStyle(lead.status)}
                 >
-                  {caseStatuses.map(status => (
+                  {leadStatuses.map(status => (
                     <option key={status.id} value={status.value}>
                       {status.label}
                     </option>
                   ))}
                 </select>
+                {lead.lead_source && (
+                  <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+                    {leadSources.find(s => s.value === lead.lead_source)?.label || lead.lead_source}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -481,11 +445,11 @@ export function CaseDetailPage() {
                   <User className="w-5 h-5 text-gray-400 mr-3" />
                   <div>
                     <div className="font-medium">
-                      {caseData.contact.first_name} {caseData.contact.last_name}
+                      {lead.first_name} {lead.last_name}
                     </div>
-                    {caseData.contact.company && (
+                    {lead.company && (
                       <div className="text-sm text-gray-500">
-                        {caseData.contact.company}
+                        {lead.company}
                       </div>
                     )}
                   </div>
@@ -493,20 +457,33 @@ export function CaseDetailPage() {
                 <div className="flex items-center">
                   <Mail className="w-5 h-5 text-gray-400 mr-3" />
                   <a
-                    href={`mailto:${caseData.contact.email}`}
+                    href={`mailto:${lead.email}`}
                     className="text-primary-600 hover:text-primary-700"
                   >
-                    {caseData.contact.email}
+                    {lead.email}
                   </a>
                 </div>
-                {caseData.contact.phone && (
+                {lead.phone && (
                   <div className="flex items-center">
                     <Phone className="w-5 h-5 text-gray-400 mr-3" />
                     <a
-                      href={`tel:${caseData.contact.phone}`}
+                      href={`tel:${lead.phone}`}
                       className="text-primary-600 hover:text-primary-700"
                     >
-                      {caseData.contact.phone}
+                      {lead.phone}
+                    </a>
+                  </div>
+                )}
+                {lead.website && (
+                  <div className="flex items-center">
+                    <Globe className="w-5 h-5 text-gray-400 mr-3" />
+                    <a
+                      href={lead.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary-600 hover:text-primary-700"
+                    >
+                      {lead.website}
                     </a>
                   </div>
                 )}
@@ -518,45 +495,44 @@ export function CaseDetailPage() {
               <h2 className="text-lg font-semibold mb-4">Assignment</h2>
               <div className="bg-gray-50 rounded-lg p-4 space-y-4">
                 <UserSearch
-                  organizationId={caseData.organization_id}
-                  selectedUserId={caseData.owner_id}
+                  organizationId={lead.organization_id}
+                  selectedUserId={lead.owner_id}
                   onSelect={handleAssign}
                 />
               </div>
             </div>
 
-            {/* Case Details */}
+            {/* Lead Details */}
             <div className="md:col-span-2">
-              <h2 className="text-lg font-semibold mb-4">Case Details</h2>
+              <h2 className="text-lg font-semibold mb-4">Lead Details</h2>
               <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-                <div>
-                  <div className="text-sm font-medium text-gray-500 mb-1">Description</div>
-                  <p className="text-gray-700 whitespace-pre-wrap">{caseData.description}</p>
-                </div>
-                {caseData.resume_url && (
+                {lead.description && (
                   <div>
-                    <div className="text-sm font-medium text-gray-500 mb-1">Resume</div>
-                    <a
-                      href={caseData.resume_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
-                    >
-                      <FileText className="w-4 h-4 mr-2" />
-                      View Resume
-                      <Download className="w-4 h-4 ml-2" />
-                    </a>
+                    <div className="text-sm font-medium text-gray-500 mb-1">Description</div>
+                    <p className="text-gray-700 whitespace-pre-wrap">{lead.description}</p>
                   </div>
                 )}
+                {lead.product_interest && (
+                  <div>
+                    <div className="text-sm font-medium text-gray-500 mb-1">Product Interest</div>
+                    <p className="text-gray-700">{lead.product_interest}</p>
+                  </div>
+                )}
+                <div>
+                  <div className="text-sm font-medium text-gray-500 mb-1">Email Preferences</div>
+                  <p className="text-gray-700">
+                    {lead.email_opt_out ? 'Opted out of emails' : 'Opted in to emails'}
+                  </p>
+                </div>
               </div>
             </div>
 
             {/* Add Custom Fields section */}
             <div className="md:col-span-2">
               <CustomFieldsSection
-                entityType="case"
+                entityType="lead"
                 entityId={id}
-                organizationId={caseData.organization_id}
+                organizationId={lead.organization_id}
                 className="bg-gray-50 rounded-lg p-4"
               />
             </div>

@@ -5,6 +5,7 @@ import { Save, X, AlertCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { CustomFieldsForm } from './CustomFieldsForm';
+import { UserSearch } from './UserSearch';
 
 type PicklistValue = {
   id: string;
@@ -150,7 +151,8 @@ export function CaseForm() {
           status: caseData.status,
           owner_id: caseData.owner_id,
           description: caseData.description,
-          resume_url: caseData.resume_url
+          resume_url: caseData.resume_url,
+          organization_id: caseData.organization_id
         });
 
         // Fetch custom fields for this case
@@ -384,19 +386,11 @@ export function CaseForm() {
             <label htmlFor="owner" className="block text-sm font-medium text-gray-700 mb-1">
               Assigned To
             </label>
-            <select
-              id="owner"
-              value={formData.owner_id || ''}
-              onChange={(e) => setFormData(prev => ({ ...prev, owner_id: e.target.value || null }))}
-              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-            >
-              <option value="">Unassigned</option>
-              {staff.map(member => (
-                <option key={member.id} value={member.id}>
-                  {member.name}
-                </option>
-              ))}
-            </select>
+            <UserSearch
+              organizationId={formData.organization_id}
+              selectedUserId={formData.owner_id}
+              onSelect={(userId) => setFormData(prev => ({ ...prev, owner_id: userId }))}
+            />
           </div>
         </div>
 
