@@ -5,6 +5,7 @@ import { Save, X, AlertCircle, Mail, Phone, Building2, User, Search } from 'luci
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { CustomFieldsForm } from './CustomFieldsForm';
+import { cn } from '../../lib/utils';
 
 type CustomerFormData = {
   first_name: string;
@@ -46,7 +47,7 @@ type Vendor = {
 export function CustomerForm() {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { organizations } = useAuth();
+  const { organizations, user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState<CustomerFormData>(initialFormData);
@@ -146,6 +147,22 @@ export function CustomerForm() {
         if (customer.vendor) {
           setSelectedVendor(customer.vendor);
         }
+
+        // Fetch custom fields for this customer
+        const { data: customFieldValues, error: customFieldsError } = await supabase
+          .from('custom_field_values')
+          .select('field_id, value')
+          .eq('entity_id', id);
+
+        if (customFieldsError) throw customFieldsError;
+
+        // Convert custom field values to a key-value pair object
+        const customFieldsData = customFieldValues?.reduce((acc, field) => {
+          acc[field.field_id] = field.value;
+          return acc;
+        }, {} as Record<string, any>) || {};
+
+        setCustomFields(customFieldsData);
       }
     } catch (err) {
       console.error('Error fetching customer:', err);
@@ -198,6 +215,9 @@ export function CustomerForm() {
     setError(null);
 
     try {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error('Not authenticated');
+
       // Use the first organization if creating new customer
       const organizationId = id 
         ? (await supabase
@@ -212,6 +232,8 @@ export function CustomerForm() {
         throw new Error('No valid organization found');
       }
 
+      let customerId = id;
+
       if (id) {
         // Verify organization access
         if (!organizations.some(org => org.id === organizationId)) {
@@ -222,23 +244,56 @@ export function CustomerForm() {
           .from('customers')
           .update({
             ...formData,
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
+            updated_by: userData.user.id
           })
           .eq('customer_id', id)
           .eq('organization_id', organizationId);
 
         if (updateError) throw updateError;
       } else {
-        const { error: insertError } = await supabase
+        const { data: newCustomer, error: insertError } = await supabase
           .from('customers')
           .insert([{
             ...formData,
             organization_id: organizationId,
             created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }]);
+            created_by: userData.user.id,
+            updated_at: new Date().toISOString(),
+            updated_by: userData.user.id
+          }])
+          .select()
+          .single();
 
         if (insertError) throw insertError;
+
+        // Set the new customer ID for custom fields
+        if (newCustomer) {
+          customerId = newCustomer.customer_id;
+        }
+      }
+
+      // Save custom field values
+      if (customerId && userData.user) {
+        for (const [fieldId, value] of Object.entries(customFields)) {
+          const { error: valueError } = await supabase
+            .from('custom_field_values')
+            .upsert({
+              organization_id: organizationId,
+              entity_id: customerId,
+              field_id: fieldId,
+              value,
+              created_by: userData.user.id,
+              updated_by: userData.user.id,
+              updated_at: new Date().toISOString()
+            }, {
+              onConflict: 'organization_id,field_id,entity_id'
+            });
+
+          if (valueError) {
+            console.error('Error saving custom field value:', valueError);
+          }
+        }
       }
 
       navigate('/admin/customers');
