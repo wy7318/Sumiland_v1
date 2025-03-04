@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Save, X, Plus, Trash2, Search, Building2, Package, Scale,
-  AlertCircle, Calendar, DollarSign, User, Mail, Phone } from 'lucide-react';
+import {
+  Save, X, Plus, Trash2, Search, Building2, Package, Scale,
+  AlertCircle, Calendar, DollarSign, User, Mail, Phone
+} from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
@@ -89,7 +91,7 @@ export function QuoteForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState<FormData>(initialFormData);
-  
+
   // Search states
   const [customerSearch, setCustomerSearch] = useState('');
   const [vendorSearch, setVendorSearch] = useState('');
@@ -108,10 +110,22 @@ export function QuoteForm() {
   const [selectedProductIndex, setSelectedProductIndex] = useState<number | null>(null);
   const [quoteStatuses, setQuoteStatuses] = useState<PicklistValue[]>([]);
   const [customFields, setCustomFields] = useState<Record<string, any>>({});
-  
+
   const customerSearchRef = useRef<HTMLDivElement>(null);
   const vendorSearchRef = useRef<HTMLDivElement>(null);
   const productSearchRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const updatedTotal = calculateTotal();
+    setFormData(prev => ({
+      ...prev,
+      subtotal: calculateSubtotal(),
+      tax_amount: formData.tax_amount ?? 0,
+      discount_amount: formData.discount_amount ?? 0,
+      total_amount: updatedTotal
+    }));
+  }, [formData.items, formData.tax_amount, formData.discount_amount]);
+
 
   useEffect(() => {
     fetchPicklists();
@@ -144,7 +158,7 @@ export function QuoteForm() {
   useEffect(() => {
     if (customerSearch) {
       const searchTerm = customerSearch.toLowerCase();
-      const filtered = customers.filter(customer => 
+      const filtered = customers.filter(customer =>
         customer.first_name.toLowerCase().includes(searchTerm) ||
         customer.last_name.toLowerCase().includes(searchTerm) ||
         customer.email.toLowerCase().includes(searchTerm) ||
@@ -159,7 +173,7 @@ export function QuoteForm() {
   useEffect(() => {
     if (vendorSearch) {
       const searchTerm = vendorSearch.toLowerCase();
-      const filtered = vendors.filter(vendor => 
+      const filtered = vendors.filter(vendor =>
         vendor.name.toLowerCase().includes(searchTerm) ||
         vendor.email?.toLowerCase().includes(searchTerm) ||
         vendor.contact_person?.toLowerCase().includes(searchTerm)
@@ -229,13 +243,13 @@ export function QuoteForm() {
         `)
         .eq('quote_id', id)
         .single();
-  
+
       if (error) throw error;
       if (quote) {
         const subtotal = quote.subtotal || 0;
         const discountAmount = quote.discount_amount || 0;
         const discountPercent = subtotal > 0 ? (discountAmount / subtotal) * 100 : 0;
-  
+
         setFormData({
           customer_id: quote.customer_id,
           vendor_id: quote.vendor_id,
@@ -254,26 +268,26 @@ export function QuoteForm() {
           })),
           organization_id: quote.organization_id,
         });
-  
+
         setSelectedCustomer(quote.customer);
         if (quote.vendor) {
           setSelectedVendor(quote.vendor);
         }
-  
+
         // Fetch custom fields for this quote
         const { data: customFieldValues, error: customFieldsError } = await supabase
           .from('custom_field_values')
           .select('field_id, value')
           .eq('entity_id', id);
-  
+
         if (customFieldsError) throw customFieldsError;
-  
+
         // Convert custom field values to a key-value pair object
         const customFieldsData = customFieldValues?.reduce((acc, field) => {
           acc[field.field_id] = field.value;
           return acc;
         }, {} as Record<string, any>) || {};
-  
+
         setCustomFields(customFieldsData);
       }
     } catch (err) {
@@ -336,23 +350,23 @@ export function QuoteForm() {
   const calculateSubtotal = () => {
     return formData.items.reduce((sum, item) => sum + item.quantity * item.unit_price, 0);
   };
-  
+
   const roundToTwo = (value: number | null) => {
     return value !== null ? Math.round(value * 100) / 100 : null;
   };
-  
+
   const calculateTaxAmount = (taxPercent: number | null, subtotal: number) => {
     return roundToTwo(taxPercent !== null ? (subtotal * taxPercent) / 100 : null);
   };
-  
+
   const calculateDiscountAmount = (discountPercent: number | null, subtotal: number) => {
     return roundToTwo(discountPercent !== null ? (subtotal * discountPercent) / 100 : null);
   };
-  
+
   const calculateTaxPercent = (taxAmount: number | null, subtotal: number) => {
     return roundToTwo(taxAmount !== null && subtotal !== 0 ? (taxAmount / subtotal) * 100 : null);
   };
-  
+
   const calculateDiscountPercent = (discountAmount: number | null, subtotal: number) => {
     return roundToTwo(discountAmount !== null && subtotal !== 0 ? (discountAmount / subtotal) * 100 : null);
   };
@@ -377,14 +391,14 @@ export function QuoteForm() {
       // Update existing item
       setFormData(prev => ({
         ...prev,
-        items: prev.items.map((item, index) => 
+        items: prev.items.map((item, index) =>
           index === selectedProductIndex
             ? {
-                item_name: product.name,
-                item_desc: product.description || null,
-                quantity: 1,
-                unit_price: product.price
-              }
+              item_name: product.name,
+              item_desc: product.description || null,
+              quantity: 1,
+              unit_price: product.price
+            }
             : item
         )
       }));
@@ -426,7 +440,7 @@ export function QuoteForm() {
   const updateItem = (index: number, field: keyof QuoteItem, value: any) => {
     setFormData(prev => ({
       ...prev,
-      items: prev.items.map((item, i) => 
+      items: prev.items.map((item, i) =>
         i === index ? { ...item, [field]: value } : item)
     }));
   };
@@ -442,8 +456,18 @@ export function QuoteForm() {
     const subtotal = calculateSubtotal();
     const taxAmount = formData.tax_amount ?? 0;
     const discountAmount = formData.discount_amount ?? 0;
-    return subtotal + taxAmount - discountAmount;
+    const total = subtotal + taxAmount - discountAmount;
+
+    console.log("🟢 Debug - Total Calculation:", {
+      subtotal,
+      taxAmount,
+      discountAmount,
+      total
+    });
+
+    return total;
   };
+
 
   // const handleSubmit = async (e: React.FormEvent) => {
   //   e.preventDefault();
@@ -590,21 +614,30 @@ export function QuoteForm() {
       setError('Please add at least one item');
       return;
     }
-  
+
     setLoading(true);
     setError(null);
-  
+
     try {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error('Not authenticated');
-  
+
+      // ✅ Explicitly calculate values before saving
       const subtotal = calculateSubtotal();
-      const total = calculateTotal();
-  
+      const discountAmount = formData.discount_amount ?? 0;
+      const taxAmount = formData.tax_amount ?? 0;
+      const total = subtotal + taxAmount - discountAmount;
+
+      console.log("🟢 Debug - Calculated Values Before Saving");
+      console.log("Subtotal:", subtotal);
+      console.log("Discount Amount:", discountAmount);
+      console.log("Tax Amount:", taxAmount);
+      console.log("Total (Expected Total Amount):", total);
+
       let quoteId = id;
-  
+
       if (id) {
-        // Update existing quote
+        console.log("🟢 Debug - Updating Existing Quote");
         const { error: updateError } = await supabase
           .from('quote_hdr')
           .update({
@@ -614,41 +647,17 @@ export function QuoteForm() {
             notes: formData.notes || null,
             subtotal,
             tax_percent: formData.tax_percent,
-            tax_amount: formData.tax_amount,
-            discount_amount: formData.discount_amount,
-            total_amount: total,
+            tax_amount: taxAmount,
+            discount_amount: discountAmount,
+            total_amount: total,  // ✅ Ensure the correct total is saved
             updated_at: new Date().toISOString(),
             updated_by: userData.user.id,
           })
           .eq('quote_id', id);
-  
+
         if (updateError) throw updateError;
-  
-        // Delete existing items
-        const { error: deleteError } = await supabase
-          .from('quote_dtl')
-          .delete()
-          .eq('quote_id', id);
-  
-        if (deleteError) throw deleteError;
-  
-        // Insert new items
-        const { error: itemsError } = await supabase
-          .from('quote_dtl')
-          .insert(
-            formData.items.map(({ item_name, item_desc, quantity, unit_price }) => ({
-              quote_id: id,
-              item_name,
-              item_desc,
-              quantity,
-              unit_price,
-              organization_id: formData.organization_id,
-            }))
-          );
-  
-        if (itemsError) throw itemsError;
       } else {
-        // Create new quote
+        console.log("🟢 Debug - Creating New Quote");
         const { data: newQuote, error: insertError } = await supabase
           .from('quote_hdr')
           .insert([{
@@ -658,9 +667,9 @@ export function QuoteForm() {
             notes: formData.notes || null,
             subtotal,
             tax_percent: formData.tax_percent,
-            tax_amount: formData.tax_amount,
-            discount_amount: formData.discount_amount,
-            total_amount: total,
+            tax_amount: taxAmount,
+            discount_amount: discountAmount,
+            total_amount: total,  // ✅ Ensure the correct total is saved
             organization_id: formData.organization_id,
             created_by: userData.user.id,
             created_at: new Date().toISOString(),
@@ -669,62 +678,21 @@ export function QuoteForm() {
           }])
           .select()
           .single();
-  
+
         if (insertError) throw insertError;
-  
-        // Set the new quote ID for custom fields
-        if (newQuote) {
-          quoteId = newQuote.quote_id;
-  
-          // Insert items
-          const { error: itemsError } = await supabase
-            .from('quote_dtl')
-            .insert(
-              formData.items.map(({ item_name, item_desc, quantity, unit_price }) => ({
-                quote_id: quoteId,
-                item_name,
-                item_desc,
-                quantity,
-                unit_price,
-                organization_id: formData.organization_id,
-              }))
-            );
-  
-          if (itemsError) throw itemsError;
-        }
+        quoteId = newQuote.quote_id;
       }
-  
-      // Save custom field values
-      if (userData.user) {
-        for (const [fieldId, value] of Object.entries(customFields)) {
-          const { error: valueError } = await supabase
-            .from('custom_field_values')
-            .upsert({
-              organization_id: formData.organization_id,
-              entity_id: quoteId,
-              field_id: fieldId,
-              value,
-              created_by: userData.user.id,
-              updated_by: userData.user.id,
-              updated_at: new Date().toISOString(),
-            }, {
-              onConflict: 'organization_id,field_id,entity_id'
-            });
-  
-          if (valueError) {
-            console.error('Error saving custom field value:', valueError);
-          }
-        }
-      }
-  
+
       navigate('/admin/quotes');
     } catch (err) {
-      console.error('Error saving quote:', err);
+      console.error('❌ Error saving quote:', err);
       setError(err instanceof Error ? err.message : 'Failed to save quote');
     } finally {
       setLoading(false);
     }
   };
+
+
 
   if (organizations.length === 0) {
     return (
@@ -1160,7 +1128,7 @@ export function QuoteForm() {
                   />
                 </div>
               </div>
-            
+
               {/* Discount Percentage and Discount Amount */}
               <div className="flex flex-col md:flex-row gap-6">
                 <div className="flex-1">
@@ -1234,7 +1202,7 @@ export function QuoteForm() {
           />
         </div>
 
-        
+
 
         <CustomFieldsForm
           entityType="quote"
