@@ -20,6 +20,10 @@ type Order = {
   payment_status: 'Pending' | 'Partial Received' | 'Fully Received';
   payment_amount: number;
   total_amount: number;
+  tax_percent: number | null; // ✅ Added
+  tax_amount: number | null; // ✅ Added
+  discount_amount: number | null; // ✅ Added
+  subtotal: number; // ✅ Added
   notes: string | null;
   quote_id: string | null;
   quote_number: string | null;
@@ -437,7 +441,21 @@ export function OrderDetailPage() {
             {/* Payment Information */}
             <div>
               <h2 className="text-lg font-semibold mb-4">Payment Information</h2>
-              <div className="bg-gray-50 rounded-lg p-4 space-y-4">
+                <div className="bg-gray-50 rounded-lg p-4 space-y-4">
+                  <div className="flex justify-between items-center">
+                  <span className="text-gray-600">Subtotal:</span>
+                  <span className="font-medium">{formatCurrency(order.subtotal)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600">Tax ({order.tax_percent ?? 0}%):</span>
+                  <span className="font-medium">{formatCurrency(order.tax_amount ?? 0)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600">Discount:</span>
+                  <span className="font-medium text-red-600">
+                    -{formatCurrency(order.discount_amount ?? 0)}
+                  </span>
+                </div>
                 <div className="flex justify-between items-center">
                   <span className="text-gray-600">Total Amount:</span>
                   <span className="font-medium">{formatCurrency(order.total_amount)}</span>

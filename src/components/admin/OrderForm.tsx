@@ -15,6 +15,10 @@ type Order = {
   payment_status: 'Pending' | 'Partial Received' | 'Fully Received';
   payment_amount: number;
   total_amount: number;
+  tax_percent: number | null; // ✅ Added
+  tax_amount: number | null; // ✅ Added
+  discount_amount: number | null; // ✅ Added
+  subtotal: number; // ✅ Added
   notes: string | null;
   quote_id: string | null;
   organization_id: string;
@@ -144,6 +148,26 @@ export function OrderForm() {
     setPaymentAmount(newAmount);
   };
 
+  const handleInputChange = (field: keyof Order, value: any) => {
+    setOrder(prev => prev ? { ...prev, [field]: value } : null);
+  };
+
+  // Auto calculate tax amount when tax percent is changed
+  const handleTaxPercentChange = (percent: number | null) => {
+    if (!order) return;
+
+    const taxAmount = percent !== null ? (order.subtotal * percent) / 100 : null;
+    setOrder(prev => prev ? { ...prev, tax_percent: percent, tax_amount: taxAmount } : null);
+  };
+
+  // Auto calculate tax percent when tax amount is changed
+  const handleTaxAmountChange = (amount: number | null) => {
+    if (!order) return;
+
+    const taxPercent = amount !== null && order.subtotal > 0 ? (amount / order.subtotal) * 100 : null;
+    setOrder(prev => prev ? { ...prev, tax_amount: amount, tax_percent: taxPercent } : null);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!order) return;
@@ -157,9 +181,14 @@ export function OrderForm() {
         .from('order_hdr')
         .update({
           status: order.status,
-          payment_amount: paymentAmount,
+          payment_amount: order.payment_amount,
+          tax_percent: order.tax_percent,
+          tax_amount: order.tax_amount,
+          discount_amount: order.discount_amount,
+          subtotal: order.subtotal,
+          total_amount: order.subtotal + (order.tax_amount ?? 0) - (order.discount_amount ?? 0),
           notes: order.notes,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         })
         .eq('order_id', id);
 
@@ -256,6 +285,45 @@ export function OrderForm() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Tax, Discount, and Subtotal Fields */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Subtotal</label>
+            <input
+              type="number"
+              value={order.subtotal}
+              onChange={(e) => handleInputChange('subtotal', parseFloat(e.target.value))}
+              className="w-full px-4 py-2 rounded-lg border border-gray-300"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Tax %</label>
+            <input
+              type="number"
+              value={order.tax_percent ?? ''}
+              onChange={(e) => handleTaxPercentChange(parseFloat(e.target.value))}
+              className="w-full px-4 py-2 rounded-lg border border-gray-300"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Tax Amount</label>
+            <input
+              type="number"
+              value={order.tax_amount ?? ''}
+              onChange={(e) => handleTaxAmountChange(parseFloat(e.target.value))}
+              className="w-full px-4 py-2 rounded-lg border border-gray-300"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Discount Amount</label>
+            <input
+              type="number"
+              value={order.discount_amount ?? ''}
+              onChange={(e) => handleInputChange('discount_amount', parseFloat(e.target.value))}
+              className="w-full px-4 py-2 rounded-lg border border-gray-300"
+            />
+          </div>
+        </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Status
