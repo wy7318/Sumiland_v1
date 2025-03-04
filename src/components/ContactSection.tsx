@@ -98,12 +98,12 @@ export function ContactSection() {
       if (orgError) throw orgError;
       if (!orgData?.id) throw new Error('Default organization not found');
 
-      // Check if customer exists
+      // Check if customer exists by email and organization
       const { data: existingCustomers, error: customerError } = await supabase
         .from('customers')
         .select('customer_id')
         .eq('email', formData.email)
-        .single();
+        .eq('organization_id', orgData.id);
 
       if (customerError && customerError.code !== 'PGRST116') {
         throw customerError;
@@ -111,7 +111,7 @@ export function ContactSection() {
 
       let contactId;
 
-      if (!existingCustomers) {
+      if (!existingCustomers?.length) {
         // Create new customer
         const { data: newCustomer, error: createError } = await supabase
           .from('customers')
@@ -131,7 +131,8 @@ export function ContactSection() {
         if (createError) throw createError;
         contactId = newCustomer.customer_id;
       } else {
-        contactId = existingCustomers.customer_id;
+        // Use existing customer
+        contactId = existingCustomers[0].customer_id;
       }
 
       // Upload resume if exists
