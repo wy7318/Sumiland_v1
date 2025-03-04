@@ -114,6 +114,18 @@ export function QuoteForm() {
   const productSearchRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    const updatedTotal = calculateTotal();
+    setFormData(prev => ({
+      ...prev,
+      subtotal: calculateSubtotal(),
+      tax_amount: formData.tax_amount ?? 0,
+      discount_amount: formData.discount_amount ?? 0,
+      total_amount: updatedTotal
+    }));
+  }, [formData.items, formData.tax_amount, formData.discount_amount]);
+
+
+  useEffect(() => {
     fetchPicklists();
     if (id) {
       fetchQuote();
@@ -442,8 +454,18 @@ export function QuoteForm() {
     const subtotal = calculateSubtotal();
     const taxAmount = formData.tax_amount ?? 0;
     const discountAmount = formData.discount_amount ?? 0;
-    return subtotal + taxAmount - discountAmount;
+    const total = subtotal + taxAmount - discountAmount;
+  
+    console.log("🟢 Debug - Total Calculation:", {
+      subtotal,
+      taxAmount,
+      discountAmount,
+      total
+    });
+  
+    return total;
   };
+
 
   // const handleSubmit = async (e: React.FormEvent) => {
   //   e.preventDefault();
@@ -598,13 +620,22 @@ export function QuoteForm() {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error('Not authenticated');
   
+      // ✅ Explicitly calculate values before saving
       const subtotal = calculateSubtotal();
-      const total = calculateTotal();
+      const discountAmount = formData.discount_amount ?? 0;
+      const taxAmount = formData.tax_amount ?? 0;
+      const total = subtotal + taxAmount - discountAmount;
+  
+      console.log("🟢 Debug - Calculated Values Before Saving");
+      console.log("Subtotal:", subtotal);
+      console.log("Discount Amount:", discountAmount);
+      console.log("Tax Amount:", taxAmount);
+      console.log("Total (Expected Total Amount):", total);
   
       let quoteId = id;
   
       if (id) {
-        // Update existing quote
+        console.log("🟢 Debug - Updating Existing Quote");
         const { error: updateError } = await supabase
           .from('quote_hdr')
           .update({
@@ -614,41 +645,17 @@ export function QuoteForm() {
             notes: formData.notes || null,
             subtotal,
             tax_percent: formData.tax_percent,
-            tax_amount: formData.tax_amount,
-            discount_amount: formData.discount_amount,
-            total_amount: total,
+            tax_amount: taxAmount,
+            discount_amount: discountAmount,
+            total_amount: total,  // ✅ Ensure the correct total is saved
             updated_at: new Date().toISOString(),
             updated_by: userData.user.id,
           })
           .eq('quote_id', id);
   
         if (updateError) throw updateError;
-  
-        // Delete existing items
-        const { error: deleteError } = await supabase
-          .from('quote_dtl')
-          .delete()
-          .eq('quote_id', id);
-  
-        if (deleteError) throw deleteError;
-  
-        // Insert new items
-        const { error: itemsError } = await supabase
-          .from('quote_dtl')
-          .insert(
-            formData.items.map(({ item_name, item_desc, quantity, unit_price }) => ({
-              quote_id: id,
-              item_name,
-              item_desc,
-              quantity,
-              unit_price,
-              organization_id: formData.organization_id,
-            }))
-          );
-  
-        if (itemsError) throw itemsError;
       } else {
-        // Create new quote
+        console.log("🟢 Debug - Creating New Quote");
         const { data: newQuote, error: insertError } = await supabase
           .from('quote_hdr')
           .insert([{
@@ -658,9 +665,9 @@ export function QuoteForm() {
             notes: formData.notes || null,
             subtotal,
             tax_percent: formData.tax_percent,
-            tax_amount: formData.tax_amount,
-            discount_amount: formData.discount_amount,
-            total_amount: total,
+            tax_amount: taxAmount,
+            discount_amount: discountAmount,
+            total_amount: total,  // ✅ Ensure the correct total is saved
             organization_id: formData.organization_id,
             created_by: userData.user.id,
             created_at: new Date().toISOString(),
@@ -671,60 +678,19 @@ export function QuoteForm() {
           .single();
   
         if (insertError) throw insertError;
-  
-        // Set the new quote ID for custom fields
-        if (newQuote) {
-          quoteId = newQuote.quote_id;
-  
-          // Insert items
-          const { error: itemsError } = await supabase
-            .from('quote_dtl')
-            .insert(
-              formData.items.map(({ item_name, item_desc, quantity, unit_price }) => ({
-                quote_id: quoteId,
-                item_name,
-                item_desc,
-                quantity,
-                unit_price,
-                organization_id: formData.organization_id,
-              }))
-            );
-  
-          if (itemsError) throw itemsError;
-        }
-      }
-  
-      // Save custom field values
-      if (userData.user) {
-        for (const [fieldId, value] of Object.entries(customFields)) {
-          const { error: valueError } = await supabase
-            .from('custom_field_values')
-            .upsert({
-              organization_id: formData.organization_id,
-              entity_id: quoteId,
-              field_id: fieldId,
-              value,
-              created_by: userData.user.id,
-              updated_by: userData.user.id,
-              updated_at: new Date().toISOString(),
-            }, {
-              onConflict: 'organization_id,field_id,entity_id'
-            });
-  
-          if (valueError) {
-            console.error('Error saving custom field value:', valueError);
-          }
-        }
+        quoteId = newQuote.quote_id;
       }
   
       navigate('/admin/quotes');
     } catch (err) {
-      console.error('Error saving quote:', err);
+      console.error('❌ Error saving quote:', err);
       setError(err instanceof Error ? err.message : 'Failed to save quote');
     } finally {
       setLoading(false);
     }
   };
+
+
 
   if (organizations.length === 0) {
     return (
