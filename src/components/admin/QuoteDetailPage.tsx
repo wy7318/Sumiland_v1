@@ -18,6 +18,11 @@ type Quote = {
   vendor_id: string | null;
   status: string;
   total_amount: number;
+  subtotal: number; // Add subtotal
+  tax_percent: number | null; // Add tax percentage
+  tax_amount: number | null; // Add tax amount
+  discount_percent: number | null; // Add discount percentage
+  discount_amount: number | null; // Add discount amount
   notes: string | null;
   created_at: string;
   organization_id: string;
@@ -99,7 +104,7 @@ export function QuoteDetailPage() {
   const fetchQuote = async () => {
     try {
       if (!id) return;
-
+  
       const { data: quoteData, error: quoteError } = await supabase
         .from('quote_hdr')
         .select(`
@@ -123,9 +128,21 @@ export function QuoteDetailPage() {
         `)
         .eq('quote_id', id)
         .single();
-
+  
       if (quoteError) throw quoteError;
-      setQuote(quoteData);
+  
+      if (quoteData) {
+        // Calculate discount_percent dynamically
+        const subtotal = quoteData.subtotal || 0;
+        const discountAmount = quoteData.discount_amount || 0;
+        const discountPercent = subtotal > 0 ? (discountAmount / subtotal) * 100 : 0;
+  
+        // Set the quote data with calculated discount_percent
+        setQuote({
+          ...quoteData,
+          discount_percent: discountPercent,
+        });
+      }
     } catch (err) {
       console.error('Error fetching quote:', err);
       setError(err instanceof Error ? err.message : 'Failed to load quote');
@@ -133,7 +150,6 @@ export function QuoteDetailPage() {
       setLoading(false);
     }
   };
-
   const handleStatusChange = async (newStatus: string) => {
     try {
       if (!id || !quote) return;
@@ -466,18 +482,79 @@ export function QuoteDetailPage() {
                       </td>
                     </tr>
                   ))}
-                  <tr className="bg-gray-50">
-                    <td colSpan={3} className="px-6 py-4 text-right font-medium">
-                      Total Amount:
-                    </td>
-                    <td className="px-6 py-4 text-right whitespace-nowrap">
-                      <div className="text-lg font-bold text-gray-900">
-                        {formatCurrency(quote.total_amount)}
-                      </div>
-                    </td>
-                  </tr>
                 </tbody>
               </table>
+            </div>
+          
+            {/* Tax and Discount Section */}
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h3 className="text-lg font-semibold mb-4">Tax Details</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Tax Percentage:</span>
+                    <span className="text-sm text-gray-900">
+                      {quote.tax_percent !== null ? `${quote.tax_percent}%` : 'N/A'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Tax Amount:</span>
+                    <span className="text-sm text-gray-900">
+                      {quote.tax_amount !== null ? formatCurrency(quote.tax_amount) : 'N/A'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+          
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h3 className="text-lg font-semibold mb-4">Discount Details</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Discount Percentage:</span>
+                    <span className="text-sm text-gray-900">
+                      {quote.discount_percent !== null ? `${quote.discount_percent}%` : 'N/A'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Discount Amount:</span>
+                    <span className="text-sm text-gray-900">
+                      {quote.discount_amount !== null ? formatCurrency(quote.discount_amount) : 'N/A'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          
+            {/* Total Amount Section */}
+            <div className="mt-6 bg-gray-50 rounded-lg p-4">
+              <div className="flex justify-between items-center">
+                <span className="text-lg font-semibold">Subtotal:</span>
+                <span className="text-lg font-bold text-gray-900">
+                  {formatCurrency(quote.subtotal)}
+                </span>
+              </div>
+              {quote.tax_amount !== null && (
+                <div className="flex justify-between items-center mt-2">
+                  <span className="text-lg font-semibold">Tax:</span>
+                  <span className="text-lg font-bold text-gray-900">
+                    {formatCurrency(quote.tax_amount)}
+                  </span>
+                </div>
+              )}
+              {quote.discount_amount !== null && (
+                <div className="flex justify-between items-center mt-2">
+                  <span className="text-lg font-semibold">Discount:</span>
+                  <span className="text-lg font-bold text-gray-900">
+                    {formatCurrency(quote.discount_amount)}
+                  </span>
+                </div>
+              )}
+              <div className="flex justify-between items-center mt-2">
+                <span className="text-lg font-semibold">Total Amount:</span>
+                <span className="text-lg font-bold text-gray-900">
+                  {formatCurrency(quote.total_amount)}
+                </span>
+              </div>
             </div>
           </div>
         </div>

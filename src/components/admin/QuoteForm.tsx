@@ -60,6 +60,11 @@ type FormData = {
   notes: string;
   items: QuoteItem[];
   organization_id: string;
+  tax_percent: number | null;
+  tax_amount: number | null;
+  discount_percent: number | null;
+  discount_amount: number | null;
+  subtotal: number;
   custom_fields?: Record<string, any>;
 };
 
@@ -69,7 +74,12 @@ const initialFormData: FormData = {
   status: '',
   notes: '',
   items: [],
-  organization_id: ''
+  organization_id: '',
+  tax_percent: null,
+  tax_amount: null,
+  discount_percent: null,
+  discount_amount: null,
+  subtotal: 0,
 };
 
 export function QuoteForm() {
@@ -219,41 +229,51 @@ export function QuoteForm() {
         `)
         .eq('quote_id', id)
         .single();
-
+  
       if (error) throw error;
       if (quote) {
+        const subtotal = quote.subtotal || 0;
+        const discountAmount = quote.discount_amount || 0;
+        const discountPercent = subtotal > 0 ? (discountAmount / subtotal) * 100 : 0;
+  
         setFormData({
           customer_id: quote.customer_id,
           vendor_id: quote.vendor_id,
           status: quote.status,
           notes: quote.notes || '',
+          tax_percent: quote.tax_percent || 0,
+          tax_amount: quote.tax_amount || 0,
+          discount_amount: discountAmount,
+          discount_percent: discountPercent,
+          subtotal: subtotal,
           items: quote.quote_dtl.map((item: any) => ({
             item_name: item.item_name,
             item_desc: item.item_desc,
             quantity: item.quantity,
-            unit_price: item.unit_price
+            unit_price: item.unit_price,
           })),
-          organization_id: quote.organization_id
+          organization_id: quote.organization_id,
         });
+  
         setSelectedCustomer(quote.customer);
         if (quote.vendor) {
           setSelectedVendor(quote.vendor);
         }
-
+  
         // Fetch custom fields for this quote
         const { data: customFieldValues, error: customFieldsError } = await supabase
           .from('custom_field_values')
           .select('field_id, value')
           .eq('entity_id', id);
-
+  
         if (customFieldsError) throw customFieldsError;
-
+  
         // Convert custom field values to a key-value pair object
         const customFieldsData = customFieldValues?.reduce((acc, field) => {
           acc[field.field_id] = field.value;
           return acc;
         }, {} as Record<string, any>) || {};
-
+  
         setCustomFields(customFieldsData);
       }
     } catch (err) {
@@ -312,6 +332,31 @@ export function QuoteForm() {
       setError('Failed to load products');
     }
   };
+
+  const calculateSubtotal = () => {
+    return formData.items.reduce((sum, item) => sum + item.quantity * item.unit_price, 0);
+  };
+  
+  const roundToTwo = (value: number | null) => {
+    return value !== null ? Math.round(value * 100) / 100 : null;
+  };
+  
+  const calculateTaxAmount = (taxPercent: number | null, subtotal: number) => {
+    return roundToTwo(taxPercent !== null ? (subtotal * taxPercent) / 100 : null);
+  };
+  
+  const calculateDiscountAmount = (discountPercent: number | null, subtotal: number) => {
+    return roundToTwo(discountPercent !== null ? (subtotal * discountPercent) / 100 : null);
+  };
+  
+  const calculateTaxPercent = (taxAmount: number | null, subtotal: number) => {
+    return roundToTwo(taxAmount !== null && subtotal !== 0 ? (taxAmount / subtotal) * 100 : null);
+  };
+  
+  const calculateDiscountPercent = (discountAmount: number | null, subtotal: number) => {
+    return roundToTwo(discountAmount !== null && subtotal !== 0 ? (discountAmount / subtotal) * 100 : null);
+  };
+
 
   const handleCustomerSelect = (customer: Customer) => {
     setSelectedCustomer(customer);
@@ -394,8 +439,146 @@ export function QuoteForm() {
   };
 
   const calculateTotal = () => {
-    return formData.items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
+    const subtotal = calculateSubtotal();
+    const taxAmount = formData.tax_amount ?? 0;
+    const discountAmount = formData.discount_amount ?? 0;
+    return subtotal + taxAmount - discountAmount;
   };
+
+  // const handleSubmit = async (e: React.FormEvent) => {
+  //   e.preventDefault();
+  //   if (!formData.customer_id) {
+  //     setError('Please select a customer');
+  //     return;
+  //   }
+  //   if (formData.items.length === 0) {
+  //     setError('Please add at least one item');
+  //     return;
+  //   }
+
+  //   setLoading(true);
+  //   setError(null);
+
+  //   try {
+  //     const { data: userData } = await supabase.auth.getUser();
+  //     if (!userData.user) throw new Error('Not authenticated');
+
+  //     let quoteId = id; // Use let since we might update it
+
+  //     if (id) {
+  //       // Update existing quote
+  //       const { error: updateError } = await supabase
+  //         .from('quote_hdr')
+  //         .update({
+  //           customer_id: formData.customer_id,
+  //           vendor_id: formData.vendor_id,
+  //           status: formData.status,
+  //           notes: formData.notes || null,
+  //           total_amount: calculateTotal(),
+  //           updated_at: new Date().toISOString(),
+  //           updated_by: userData.user.id
+  //         })
+  //         .eq('quote_id', id);
+
+  //       if (updateError) throw updateError;
+
+  //       // Delete existing items
+  //       const { error: deleteError } = await supabase
+  //         .from('quote_dtl')
+  //         .delete()
+  //         .eq('quote_id', id);
+
+  //       if (deleteError) throw deleteError;
+
+  //       // Insert new items
+  //       const { error: itemsError } = await supabase
+  //         .from('quote_dtl')
+  //         .insert(
+  //           formData.items.map(({ item_name, item_desc, quantity, unit_price }) => ({
+  //             quote_id: id,
+  //             item_name,
+  //             item_desc,
+  //             quantity,
+  //             unit_price,
+  //             organization_id: formData.organization_id
+  //           }))
+  //         );
+
+  //       if (itemsError) throw itemsError;
+  //     } else {
+  //       // Create new quote
+  //       const { data: newQuote, error: insertError } = await supabase
+  //         .from('quote_hdr')
+  //         .insert([{
+  //           customer_id: formData.customer_id,
+  //           vendor_id: formData.vendor_id,
+  //           status: formData.status,
+  //           notes: formData.notes || null,
+  //           total_amount: calculateTotal(),
+  //           organization_id: formData.organization_id,
+  //           created_by: userData.user.id,
+  //           created_at: new Date().toISOString(),
+  //           updated_by: userData.user.id,
+  //           updated_at: new Date().toISOString()
+  //         }])
+  //         .select()
+  //         .single();
+
+  //       if (insertError) throw insertError;
+
+  //       // Set the new quote ID for custom fields
+  //       if (newQuote) {
+  //         quoteId = newQuote.quote_id;
+
+  //         // Insert items
+  //         const { error: itemsError } = await supabase
+  //           .from('quote_dtl')
+  //           .insert(
+  //             formData.items.map(({ item_name, item_desc, quantity, unit_price }) => ({
+  //               quote_id: quoteId,
+  //               item_name,
+  //               item_desc,
+  //               quantity,
+  //               unit_price,
+  //               organization_id: formData.organization_id
+  //             }))
+  //           );
+
+  //         if (itemsError) throw itemsError;
+  //       }
+  //     }
+
+  //     // Save custom field values
+  //     if (userData.user) {
+  //       for (const [fieldId, value] of Object.entries(customFields)) {
+  //         const { error: valueError } = await supabase
+  //           .from('custom_field_values')
+  //           .upsert({
+  //             organization_id: formData.organization_id,
+  //             entity_id: quoteId,
+  //             field_id: fieldId,
+  //             value,
+  //             created_by: userData.user.id,
+  //             updated_by: userData.user.id,
+  //             updated_at: new Date().toISOString()
+  //           }, {
+  //             onConflict: 'organization_id,field_id,entity_id'
+  //           });
+
+  //         if (valueError) {
+  //           console.error('Error saving custom field value:', valueError);
+  //         }
+  //       }
+  //     }
+
+  //     navigate('/admin/quotes');
+  //   } catch (err) {
+  //     console.error('Error saving quote:', err);
+  //     setError(err instanceof Error ? err.message : 'Failed to save quote');
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -407,16 +590,19 @@ export function QuoteForm() {
       setError('Please add at least one item');
       return;
     }
-
+  
     setLoading(true);
     setError(null);
-
+  
     try {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error('Not authenticated');
-
-      let quoteId = id; // Use let since we might update it
-
+  
+      const subtotal = calculateSubtotal();
+      const total = calculateTotal();
+  
+      let quoteId = id;
+  
       if (id) {
         // Update existing quote
         const { error: updateError } = await supabase
@@ -426,22 +612,26 @@ export function QuoteForm() {
             vendor_id: formData.vendor_id,
             status: formData.status,
             notes: formData.notes || null,
-            total_amount: calculateTotal(),
+            subtotal,
+            tax_percent: formData.tax_percent,
+            tax_amount: formData.tax_amount,
+            discount_amount: formData.discount_amount,
+            total_amount: total,
             updated_at: new Date().toISOString(),
-            updated_by: userData.user.id
+            updated_by: userData.user.id,
           })
           .eq('quote_id', id);
-
+  
         if (updateError) throw updateError;
-
+  
         // Delete existing items
         const { error: deleteError } = await supabase
           .from('quote_dtl')
           .delete()
           .eq('quote_id', id);
-
+  
         if (deleteError) throw deleteError;
-
+  
         // Insert new items
         const { error: itemsError } = await supabase
           .from('quote_dtl')
@@ -452,10 +642,10 @@ export function QuoteForm() {
               item_desc,
               quantity,
               unit_price,
-              organization_id: formData.organization_id
+              organization_id: formData.organization_id,
             }))
           );
-
+  
         if (itemsError) throw itemsError;
       } else {
         // Create new quote
@@ -466,22 +656,26 @@ export function QuoteForm() {
             vendor_id: formData.vendor_id,
             status: formData.status,
             notes: formData.notes || null,
-            total_amount: calculateTotal(),
+            subtotal,
+            tax_percent: formData.tax_percent,
+            tax_amount: formData.tax_amount,
+            discount_amount: formData.discount_amount,
+            total_amount: total,
             organization_id: formData.organization_id,
             created_by: userData.user.id,
             created_at: new Date().toISOString(),
             updated_by: userData.user.id,
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
           }])
           .select()
           .single();
-
+  
         if (insertError) throw insertError;
-
+  
         // Set the new quote ID for custom fields
         if (newQuote) {
           quoteId = newQuote.quote_id;
-
+  
           // Insert items
           const { error: itemsError } = await supabase
             .from('quote_dtl')
@@ -492,14 +686,14 @@ export function QuoteForm() {
                 item_desc,
                 quantity,
                 unit_price,
-                organization_id: formData.organization_id
+                organization_id: formData.organization_id,
               }))
             );
-
+  
           if (itemsError) throw itemsError;
         }
       }
-
+  
       // Save custom field values
       if (userData.user) {
         for (const [fieldId, value] of Object.entries(customFields)) {
@@ -512,17 +706,17 @@ export function QuoteForm() {
               value,
               created_by: userData.user.id,
               updated_by: userData.user.id,
-              updated_at: new Date().toISOString()
+              updated_at: new Date().toISOString(),
             }, {
               onConflict: 'organization_id,field_id,entity_id'
             });
-
+  
           if (valueError) {
             console.error('Error saving custom field value:', valueError);
           }
         }
       }
-
+  
       navigate('/admin/quotes');
     } catch (err) {
       console.error('Error saving quote:', err);
@@ -851,7 +1045,7 @@ export function QuoteForm() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Description
-                    </label> ```tsx
+                    </label>
                     <input
                       type="text"
                       value={item.item_desc || ''}
@@ -918,12 +1112,111 @@ export function QuoteForm() {
               Add Item
             </button>
 
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Tax Percentage and Tax Amount */}
+              <div className="flex flex-col md:flex-row gap-6">
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Tax Percentage (%)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={formData.tax_percent ?? ''}
+                    onChange={(e) => {
+                      const taxPercent = e.target.value ? parseFloat(e.target.value) : null;
+                      const subtotal = calculateSubtotal();
+                      const taxAmount = calculateTaxAmount(taxPercent, subtotal);
+                      setFormData((prev) => ({
+                        ...prev,
+                        tax_percent: taxPercent,
+                        tax_amount: taxAmount,
+                      }));
+                    }}
+                    className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Tax Amount
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={formData.tax_amount ?? ''}
+                    onChange={(e) => {
+                      const taxAmount = e.target.value ? parseFloat(e.target.value) : null;
+                      const subtotal = calculateSubtotal();
+                      const taxPercent = calculateTaxPercent(taxAmount, subtotal);
+                      setFormData((prev) => ({
+                        ...prev,
+                        tax_amount: taxAmount,
+                        tax_percent: taxPercent,
+                      }));
+                    }}
+                    className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                  />
+                </div>
+              </div>
+            
+              {/* Discount Percentage and Discount Amount */}
+              <div className="flex flex-col md:flex-row gap-6">
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Discount Percentage (%)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={formData.discount_percent ?? ''}
+                    onChange={(e) => {
+                      const discountPercent = e.target.value ? parseFloat(e.target.value) : null;
+                      const subtotal = calculateSubtotal();
+                      const discountAmount = calculateDiscountAmount(discountPercent, subtotal);
+                      setFormData((prev) => ({
+                        ...prev,
+                        discount_percent: discountPercent,
+                        discount_amount: discountAmount,
+                      }));
+                    }}
+                    className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Discount Amount
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={formData.discount_amount ?? ''}
+                    onChange={(e) => {
+                      const discountAmount = e.target.value ? parseFloat(e.target.value) : null;
+                      const subtotal = calculateSubtotal();
+                      const discountPercent = calculateDiscountPercent(discountAmount, subtotal);
+                      setFormData((prev) => ({
+                        ...prev,
+                        discount_amount: discountAmount,
+                        discount_percent: discountPercent,
+                      }));
+                    }}
+                    className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+
             <div className="flex justify-end">
               <div className="text-right">
-                <span className="text-lg font-medium">Total:</span>
-                <span className="ml-2 text-xl font-bold">
-                  ${calculateTotal().toFixed(2)}
-                </span>
+                <div className="text-sm text-gray-500">Subtotal: ${calculateSubtotal().toFixed(2)}</div>
+                <div className="text-sm text-gray-500">Tax: ${(formData.tax_amount ?? 0).toFixed(2)}</div>
+                <div className="text-sm text-gray-500">Discount: ${(formData.discount_amount ?? 0).toFixed(2)}</div>
+                <div className="text-lg font-medium">Total: ${calculateTotal().toFixed(2)}</div>
               </div>
             </div>
           </div>
@@ -940,6 +1233,8 @@ export function QuoteForm() {
             className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
           />
         </div>
+
+        
 
         <CustomFieldsForm
           entityType="quote"
