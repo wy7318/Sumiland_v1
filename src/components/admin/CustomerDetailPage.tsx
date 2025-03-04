@@ -4,10 +4,11 @@ import { motion } from 'framer-motion';
 import { 
   ArrowLeft, Building2, Mail, Phone, Calendar,
   Edit, AlertCircle, Send, Reply, X, User,
-  Globe, CheckCircle
+  Globe, CheckCircle, ChevronDown, ChevronUp,
+  FileText, ShoppingBag, UserCheck
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { cn } from '../../lib/utils';
+import { cn, formatCurrency } from '../../lib/utils';
 import { CustomFieldsSection } from './CustomFieldsSection';
 
 type Customer = {
@@ -34,6 +35,34 @@ type Customer = {
   } | null;
 };
 
+type Lead = {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  company: string | null;
+  status: string;
+  lead_source: string | null;
+  created_at: string;
+};
+
+type Quote = {
+  quote_id: string;
+  quote_number: string;
+  status: string;
+  total_amount: number;
+  created_at: string;
+};
+
+type Order = {
+  order_id: string;
+  order_number: string;
+  status: string;
+  total_amount: number;
+  payment_status: string;
+  created_at: string;
+};
+
 type Feed = {
   id: string;
   content: string;
@@ -50,6 +79,13 @@ type Feed = {
   };
 };
 
+type RelatedTab = {
+  id: 'leads' | 'quotes' | 'orders';
+  label: string;
+  icon: typeof UserCheck;
+  count: number;
+};
+
 export function CustomerDetailPage() {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -60,6 +96,10 @@ export function CustomerDetailPage() {
   const [newComment, setNewComment] = useState('');
   const [replyTo, setReplyTo] = useState<Feed | null>(null);
   const [editingFeed, setEditingFeed] = useState<Feed | null>(null);
+  const [expandedTabs, setExpandedTabs] = useState<string[]>([]);
+  const [relatedLeads, setRelatedLeads] = useState<Lead[]>([]);
+  const [relatedQuotes, setRelatedQuotes] = useState<Quote[]>([]);
+  const [relatedOrders, setRelatedOrders] = useState<Order[]>([]);
 
   useEffect(() => {
     if (id) {
@@ -70,22 +110,28 @@ export function CustomerDetailPage() {
   useEffect(() => {
     if (customer) {
       fetchFeeds();
+      fetchRelatedRecords();
     }
   }, [customer]);
 
   const fetchCustomer = async () => {
     try {
-      const { data, error } = await supabase
+      const { data: customer, error } = await supabase
         .from('customers')
         .select(`
           *,
-          vendor:vendors!customers_vendor_id_fkey(*)
+          vendor:vendors!customers_vendor_id_fkey(
+            id,
+            name,
+            type,
+            status
+          )
         `)
         .eq('customer_id', id)
         .single();
-  
+
       if (error) throw error;
-      setCustomer(data);
+      setCustomer(customer);
     } catch (err) {
       console.error('Error fetching customer:', err);
       setError(err instanceof Error ? err.message : 'Failed to load customer');
@@ -94,6 +140,43 @@ export function CustomerDetailPage() {
     }
   };
 
+  const fetchRelatedRecords = async () => {
+    if (!customer?.email) return;
+
+    try {
+      // Fetch related leads
+      const { data: leads, error: leadsError } = await supabase
+        .from('leads')
+        .select('*')
+        .eq('email', customer.email)
+        .order('created_at', { ascending: false });
+
+      if (leadsError) throw leadsError;
+      setRelatedLeads(leads || []);
+
+      // Fetch related quotes
+      const { data: quotes, error: quotesError } = await supabase
+        .from('quote_hdr')
+        .select('*')
+        .eq('customer_id', customer.customer_id)
+        .order('created_at', { ascending: false });
+
+      if (quotesError) throw quotesError;
+      setRelatedQuotes(quotes || []);
+
+      // Fetch related orders
+      const { data: orders, error: ordersError } = await supabase
+        .from('order_hdr')
+        .select('*')
+        .eq('customer_id', customer.customer_id)
+        .order('created_at', { ascending: false });
+
+      if (ordersError) throw ordersError;
+      setRelatedOrders(orders || []);
+    } catch (err) {
+      console.error('Error fetching related records:', err);
+    }
+  };
 
   const fetchFeeds = async () => {
     if (!id || !customer) return;
@@ -191,6 +274,14 @@ export function CustomerDetailPage() {
     }
   };
 
+  const toggleTab = (tabId: string) => {
+    setExpandedTabs(prev => 
+      prev.includes(tabId) 
+        ? prev.filter(id => id !== tabId)
+        : [...prev, tabId]
+    );
+  };
+
   const renderFeedItem = (feed: Feed, isReply = false) => {
     const isEditing = editingFeed?.id === feed.id;
     const replies = feeds.filter(f => f.parent_id === feed.id);
@@ -222,7 +313,7 @@ export function CustomerDetailPage() {
               </div>
             </div>
           </div>
-          {feed.created_by === (customer?.customer_id) && !isEditing && (
+          {feed.created_by === customer?.customer_id && !isEditing && (
             <div className="relative group">
               <button className="p-1 rounded-full hover:bg-gray-100">
                 <X className="w-4 h-4 text-gray-500" />
@@ -293,6 +384,12 @@ export function CustomerDetailPage() {
       </motion.div>
     );
   };
+
+  const relatedTabs: RelatedTab[] = [
+    { id: 'leads', label: 'Leads', icon: UserCheck, count: relatedLeads.length },
+    { id: 'quotes', label: 'Quotes', icon: FileText, count: relatedQuotes.length },
+    { id: 'orders', label: 'Orders', icon: ShoppingBag, count: relatedOrders.length }
+  ];
 
   if (loading) {
     return (
@@ -439,6 +536,136 @@ export function CustomerDetailPage() {
                 className="bg-gray-50 rounded-lg p-4"
               />
             </div>
+          </div>
+
+          {/* Related Lists */}
+          <div className="mt-8 space-y-4">
+            <h2 className="text-lg font-semibold mb-4">Related Lists</h2>
+            {relatedTabs.map(tab => (
+              <div key={tab.id} className="bg-white border rounded-lg overflow-hidden">
+                <button
+                  onClick={() => toggleTab(tab.id)}
+                  className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50"
+                >
+                  <div className="flex items-center space-x-2">
+                    <tab.icon className="w-5 h-5 text-gray-400" />
+                    <span className="font-medium">{tab.label}</span>
+                    <span className="text-sm text-gray-500">({tab.count})</span>
+                  </div>
+                  {expandedTabs.includes(tab.id) ? (
+                    <ChevronUp className="w-5 h-5 text-gray-400" />
+                  ) : (
+                    <ChevronDown className="w-5 h-5 text-gray-400" />
+                  )}
+                </button>
+
+                {expandedTabs.includes(tab.id) && (
+                  <div className="border-t border-gray-200">
+                    {tab.id === 'leads' && (
+                      <div className="divide-y divide-gray-200">
+                        {relatedLeads.map(lead => (
+                          <div key={lead.id} className="p-4 hover:bg-gray-50">
+                            <Link to={`/admin/leads/${lead.id}`} className="block">
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <div className="font-medium">{lead.first_name} {lead.last_name}</div>
+                                  <div className="text-sm text-gray-500">{lead.company}</div>
+                                </div>
+                                <div className="text-sm text-gray-500">
+                                  {new Date(lead.created_at).toLocaleDateString()}
+                                </div>
+                              </div>
+                              <div className="mt-2 flex items-center gap-2">
+                                <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+                                  {lead.status}
+                                </span>
+                                {lead.lead_source && (
+                                  <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">
+                                    {lead.lead_source}
+                                  </span>
+                                )}
+                              </div>
+                            </Link>
+                          </div>
+                        ))}
+                        {relatedLeads.length === 0 && (
+                          <div className="p-4 text-center text-gray-500">
+                            No related leads found
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {tab.id === 'quotes' && (
+                      <div className="divide-y divide-gray-200">
+                        {relatedQuotes.map(quote => (
+                          <div key={quote.quote_id} className="p-4 hover:bg-gray-50">
+                            <Link to={`/admin/quotes/${quote.quote_id}`} className="block">
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <div className="font-medium">{quote.quote_number}</div>
+                                  <div className="text-sm text-gray-500">
+                                    {formatCurrency(quote.total_amount)}
+                                  </div>
+                                </div>
+                                <div className="text-sm text-gray-500">
+                                  {new Date(quote.created_at).toLocaleDateString()}
+                                </div>
+                              </div>
+                              <div className="mt-2">
+                                <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+                                  {quote.status}
+                                </span>
+                              </div>
+                            </Link>
+                          </div>
+                        ))}
+                        {relatedQuotes.length === 0 && (
+                          <div className="p-4 text-center text-gray-500">
+                            No related quotes found
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {tab.id === 'orders' && (
+                      <div className="divide-y divide-gray-200">
+                        {relatedOrders.map(order => (
+                          <div key={order.order_id} className="p-4 hover:bg-gray-50">
+                            <Link to={`/admin/orders/${order.order_id}`} className="block">
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <div className="font-medium">{order.order_number}</div>
+                                  <div className="text-sm text-gray-500">
+                                    {formatCurrency(order.total_amount)}
+                                  </div>
+                                </div>
+                                <div className="text-sm text-gray-500">
+                                  {new Date(order.created_at).toLocaleDateString()}
+                                </div>
+                              </div>
+                              <div className="mt-2 flex items-center gap-2">
+                                <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+                                  {order.status}
+                                </span>
+                                <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">
+                                  {order.payment_status}
+                                </span>
+                              </div>
+                            </Link>
+                          </div>
+                        ))}
+                        {relatedOrders.length === 0 && (
+                          <div className="p-4 text-center text-gray-500">
+                            No related orders found
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
 
           {/* Add Feed Section */}
