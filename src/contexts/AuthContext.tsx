@@ -67,43 +67,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchUserOrganizations = async (userId: string) => {
     try {
-      // First get the user-organization mappings
-      const { data: mappings, error: mappingsError } = await supabase
+      // Get user-organization mappings with organization details
+      const { data, error } = await supabase
         .from('user_organizations')
-        .select('organization_id, role')
-        .eq('user_id', userId);
+        .select(`
+          organization_id,
+          role,
+          organizations (
+            id,
+            name,
+            status
+          )
+        `)
+        .eq('user_id', userId)
+        .eq('organizations.status', 'active'); // Only get active organizations
 
-      if (mappingsError) {
-        console.error('Organization mappings error:', mappingsError);
+      if (error) {
+        console.error('Organizations error:', error);
         return [];
       }
 
-      if (!mappings?.length) {
-        return [];
-      }
-
-      // Then get the organization details
-      const orgIds = mappings.map(m => m.organization_id);
-      const { data: orgs, error: orgsError } = await supabase
-        .from('organizations')
-        .select('id, name, status')
-        .in('id', orgIds);
-
-      if (orgsError) {
-        console.error('Organizations error:', orgsError);
-        return [];
-      }
-
-      // Combine the data
-      return mappings.map(mapping => {
-        const org = orgs?.find(o => o.id === mapping.organization_id);
-        return {
-          id: mapping.organization_id,
-          name: org?.name || 'Unknown Organization',
-          status: org?.status || 'inactive',
-          role: mapping.role
-        };
-      });
+      // Transform the data into the expected format
+      return data
+        .filter(item => item.organizations) // Filter out any null organizations
+        .map(item => ({
+          id: item.organizations.id,
+          name: item.organizations.name,
+          status: item.organizations.status,
+          role: item.role
+        }));
     } catch (error) {
       console.error('Organizations fetch error:', error);
       return [];

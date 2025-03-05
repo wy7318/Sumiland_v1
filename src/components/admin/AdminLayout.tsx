@@ -10,6 +10,7 @@ import {
 import { getCurrentUser, signOut } from '../../lib/auth';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
+import { OrganizationSwitcher } from '../OrganizationSwitcher';
 
 export function AdminLayout() {
   const navigate = useNavigate();
@@ -92,10 +93,13 @@ export function AdminLayout() {
           "flex flex-col transition-all duration-300"
         )}
       >
-        {/* Logo */}
+        {/* Logo and Organization Switcher */}
         <div className="h-16 flex items-center justify-between px-4 border-b border-primary-500">
           {isExpanded ? (
-            <span className="text-xl font-bold">Admin Panel</span>
+            <div className="flex items-center space-x-4 flex-1 min-w-0">
+              <span className="text-xl font-bold truncate">Admin Panel</span>
+              <OrganizationSwitcher />
+            </div>
           ) : (
             <span className="text-xl font-bold mx-auto">AP</span>
           )}
