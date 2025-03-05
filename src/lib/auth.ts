@@ -129,3 +129,18 @@ export async function getCurrentUser() {
     return null;
   }
 }
+
+export async function resetPassword(email: string) {
+  try {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    if (error) throw error;
+    return { error: null };
+  } catch (err) {
+    console.error('Reset password error:', err);
+    return {
+      error: err instanceof Error ? err : new Error('Failed to send reset password email')
+    };
+  }
+}

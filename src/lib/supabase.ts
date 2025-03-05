@@ -27,3 +27,27 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     retries: 3
   }
 });
+
+// Create a function to update headers with organization ID
+export const updateSupabaseHeaders = async (organizationId: string | null) => {
+  if (organizationId) {
+    // Get current session
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      throw new Error('No active session');
+    }
+
+    // Set headers for all future requests
+    supabase.headers = {
+      'x-organization-id': organizationId
+    };
+
+    // Update auth session with new headers
+    await supabase.auth.setSession({
+      access_token: session.access_token,
+      refresh_token: session.refresh_token
+    });
+  } else {
+    supabase.headers = {};
+  }
+};
