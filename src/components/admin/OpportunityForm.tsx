@@ -1,14 +1,58 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Save, X, AlertCircle, Search, Building2, User, Mail, Phone,
-  Calendar, DollarSign, Percent, Package, Plus, Trash2
-} from 'lucide-react';
+import { Save, X, Plus, Trash2, Search, Building2, Package, Scale,
+  AlertCircle, Calendar, DollarSign, User, Mail, Phone, Percent  } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
 import { CustomFieldsForm } from './CustomFieldsForm';
+
+type Customer = {
+  customer_id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string | null;
+  company: string | null;
+};
+
+type Vendor = {
+  id: string;
+  name: string;
+  type: string;
+  email: string | null;
+  phone: string | null;
+  contact_person: string | null;
+};
+
+type Product = {
+  id: string;
+  name: string;
+  description: string | null;
+  price: number;
+  stock_unit: 'weight' | 'quantity';
+  weight_unit: string | null;
+};
+
+type PicklistValue = {
+  id: string;
+  value: string;
+  label: string;
+  is_default: boolean;
+  is_active: boolean;
+  color: string | null;
+  text_color: string | null;
+};
+
+type OpportunityProduct = {
+  product_id: string | null;
+  product_name?: string;
+  quantity: number;
+  unit_price: number;
+  status: string;
+  notes?: string;
+};
 
 type FormData = {
   name: string;
@@ -23,50 +67,10 @@ type FormData = {
   type: string;
   description: string;
   status: string;
+  lead_id: string | null;
   organization_id: string;
-  products: {
-    product_id: string | null;
-    product_name?: string;
-    quantity: number;
-    unit_price: number;
-    status: string;
-    notes?: string;
-  }[];
-};
-
-type Account = {
-  id: string;
-  name: string;
-  type: string;
-  email: string | null;
-  phone: string | null;
-  contact_person: string | null;
-};
-
-type Contact = {
-  customer_id: string;
-  first_name: string;
-  last_name: string;
-  email: string;
-  phone: string | null;
-  company: string | null;
-};
-
-type Product = {
-  id: string;
-  name: string;
-  description: string | null;
-  price: number;
-};
-
-type PicklistValue = {
-  id: string;
-  value: string;
-  label: string;
-  is_default: boolean;
-  is_active: boolean;
-  color: string | null;
-  text_color: string | null;
+  products: OpportunityProduct[];
+  custom_fields?: Record<string, any>;
 };
 
 const initialFormData: FormData = {
@@ -82,6 +86,7 @@ const initialFormData: FormData = {
   type: '',
   description: '',
   status: '',
+  lead_id: null,
   organization_id: '',
   products: []
 };
@@ -89,44 +94,57 @@ const initialFormData: FormData = {
 export function OpportunityForm() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const location = useLocation();
   const { organizations, user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState<FormData>(initialFormData);
-  const [customFields, setCustomFields] = useState<Record<string, any>>({});
-
+  
   // Search states
-  const [accountSearch, setAccountSearch] = useState('');
-  const [contactSearch, setContactSearch] = useState('');
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [vendorSearch, setVendorSearch] = useState('');
   const [productSearch, setProductSearch] = useState('');
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  const [filteredAccounts, setFilteredAccounts] = useState<Account[]>([]);
-  const [filteredContacts, setFilteredContacts] = useState<Contact[]>([]);
+  const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
+  const [filteredVendors, setFilteredVendors] = useState<Vendor[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
-  const [showAccountDropdown, setShowAccountDropdown] = useState(false);
-  const [showContactDropdown, setShowContactDropdown] = useState(false);
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+  const [showVendorDropdown, setShowVendorDropdown] = useState(false);
   const [showProductDropdown, setShowProductDropdown] = useState(false);
-  const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
-  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
   const [selectedProductIndex, setSelectedProductIndex] = useState<number | null>(null);
-
-  // Picklist states
   const [opportunityStages, setOpportunityStages] = useState<PicklistValue[]>([]);
   const [opportunityTypes, setOpportunityTypes] = useState<PicklistValue[]>([]);
   const [opportunityStatuses, setOpportunityStatuses] = useState<PicklistValue[]>([]);
   const [productStatuses, setProductStatuses] = useState<PicklistValue[]>([]);
   const [leadSources, setLeadSources] = useState<PicklistValue[]>([]);
-
-  // Refs for dropdowns
-  const accountSearchRef = useRef<HTMLDivElement>(null);
-  const contactSearchRef = useRef<HTMLDivElement>(null);
+  const [customFields, setCustomFields] = useState<Record<string, any>>({});
+  
+  const customerSearchRef = useRef<HTMLDivElement>(null);
+  const vendorSearchRef = useRef<HTMLDivElement>(null);
   const productSearchRef = useRef<HTMLDivElement>(null);
+
+  // Get lead data from navigation state if available
+  const leadData = location.state?.leadData;
 
   useEffect(() => {
     fetchPicklists();
-    if (id) {
+    if (leadData) {
+      // Pre-fill form with lead data
+      setFormData(prev => ({
+        ...prev,
+        name: leadData.name,
+        contact_id: leadData.contact_id,
+        lead_id: leadData.lead_id,
+        lead_source: leadData.lead_source,
+        description: leadData.description,
+        organization_id: leadData.organization_id,
+        owner_id: leadData.owner_id
+      }));
+    } else if (id) {
       fetchOpportunity();
     } else if (organizations.length > 0) {
       setFormData(prev => ({
@@ -134,51 +152,36 @@ export function OpportunityForm() {
         organization_id: organizations[0].id
       }));
     }
-
-    // Click outside handler
-    const handleClickOutside = (event: MouseEvent) => {
-      if (accountSearchRef.current && !accountSearchRef.current.contains(event.target as Node)) {
-        setShowAccountDropdown(false);
-      }
-      if (contactSearchRef.current && !contactSearchRef.current.contains(event.target as Node)) {
-        setShowContactDropdown(false);
-      }
-      if (productSearchRef.current && !productSearchRef.current.contains(event.target as Node)) {
-        setShowProductDropdown(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [id, organizations]);
+  }, [id, organizations, leadData]);
 
   useEffect(() => {
-    if (accountSearch) {
-      const searchTerm = accountSearch.toLowerCase();
-      const filtered = accounts.filter(account => 
-        account.name.toLowerCase().includes(searchTerm) ||
-        account.email?.toLowerCase().includes(searchTerm) ||
-        account.contact_person?.toLowerCase().includes(searchTerm)
+    if (customerSearch) {
+      const searchTerm = customerSearch.toLowerCase();
+      const filtered = customers.filter(customer => 
+        customer.first_name.toLowerCase().includes(searchTerm) ||
+        customer.last_name.toLowerCase().includes(searchTerm) ||
+        customer.email.toLowerCase().includes(searchTerm) ||
+        customer.company?.toLowerCase().includes(searchTerm)
       );
-      setFilteredAccounts(filtered);
+      setFilteredCustomers(filtered);
     } else {
-      setFilteredAccounts([]);
+      setFilteredCustomers([]);
     }
-  }, [accountSearch, accounts]);
+  }, [customerSearch, customers]);
 
   useEffect(() => {
-    if (contactSearch) {
-      const searchTerm = contactSearch.toLowerCase();
-      const filtered = contacts.filter(contact => 
-        `${contact.first_name} ${contact.last_name}`.toLowerCase().includes(searchTerm) ||
-        contact.email.toLowerCase().includes(searchTerm) ||
-        contact.company?.toLowerCase().includes(searchTerm)
+    if (vendorSearch) {
+      const searchTerm = vendorSearch.toLowerCase();
+      const filtered = vendors.filter(vendor => 
+        vendor.name.toLowerCase().includes(searchTerm) ||
+        vendor.email?.toLowerCase().includes(searchTerm) ||
+        vendor.contact_person?.toLowerCase().includes(searchTerm)
       );
-      setFilteredContacts(filtered);
+      setFilteredVendors(filtered);
     } else {
-      setFilteredContacts([]);
+      setFilteredVendors([]);
     }
-  }, [contactSearch, contacts]);
+  }, [vendorSearch, vendors]);
 
   useEffect(() => {
     if (productSearch) {
@@ -192,6 +195,24 @@ export function OpportunityForm() {
       setFilteredProducts([]);
     }
   }, [productSearch, products]);
+
+  // Click outside handlers
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (customerSearchRef.current && !customerSearchRef.current.contains(event.target as Node)) {
+        setShowCustomerDropdown(false);
+      }
+      if (vendorSearchRef.current && !vendorSearchRef.current.contains(event.target as Node)) {
+        setShowVendorDropdown(false);
+      }
+      if (productSearchRef.current && !productSearchRef.current.contains(event.target as Node)) {
+        setShowProductDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const fetchPicklists = async () => {
     try {
@@ -277,22 +298,8 @@ export function OpportunityForm() {
         .from('opportunities')
         .select(`
           *,
-          account:vendors(
-            id,
-            name,
-            type,
-            email,
-            phone,
-            contact_person
-          ),
-          contact:customers(
-            customer_id,
-            first_name,
-            last_name,
-            email,
-            phone,
-            company
-          ),
+          account:vendors(*),
+          contact:customers(*),
           products:opportunity_products(*)
         `)
         .eq('id', id)
@@ -313,21 +320,23 @@ export function OpportunityForm() {
           type: opportunity.type || '',
           description: opportunity.description || '',
           status: opportunity.status,
+          lead_id: opportunity.lead_id,
           organization_id: opportunity.organization_id,
-          products: opportunity.products.map(p => ({
+          products: opportunity.products.map((p: any) => ({
             product_id: p.product_id,
+            product_name: p.product?.name,
             quantity: p.quantity,
             unit_price: p.unit_price,
             status: p.status,
-            notes: p.notes || ''
+            notes: p.notes
           }))
         });
 
         if (opportunity.account) {
-          setSelectedAccount(opportunity.account);
+          setSelectedVendor(opportunity.account);
         }
         if (opportunity.contact) {
-          setSelectedContact(opportunity.contact);
+          setSelectedCustomer(opportunity.contact);
         }
 
         // Fetch custom fields
@@ -352,7 +361,23 @@ export function OpportunityForm() {
     }
   };
 
-  const fetchAccounts = async () => {
+  const fetchCustomers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('customers')
+        .select('*')
+        .in('organization_id', organizations.map(org => org.id))
+        .order('first_name');
+
+      if (error) throw error;
+      setCustomers(data || []);
+    } catch (err) {
+      console.error('Error fetching customers:', err);
+      setError('Failed to load customers');
+    }
+  };
+
+  const fetchVendors = async () => {
     try {
       const { data, error } = await supabase
         .from('vendors')
@@ -362,26 +387,10 @@ export function OpportunityForm() {
         .order('name');
 
       if (error) throw error;
-      setAccounts(data || []);
+      setVendors(data || []);
     } catch (err) {
-      console.error('Error fetching accounts:', err);
-      setError('Failed to load accounts');
-    }
-  };
-
-  const fetchContacts = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('customers')
-        .select('*')
-        .in('organization_id', organizations.map(org => org.id))
-        .order('first_name');
-
-      if (error) throw error;
-      setContacts(data || []);
-    } catch (err) {
-      console.error('Error fetching contacts:', err);
-      setError('Failed to load contacts');
+      console.error('Error fetching vendors:', err);
+      setError('Failed to load vendors');
     }
   };
 
@@ -402,18 +411,18 @@ export function OpportunityForm() {
     }
   };
 
-  const handleAccountSelect = (account: Account) => {
-    setSelectedAccount(account);
-    setFormData(prev => ({ ...prev, account_id: account.id }));
-    setAccountSearch('');
-    setShowAccountDropdown(false);
+  const handleCustomerSelect = (customer: Customer) => {
+    setSelectedCustomer(customer);
+    setFormData(prev => ({ ...prev, contact_id: customer.customer_id }));
+    setCustomerSearch('');
+    setShowCustomerDropdown(false);
   };
 
-  const handleContactSelect = (contact: Contact) => {
-    setSelectedContact(contact);
-    setFormData(prev => ({ ...prev, contact_id: contact.customer_id }));
-    setContactSearch('');
-    setShowContactDropdown(false);
+  const handleVendorSelect = (vendor: Vendor) => {
+    setSelectedVendor(vendor);
+    setFormData(prev => ({ ...prev, account_id: vendor.id }));
+    setVendorSearch('');
+    setShowVendorDropdown(false);
   };
 
   const handleProductSelect = (product: Product) => {
@@ -454,7 +463,7 @@ export function OpportunityForm() {
     setSelectedProductIndex(null);
   };
 
-  const updateProduct = (index: number, field: keyof FormData['products'][0], value: any) => {
+  const updateProduct = (index: number, field: keyof OpportunityProduct, value: any) => {
     setFormData(prev => ({
       ...prev,
       products: prev.products.map((item, i) => 
@@ -626,42 +635,118 @@ export function OpportunityForm() {
             />
           </div>
 
-          <div>
+          <div ref={customerSearchRef} className="relative">
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Stage *
+              Contact
             </label>
-            <select
-              value={formData.stage}
-              onChange={(e) => setFormData(prev => ({ ...prev, stage: e.target.value }))}
-              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-              required
-            >
-              <option value="">Select Stage</option>
-              {opportunityStages.map(stage => (
-                <option key={stage.id} value={stage.value}>
-                  {stage.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div ref={accountSearchRef} className="relative">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Account
-            </label>
-            {selectedAccount ? (
+            {selectedCustomer ? (
               <div className="flex items-center justify-between p-2 border rounded-lg">
-                <div className="flex items-center">
-                  <Building2 className="w-5 h-5 text-gray-400 mr-2" />
-                  <div>
-                    <p className="font-medium">{selectedAccount.name}</p>
-                    <p className="text-sm text-gray-500">Type: {selectedAccount.type}</p>
-                  </div>
+                <div>
+                  <p className="font-medium">
+                    {selectedCustomer.first_name} {selectedCustomer.last_name}
+                  </p>
+                  <p className="text-sm text-gray-500">{selectedCustomer.email}</p>
+                  {selectedCustomer.company && (
+                    <p className="text-sm text-gray-500">{selectedCustomer.company}</p>
+                  )}
                 </div>
                 <button
                   type="button"
                   onClick={() => {
-                    setSelectedAccount(null);
+                    setSelectedCustomer(null);
+                    setFormData(prev => ({ ...prev, contact_id: null }));
+                  }}
+                  className="p-1 hover:bg-gray-100 rounded-full"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="text"
+                  value={customerSearch}
+                  onChange={(e) => {
+                    setCustomerSearch(e.target.value);
+                    setShowCustomerDropdown(true);
+                    if (!customers.length) {
+                      fetchCustomers();
+                    }
+                  }}
+                  onFocus={() => {
+                    setShowCustomerDropdown(true);
+                    if (!customers.length) {
+                      fetchCustomers();
+                    }
+                  }}
+                  placeholder="Search contacts..."
+                  className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                />
+              </div>
+            )}
+
+            <AnimatePresence>
+              {showCustomerDropdown && customerSearch && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="absolute z-10 w-full mt-1 bg-white rounded-lg shadow-lg border border-gray-200"
+                >
+                  {filteredCustomers.length > 0 ? (
+                    <ul className="py-1 max-h-60 overflow-auto">
+                      {filteredCustomers.map(customer => (
+                        <li
+                          key={customer.customer_id}
+                          onClick={() => handleCustomerSelect(customer)}
+                          className="px-4 py-2 hover:bg-gray-50 cursor-pointer"
+                        >
+                          <div className="font-medium">
+                            {customer.first_name} {customer.last_name}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {customer.email}
+                          </div>
+                          {customer.company && (
+                            <div className="text-sm text-gray-500">
+                              {customer.company}
+                            </div>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="p-4 text-gray-500">
+                      No contacts found
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          <div ref={vendorSearchRef} className="relative">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Account
+            </label>
+            {selectedVendor ? (
+              <div className="flex items-center justify-between p-2 border rounded-lg">
+                <div>
+                  <p className="font-medium">{selectedVendor.name}</p>
+                  {selectedVendor.contact_person && (
+                    <p className="text-sm text-gray-500">
+                      Contact: {selectedVendor.contact_person}
+                    </p>
+                  )}
+                  {selectedVendor.email && (
+                    <p className="text-sm text-gray-500">{selectedVendor.email}</p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedVendor(null);
                     setFormData(prev => ({ ...prev, account_id: null }));
                   }}
                   className="p-1 hover:bg-gray-100 rounded-full"
@@ -674,18 +759,18 @@ export function OpportunityForm() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <input
                   type="text"
-                  value={accountSearch}
+                  value={vendorSearch}
                   onChange={(e) => {
-                    setAccountSearch(e.target.value);
-                    setShowAccountDropdown(true);
-                    if (!accounts.length) {
-                      fetchAccounts();
+                    setVendorSearch(e.target.value);
+                    setShowVendorDropdown(true);
+                    if (!vendors.length) {
+                      fetchVendors();
                     }
                   }}
                   onFocus={() => {
-                    setShowAccountDropdown(true);
-                    if (!accounts.length) {
-                      fetchAccounts();
+                    setShowVendorDropdown(true);
+                    if (!vendors.length) {
+                      fetchVendors();
                     }
                   }}
                   placeholder="Search accounts..."
@@ -695,28 +780,30 @@ export function OpportunityForm() {
             )}
 
             <AnimatePresence>
-              {showAccountDropdown && accountSearch && (
+              {showVendorDropdown && vendorSearch && (
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
                   className="absolute z-10 w-full mt-1 bg-white rounded-lg shadow-lg border border-gray-200"
                 >
-                  {filteredAccounts.length > 0 ? (
+                  {filteredVendors.length > 0 ? (
                     <ul className="py-1 max-h-60 overflow-auto">
-                      {filteredAccounts.map(account => (
+                      {filteredVendors.map(vendor => (
                         <li
-                          key={account.id}
-                          onClick={() => handleAccountSelect(account)}
+                          key={vendor.id}
+                          onClick={() => handleVendorSelect(vendor)}
                           className="px-4 py-2 hover:bg-gray-50 cursor-pointer"
                         >
-                          <div className="font-medium">{account.name}</div>
-                          <div className="text-sm text-gray-500">
-                            Type: {account.type}
-                          </div>
-                          {account.contact_person && (
+                          <div className="font-medium">{vendor.name}</div>
+                          {vendor.contact_person && (
                             <div className="text-sm text-gray-500">
-                              Contact: {account.contact_person}
+                              Contact: {vendor.contact_person}
+                            </div>
+                          )}
+                          {vendor.email && (
+                            <div className="text-sm text-gray-500">
+                              {vendor.email}
                             </div>
                           )}
                         </li>
@@ -732,95 +819,23 @@ export function OpportunityForm() {
             </AnimatePresence>
           </div>
 
-          <div ref={contactSearchRef} className="relative">
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Contact
+              Stage *
             </label>
-            {selectedContact ? (
-              <div className="flex items-center justify-between p-2 border rounded-lg">
-                <div className="flex items-center">
-                  <User className="w-5 h-5 text-gray-400 mr-2" />
-                  <div>
-                    <p className="font-medium">
-                      {selectedContact.first_name} {selectedContact.last_name}
-                    </p>
-                    <p className="text-sm text-gray-500">{selectedContact.email}</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedContact(null);
-                    setFormData(prev => ({ ...prev, contact_id: null }));
-                  }}
-                  className="p-1 hover:bg-gray-100 rounded-full"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            ) : (
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input
-                  type="text"
-                  value={contactSearch}
-                  onChange={(e) => {
-                    setContactSearch(e.target.value);
-                    setShowContactDropdown(true);
-                    if (!contacts.length) {
-                      fetchContacts();
-                    }
-                  }}
-                  onFocus={() => {
-                    setShowContactDropdown(true);
-                    if (!contacts.length) {
-                      fetchContacts();
-                    }
-                  }}
-                  placeholder="Search contacts..."
-                  className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-                />
-              </div>
-            )}
-
-            <AnimatePresence>
-              {showContactDropdown && contactSearch && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="absolute z-10 w-full mt-1 bg-white rounded-lg shadow-lg border border-gray-200"
-                >
-                  {filteredContacts.length > 0 ? (
-                    <ul className="py-1 max-h-60 overflow-auto">
-                      {filteredContacts.map(contact => (
-                        <li
-                          key={contact.customer_id}
-                          onClick={() => handleContactSelect(contact)}
-                          className="px-4 py-2 hover:bg-gray-50 cursor-pointer"
-                        >
-                          <div className="font-medium">
-                            {contact.first_name} {contact.last_name}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {contact.email}
-                          </div>
-                          {contact.company && (
-                            <div className="text-sm text-gray-500">
-                              {contact.company}
-                            </div>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <div className="p-4 text-gray-500">
-                      No contacts found
-                    </div>
-                  )}
-                </motion.div>
-              )}
-            </AnimatePresence>
+            <select
+              value={formData.stage}
+              onChange={(e) => setFormData(prev => ({ ...prev, stage: e.target.value }))}
+              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+              required
+            >
+              <option value="">Select Stage</option>
+              {opportunityStages.map(stage => (
+                <option key={stage.id} value={ stage.value}>
+                  {stage.label}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div>
@@ -859,7 +874,7 @@ export function OpportunityForm() {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Expecte d Close Date
+              Expected Close Date
             </label>
             <div className="relative">
               <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -994,15 +1009,20 @@ export function OpportunityForm() {
                             onClick={() => handleProductSelect(product)}
                             className="px-4 py-2 hover:bg-gray-50 cursor-pointer"
                           >
-                            <div className="font-medium">{product.name}</div>
-                            <div className="text-sm text-gray-500">
-                              Price: ${product.price.toFixed(2)}
-                            </div>
-                            {product.description && (
-                              <div className="text-sm text-gray-500">
-                                {product.description}
+                            <div className="flex items-center">
+                              {product.stock_unit === 'quantity' ? (
+                                <Package className="w-4 h-4 text-gray-400 mr-2" />
+                              ) : (
+                                <Scale className="w-4 h-4 text-gray-400 mr-2" />
+                              )}
+                              <div>
+                                <div className="font-medium">{product.name}</div>
+                                <div className="text-sm text-gray-500">
+                                  Price: ${product.price.toFixed(2)} |
+                                  {product.stock_unit === 'quantity' ? ' Units' : ` Weight (${product.weight_unit})`}
+                                </div>
                               </div>
-                            )}
+                            </div>
                           </li>
                         ))}
                       </ul>

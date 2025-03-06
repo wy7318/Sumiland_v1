@@ -503,7 +503,8 @@ export function OpportunityDetailPage() {
         <div className="p-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
             <div>
-              <h1 className="text-2xl font-bold mb-2">{opportunity.name}</h1>
+              <h1 className="text-2xl font-bold">{opportunity.opportunity_number}</h1>
+              <h2 className="text-lg text-gray-500">{opportunity.name}</h2>
               <div className="flex items-center gap-4">
                 <select
                   value={opportunity.stage}

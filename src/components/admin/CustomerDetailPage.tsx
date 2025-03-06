@@ -73,6 +73,14 @@ type Case = {
   created_at: string;
 };
 
+type Opportunity = {
+  id: string;
+  name: string;
+  amount: number;
+  status: string;
+  created_at: string;
+};
+
 type Feed = {
   id: string;
   content: string;
@@ -90,7 +98,7 @@ type Feed = {
 };
 
 type RelatedTab = {
-  id: 'leads' | 'quotes' | 'orders' | 'cases';
+  id: 'leads' | 'quotes' | 'orders' | 'cases' | 'opportunities';
   label: string;
   icon: typeof UserCheck;
   count: number;
@@ -111,6 +119,7 @@ export function CustomerDetailPage() {
   const [relatedQuotes, setRelatedQuotes] = useState<Quote[]>([]);
   const [relatedOrders, setRelatedOrders] = useState<Order[]>([]);
   const [relatedCases, setRelatedCases] = useState<Case[]>([]);
+  const [relatedOpportunities, setRelatedOpportunities] = useState<Opportunity[]>([]);
 
   useEffect(() => {
     if (id) {
@@ -176,6 +185,18 @@ export function CustomerDetailPage() {
 
       if (quotesError) throw quotesError;
       setRelatedQuotes(quotes || []);
+
+      // Fetch related Opty
+      const { data: opportunities, error: opportunitiesError } = await supabase
+        .from('opportunities')
+        .select('*')
+        .eq('contact_id', customer.customer_id)
+        .eq('organization_id', customer.organization_id)
+        .order('created_at', { ascending: false });
+      
+      if (opportunitiesError) throw opportunitiesError;
+      console.log('Related Opportunities:', opportunities); // Debugging line
+      setRelatedOpportunities(opportunities || []);
 
       // Fetch related orders
       const { data: orders, error: ordersError } = await supabase
@@ -415,7 +436,8 @@ export function CustomerDetailPage() {
     { id: 'leads', label: 'Leads', icon: UserCheck, count: relatedLeads.length },
     { id: 'quotes', label: 'Quotes', icon: FileText, count: relatedQuotes.length },
     { id: 'orders', label: 'Orders', icon: ShoppingBag, count: relatedOrders.length },
-    { id: 'cases', label: 'Cases', icon: MessageSquare, count: relatedCases.length }
+    { id: 'cases', label: 'Cases', icon: MessageSquare, count: relatedCases.length },
+    { id: 'opportunities', label: 'Opportunities', icon: MessageSquare, count: relatedOpportunities.length }
   ];
 
   if (loading) {
@@ -685,6 +707,38 @@ export function CustomerDetailPage() {
                         {relatedOrders.length === 0 && (
                           <div className="p-4 text-center text-gray-500">
                             No related orders found
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {tab.id === 'opportunities' && (
+                      <div className="divide-y divide-gray-200">
+                        {relatedOpportunities.map(opportunity => (
+                          <div key={opportunity.id} className="p-4 hover:bg-gray-50">
+                            <Link to={`/admin/opportunities/${opportunity.id}`} className="block">
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <div className="font-medium">{opportunity.opportunity_number}</div>
+                                  <div className="text-sm text-gray-500">
+                                    {formatCurrency(opportunity.amount)}
+                                  </div>
+                                </div>
+                                <div className="text-sm text-gray-500">
+                                  {new Date(opportunity.created_at).toLocaleDateString()}
+                                </div>
+                              </div>
+                              <div className="mt-2">
+                                <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+                                  {opportunity.status}
+                                </span>
+                              </div>
+                            </Link>
+                          </div>
+                        ))}
+                        {relatedOpportunities.length === 0 && (
+                          <div className="p-4 text-center text-gray-500">
+                            No related opportunities found
                           </div>
                         )}
                       </div>
