@@ -49,6 +49,9 @@ import { LeadDetailPage } from './components/admin/LeadDetailPage';
 import { CustomerDetailPage } from './components/admin/CustomerDetailPage';
 import { OrganizationProvider } from './contexts/OrganizationContext';
 import { OrganizationSelector } from './components/OrganizationSelector';
+import { OpportunitiesPage } from './components/admin/OpportunitiesPage';
+import { OpportunityForm } from './components/admin/OpportunityForm';
+import { OpportunityDetailPage } from './components/admin/OpportunityDetailPage';
 
 function App() {
     const { scrollYProgress } = useScroll();
@@ -117,6 +120,10 @@ function App() {
                             <Route path="leads/new" element={<LeadForm />} />
                             <Route path="leads/:id" element={<LeadDetailPage />} />
                             <Route path="leads/:id/edit" element={<LeadForm />} />
+                            <Route path="opportunities" element={<OpportunitiesPage />} />
+                            <Route path="opportunities/new" element={<OpportunityForm />} />
+                            <Route path="opportunities/:id" element={<OpportunityDetailPage />} />
+                            <Route path="opportunities/:id/edit" element={<OpportunityForm />} />
                             <Route path="products" element={<ProductsPage />} />
                             <Route path="products/new" element={<ProductForm />} />
                             <Route path="products/:id/edit" element={<ProductForm />} />
