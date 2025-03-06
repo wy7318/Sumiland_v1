@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import {
+import { 
   ArrowLeft, Building2, Mail, Phone, Calendar,
   Edit, AlertCircle, FileText, DollarSign, User,
   CheckCircle, X, Send, Package, ShoppingBag
@@ -92,7 +92,7 @@ export function QuoteDetailPage() {
   const fetchQuote = async () => {
     try {
       if (!id) return;
-
+  
       const { data: quoteData, error: quoteError } = await supabase
         .from('quote_hdr')
         .select(`
@@ -116,15 +116,15 @@ export function QuoteDetailPage() {
         `)
         .eq('quote_id', id)
         .single();
-
+  
       if (quoteError) throw quoteError;
-
+  
       if (quoteData) {
         // Calculate discount_percent dynamically
         const subtotal = quoteData.subtotal || 0;
         const discountAmount = quoteData.discount_amount || 0;
         const discountPercent = subtotal > 0 ? (discountAmount / subtotal) * 100 : 0;
-
+  
         // Set the quote data with calculated discount_percent
         setQuote({
           ...quoteData,
@@ -145,7 +145,7 @@ export function QuoteDetailPage() {
 
       const { error } = await supabase
         .from('quote_hdr')
-        .update({
+        .update({ 
           status: newStatus,
           updated_at: new Date().toISOString()
         })
@@ -165,37 +165,37 @@ export function QuoteDetailPage() {
         setError("Quote data is missing.");
         return;
       }
-
+  
       setCreatingOrder(true);
       setError(null);
-
+  
       // Get the authenticated user
       const { data: userData, error: userError } = await supabase.auth.getUser();
       if (userError || !userData?.user?.id) {
         throw new Error('User not authenticated.');
       }
-
+  
       const userId = userData.user.id;
-
+  
       // Call the Supabase function to create an order
       const { data, error } = await supabase
-        .rpc('create_order_from_quote', {
-          quote_id_param: quote.quote_id,
-          user_id_param: userId
+        .rpc('create_order_from_quote', { 
+          quote_id_param: quote.quote_id, 
+          user_id_param: userId 
         });
-
+  
       if (error) {
         console.error('Supabase RPC Error:', error);
         throw error;
       }
-
+  
       if (data?.error) {
         console.error('Supabase Function Error:', data.error);
         throw new Error(data.error);
       }
-
+  
       alert(`Order created successfully! Order ID: ${data.order_id}`);
-
+  
       // Navigate to the orders page after successfully creating the order
       navigate('/admin/orders');
     } catch (err) {
@@ -463,7 +463,7 @@ export function QuoteDetailPage() {
                 </tbody>
               </table>
             </div>
-
+          
             {/* Tax and Discount Section */}
             <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="bg-gray-50 rounded-lg p-4">
@@ -483,7 +483,7 @@ export function QuoteDetailPage() {
                   </div>
                 </div>
               </div>
-
+          
               <div className="bg-gray-50 rounded-lg p-4">
                 <h3 className="text-lg font-semibold mb-4">Discount Details</h3>
                 <div className="space-y-2">
@@ -502,7 +502,7 @@ export function QuoteDetailPage() {
                 </div>
               </div>
             </div>
-
+          
             {/* Total Amount Section */}
             <div className="mt-6 bg-gray-50 rounded-lg p-4">
               <div className="flex justify-between items-center">

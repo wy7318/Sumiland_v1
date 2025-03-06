@@ -61,6 +61,20 @@ const PICKLIST_FIELDS = {
       status: 'Status'
     }
   },
+  Opportunity: {
+    label: 'Opportunity',
+    fields: {
+      stage: 'Stage',
+      type: 'Type',
+      status: 'Status'
+    }
+  },
+  OpportunityProduct: {
+    label: 'OpportunityProduct',
+    fields: {
+      status: 'Status'
+    }
+  },
   Portfolio: {
     label: 'Portfolio',
     fields: {
@@ -86,6 +100,10 @@ const PICKLIST_TYPE_MAPPING = {
   'Product.weight_unit': 'product_weight_unit',
   'Account.type': 'account_type',
   'Account.status': 'account_status',
+  'Opportunity.stage': 'opportunity_stage',
+  'Opportunity.type': 'opportunity_type',
+  'Opportunity.status': 'opportunity_status',
+  'OpportunityProduct.status': 'opportunity_product_status',
   'Portfolio.category': 'portfolio_category'
 } as const;
 
@@ -661,3 +679,4 @@ export function PicklistManagementPage() {
     </div>
   );
 }
+
