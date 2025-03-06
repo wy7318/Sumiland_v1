@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { 
   ArrowLeft, Building2, Mail, Phone, Calendar,
   Edit, AlertCircle, Send, Reply, X, User,
-  Globe, CheckCircle
+  Globe, CheckCircle, UserPlus, Target
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { cn } from '../../lib/utils';
@@ -56,6 +56,8 @@ export function LeadDetailPage() {
   const [editingFeed, setEditingFeed] = useState<Feed | null>(null);
   const [leadStatuses, setLeadStatuses] = useState<PicklistValue[]>([]);
   const [leadSources, setLeadSources] = useState<PicklistValue[]>([]);
+  const [converting, setConverting] = useState(false);
+  const [conversionError, setConversionError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchPicklists();
@@ -258,6 +260,67 @@ export function LeadDetailPage() {
     }
   };
 
+  const handleConvertToContact = async () => {
+    if (!lead) return;
+    setConverting(true);
+    setConversionError(null);
+
+    try {
+      // Check if contact already exists
+      const { data: existingContact, error: checkError } = await supabase
+        .from('customers')
+        .select('customer_id')
+        .eq('email', lead.email)
+        .eq('organization_id', lead.organization_id)
+        .maybeSingle();
+
+      if (checkError) throw checkError;
+
+      if (existingContact) {
+        setConversionError('A contact with this email already exists');
+        return;
+      }
+
+      // Redirect to customer form with pre-filled data
+      navigate('/admin/customers/new', {
+        state: {
+          leadData: {
+            first_name: lead.first_name,
+            last_name: lead.last_name,
+            email: lead.email,
+            phone: lead.phone,
+            company: lead.company,
+            lead_id: lead.id
+          }
+        }
+      });
+    } catch (err) {
+      console.error('Error during contact conversion:', err);
+      setConversionError(err instanceof Error ? err.message : 'Failed to convert lead');
+    } finally {
+      setConverting(false);
+    }
+  };
+
+  const handleConvertToOpportunity = () => {
+    if (!lead) return;
+    
+    // Redirect to opportunity form with pre-filled data
+    navigate('/admin/opportunities/new', {
+      state: {
+        leadData: {
+          name: `${lead.first_name} ${lead.last_name} Opportunity`,
+          contact_id: lead.customer_id,
+          lead_id: lead.id,
+          lead_source: lead.lead_source,
+          description: lead.description,
+          organization_id: lead.organization_id,
+          owner_id: lead.owner_id
+        }
+      }
+    });
+  };
+
   // Get style for status badge
   const getStatusStyle = (status: string) => {
     const statusValue = leadStatuses.find(s => s.value === status);
@@ -411,9 +474,7 @@ export function LeadDetailPage() {
         <div className="p-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
             <div>
-              <h1 className="text-2xl font-bold mb-2">
-                {lead.first_name} {lead.last_name}
-              </h1>
+              <h1 className="text-2xl font-bold mb-2">{lead.first_name} {lead.last_name}</h1>
               <div className="flex items-center gap-4">
                 <select
                   value={lead.status}
@@ -434,7 +495,33 @@ export function LeadDetailPage() {
                 )}
               </div>
             </div>
+
+            <div className="mt-4 md:mt-0 flex gap-4">
+              <button
+                onClick={handleConvertToContact}
+                disabled={converting}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 disabled:opacity-50"
+              >
+                <UserPlus className="w-4 h-4 mr-2" />
+                Convert to Contact
+              </button>
+              <button
+                onClick={handleConvertToOpportunity}
+                disabled={converting}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+              >
+                <Target className="w-4 h-4 mr-2" />
+                Convert to Opportunity
+              </button>
+            </div>
           </div>
+
+          {conversionError && (
+            <div className="mb-6 bg-red-50 text-red-600 p-4 rounded-lg flex items-center">
+              <AlertCircle className="w-5 h-5 mr-2" />
+              {conversionError}
+            </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {/* Contact Information */}

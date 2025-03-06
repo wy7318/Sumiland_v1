@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Save, X, AlertCircle, Mail, Phone, Building2, User, Search } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -20,6 +20,8 @@ type CustomerFormData = {
   country: string;
   company: string;
   vendor_id: string | null;
+  organization_id?: string;
+  lead_id?: string | null;
 };
 
 const initialFormData: CustomerFormData = {
@@ -34,7 +36,9 @@ const initialFormData: CustomerFormData = {
   zip_code: '',
   country: '',
   company: '',
-  vendor_id: null
+  vendor_id: null,
+  organization_id: '',
+  lead_id: null
 };
 
 type Vendor = {
@@ -47,6 +51,7 @@ type Vendor = {
 export function CustomerForm() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const location = useLocation();
   const { organizations, user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -62,13 +67,32 @@ export function CustomerForm() {
   
   const vendorSearchRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (id) {
-      fetchCustomer();
-    }
-  }, [id]);
+  // Get lead data from navigation state if available
+  const leadData = location.state?.leadData;
 
-  // Filter vendors based on search
+  useEffect(() => {
+    if (leadData) {
+      // Pre-fill form with lead data
+      setFormData(prev => ({
+        ...prev,
+        first_name: leadData.first_name,
+        last_name: leadData.last_name,
+        email: leadData.email,
+        phone: leadData.phone || '',
+        company: leadData.company || '',
+        lead_id: leadData.lead_id,
+        organization_id: organizations[0]?.id || ''
+      }));
+    } else if (id) {
+      fetchCustomer();
+    } else if (organizations.length > 0) {
+      setFormData(prev => ({
+        ...prev,
+        organization_id: organizations[0].id
+      }));
+    }
+  }, [id, organizations, leadData]);
+
   useEffect(() => {
     if (vendorSearch) {
       const searchTerm = vendorSearch.toLowerCase();
@@ -82,7 +106,6 @@ export function CustomerForm() {
     }
   }, [vendorSearch, vendors]);
 
-  // Click outside handler
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (vendorSearchRef.current && !vendorSearchRef.current.contains(event.target as Node)) {
@@ -142,13 +165,14 @@ export function CustomerForm() {
           zip_code: customer.zip_code || '',
           country: customer.country || '',
           company: customer.company || '',
-          vendor_id: customer.vendor_id
+          vendor_id: customer.vendor_id,
+          organization_id: customer.organization_id,
+          lead_id: customer.lead_id
         });
         if (customer.vendor) {
           setSelectedVendor(customer.vendor);
         }
 
-        // Fetch custom fields for this customer
         const { data: customFieldValues, error: customFieldsError } = await supabase
           .from('custom_field_values')
           .select('field_id, value')
@@ -156,7 +180,6 @@ export function CustomerForm() {
 
         if (customFieldsError) throw customFieldsError;
 
-        // Convert custom field values to a key-value pair object
         const customFieldsData = customFieldValues?.reduce((acc, field) => {
           acc[field.field_id] = field.value;
           return acc;
@@ -215,76 +238,59 @@ export function CustomerForm() {
     setError(null);
 
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) throw new Error('Not authenticated');
-
-      // Use the first organization if creating new customer
-      const organizationId = id 
-        ? (await supabase
-            .from('customers')
-            .select('organization_id')
-            .eq('customer_id', id)
-            .single()
-          ).data?.organization_id
-        : organizations[0]?.id;
-
-      if (!organizationId) {
-        throw new Error('No valid organization found');
-      }
-
       let customerId = id;
 
-      if (id) {
-        // Verify organization access
-        if (!organizations.some(org => org.id === organizationId)) {
-          throw new Error('You do not have permission to update this customer');
-        }
+      // Add lead_id to the data if converting from lead
+      const customerData = {
+        ...formData,
+        lead_id: leadData?.lead_id || null
+      };
 
+      if (id) {
         const { error: updateError } = await supabase
           .from('customers')
-          .update({
-            ...formData,
-            updated_at: new Date().toISOString(),
-            updated_by: userData.user.id
-          })
-          .eq('customer_id', id)
-          .eq('organization_id', organizationId);
+          .update(customerData)
+          .eq('customer_id', id);
 
         if (updateError) throw updateError;
       } else {
         const { data: newCustomer, error: insertError } = await supabase
           .from('customers')
-          .insert([{
-            ...formData,
-            organization_id: organizationId,
-            created_at: new Date().toISOString(),
-            created_by: userData.user.id,
-            updated_at: new Date().toISOString(),
-            updated_by: userData.user.id
-          }])
+          .insert([customerData])
           .select()
           .single();
 
         if (insertError) throw insertError;
+        customerId = newCustomer.customer_id;
 
-        // Set the new customer ID for custom fields
-        if (newCustomer) {
-          customerId = newCustomer.customer_id;
+        // If converting from lead, update lead status
+        if (leadData?.lead_id) {
+          const { error: leadUpdateError } = await supabase
+            .from('leads')
+            .update({
+              // status: 'Converted',
+              is_converted: true,
+              converted_at: new Date().toISOString(),
+              converted_by: user?.id
+            })
+            .eq('id', leadData.lead_id);
+
+          if (leadUpdateError) throw leadUpdateError;
         }
       }
 
       // Save custom field values
-      if (customerId && userData.user) {
+      if (customerId && user) {
         for (const [fieldId, value] of Object.entries(customFields)) {
           const { error: valueError } = await supabase
             .from('custom_field_values')
             .upsert({
-              organization_id: organizationId,
+              organization_id: formData.organization_id,
               entity_id: customerId,
               field_id: fieldId,
               value,
-              created_by: userData.user.id,
-              updated_by: userData.user.id,
+              created_by: user.id,
+              updated_by: user.id,
               updated_at: new Date().toISOString()
             }, {
               onConflict: 'organization_id,field_id,entity_id'
