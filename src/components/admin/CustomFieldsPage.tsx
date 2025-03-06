@@ -10,7 +10,7 @@ import { cn } from '../../lib/utils';
 
 type CustomField = {
   id: string;
-  entity_type: 'case' | 'vendor' | 'customer' | 'product' | 'order' | 'quote' | 'lead';
+  entity_type: 'case' | 'vendor' | 'customer' | 'product' | 'order' | 'quote' | 'lead' |'opportunity';
   field_name: string;
   field_type: 'text' | 'number' | 'date' | 'boolean' | 'select' | 'multi_select' | 'url' | 'email' | 'phone' | 'currency';
   field_label: string;
@@ -27,6 +27,7 @@ type CustomField = {
 };
 
 const ENTITY_TYPES = [
+  { value: 'opportunity', label: 'Opportunities' },
   { value: 'lead', label: 'Leads' },
   { value: 'case', label: 'Cases' },
   { value: 'vendor', label: 'Accounts' },
