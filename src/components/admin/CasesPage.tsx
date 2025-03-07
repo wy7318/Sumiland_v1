@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
-  Search, Filter, ChevronDown, ChevronUp, Edit, Trash2, 
-  Eye, AlertCircle, CheckCircle, Clock, Calendar, User as UserIcon,
-  RefreshCw, XCircle, CheckCircleIcon
+  Plus, Search, Filter, ChevronDown, ChevronUp, Edit, Trash2, 
+  Eye, AlertCircle, FileDown, LayoutGrid, LayoutList, User,
+  Mail, Building2
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { useAuth } from '../../contexts/AuthContext';
 import { cn } from '../../lib/utils';
+import { useAuth } from '../../contexts/AuthContext';
+import { KanbanBoard, KanbanCard } from './KanbanBoard';
 
 type Case = {
   id: string;
@@ -20,6 +21,7 @@ type Case = {
   owner_id: string | null;
   description: string;
   resume_url: string | null;
+  attachment_url: string | null;
   created_at: string;
   organization_id: string;
   contact: {
@@ -27,7 +29,11 @@ type Case = {
     last_name: string;
     email: string;
     phone: string | null;
+    company: string | null;
   };
+  owner: {
+    name: string;
+  } | null;
 };
 
 type PicklistValue = {
@@ -40,8 +46,63 @@ type PicklistValue = {
   text_color: string | null;
 };
 
+type ViewMode = 'list' | 'kanban';
+
+function CaseCard({ case_ }: { case_: Case }) {
+  return (
+    <KanbanCard id={case_.id}>
+      <div className="space-y-2">
+        <h4 className="font-medium">{case_.title}</h4>
+        
+        <div className="flex items-center text-sm text-gray-500">
+          <User className="w-4 h-4 mr-1" />
+          {case_.contact.first_name} {case_.contact.last_name}
+        </div>
+
+        <div className="flex items-center text-sm text-gray-500">
+          <Mail className="w-4 h-4 mr-1" />
+          {case_.contact.email}
+        </div>
+
+        {case_.contact.company && (
+          <div className="flex items-center text-sm text-gray-500">
+            <Building2 className="w-4 h-4 mr-1" />
+            {case_.contact.company}
+          </div>
+        )}
+
+        {case_.owner ? (
+          <div className="flex items-center text-sm text-gray-500">
+            <User className="w-4 h-4 mr-1" />
+            {case_.owner.name}
+          </div>
+        ) : (
+          <div className="text-sm text-gray-400">Unassigned</div>
+        )}
+
+        <div className="flex justify-end gap-2 mt-2">
+          <Link
+            to={`/admin/cases/${case_.id}`}
+            className="text-primary-600 hover:text-primary-900"
+            onClick={e => e.stopPropagation()}
+          >
+            <Eye className="w-4 h-4" />
+          </Link>
+          <Link
+            to={`/admin/cases/${case_.id}/edit`}
+            className="text-blue-600 hover:text-blue-900"
+            onClick={e => e.stopPropagation()}
+          >
+            <Edit className="w-4 h-4" />
+          </Link>
+        </div>
+      </div>
+    </KanbanCard>
+  );
+}
+
 export function CasesPage() {
-  const { user, organizations } = useAuth();
+  const { organizations } = useAuth();
   const [cases, setCases] = useState<Case[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -54,13 +115,12 @@ export function CasesPage() {
   const [staff, setStaff] = useState<any[]>([]);
   const [caseTypes, setCaseTypes] = useState<PicklistValue[]>([]);
   const [caseStatuses, setCaseStatuses] = useState<PicklistValue[]>([]);
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
 
   useEffect(() => {
-    if (organizations.length > 0) {
-      fetchCases();
-      fetchStaff();
-      fetchPicklists();
-    }
+    fetchPicklists();
+    fetchCases();
+    fetchStaff();
   }, [organizations]);
 
   const fetchPicklists = async () => {
@@ -71,8 +131,7 @@ export function CasesPage() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'case_type')
         .eq('is_active', true)
-        .order('display_order', { ascending: true })
-        .order('label', { ascending: true });
+        .order('display_order', { ascending: true });
 
       if (typeError) throw typeError;
       setCaseTypes(typeData || []);
@@ -83,8 +142,7 @@ export function CasesPage() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'case_status')
         .eq('is_active', true)
-        .order('display_order', { ascending: true })
-        .order('label', { ascending: true });
+        .order('display_order', { ascending: true });
 
       if (statusError) throw statusError;
       setCaseStatuses(statusData || []);
@@ -115,13 +173,23 @@ export function CasesPage() {
 
       if (customersError) throw customersError;
 
+      // Get owner details
+      const ownerIds = casesData?.map(c => c.owner_id).filter(Boolean) || [];
+      const { data: ownersData, error: ownersError } = await supabase
+        .from('profiles')
+        .select('id, name')
+        .in('id', ownerIds);
+
+      if (ownersError) throw ownersError;
+
       // Combine the data
-      const casesWithCustomers = casesData?.map(case_ => ({
+      const casesWithDetails = casesData?.map(case_ => ({
         ...case_,
-        contact: customersData?.find(c => c.customer_id === case_.contact_id)
+        contact: customersData?.find(c => c.customer_id === case_.contact_id),
+        owner: ownersData?.find(o => o.id === case_.owner_id)
       })) || [];
 
-      setCases(casesWithCustomers);
+      setCases(casesWithDetails);
     } catch (err) {
       console.error('Error fetching cases:', err);
       setError(err instanceof Error ? err.message : 'Failed to load cases');
@@ -132,7 +200,7 @@ export function CasesPage() {
 
   const fetchStaff = async () => {
     try {
-      if (!user) return;
+      if (!organizations.length) return;
 
       // Get all users from the same organizations
       const { data: orgUsers, error: orgUsersError } = await supabase
@@ -157,9 +225,6 @@ export function CasesPage() {
 
   const handleStatusChange = async (caseId: string, newStatus: string) => {
     try {
-      const caseToUpdate = cases.find(c => c.id === caseId);
-      if (!caseToUpdate) return;
-
       const { error } = await supabase
         .from('cases')
         .update({ 
@@ -232,7 +297,7 @@ export function CasesPage() {
     try {
       const { error } = await supabase
         .from('cases')
-        .update({ 
+        .update({
           owner_id: userId,
           status: caseStatuses.find(s => s.value === 'Assigned')?.value || 'Assigned',
           updated_at: new Date().toISOString()
@@ -298,7 +363,7 @@ export function CasesPage() {
     return status?.label || statusValue;
   };
 
-  if (loading) {
+  if (loading || !caseStatuses.length) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
@@ -310,6 +375,31 @@ export function CasesPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Case Management</h1>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => setViewMode(viewMode === 'list' ? 'kanban' : 'list')}
+            className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+          >
+            {viewMode === 'list' ? (
+              <>
+                <LayoutGrid className="w-4 h-4 mr-2" />
+                Kanban View
+              </>
+            ) : (
+              <>
+                <LayoutList className="w-4 h-4 mr-2" />
+                List View
+              </>
+            )}
+          </button>
+          <Link
+            to="/admin/cases/new"
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            New Case
+          </Link>
+        </div>
       </div>
 
       {error && (
@@ -361,7 +451,7 @@ export function CasesPage() {
               ))}
             </select>
 
-            {selectedCases.length > 0 && (
+            {selectedCases.length > 0 && viewMode === 'list' && (
               <div className="flex items-center gap-2">
                 <select
                   onChange={(e) => handleBulkAction(e.target.value)}
@@ -383,148 +473,157 @@ export function CasesPage() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  <input
-                    type="checkbox"
-                    checked={selectedCases.length === filteredCases.length}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedCases(filteredCases.map(c => c.id));
-                      } else {
-                        setSelectedCases([]);
-                      }
-                    }}
-                    className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                  />
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Title
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Client
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Type
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Assigned To
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Created
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {sortedCases.map((case_) => (
-                <tr key={case_.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
+        {viewMode === 'list' ? (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     <input
                       type="checkbox"
-                      checked={selectedCases.includes(case_.id)}
+                      checked={selectedCases.length === filteredCases.length}
                       onChange={(e) => {
                         if (e.target.checked) {
-                          setSelectedCases(prev => [...prev, case_.id]);
+                          setSelectedCases(filteredCases.map(c => c.id));
                         } else {
-                          setSelectedCases(prev => prev.filter(id => id !== case_.id));
+                          setSelectedCases([]);
                         }
                       }}
                       className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                     />
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="text-sm font-medium text-gray-900">
-                      {case_.title}
-                    </div>
-                    {case_.sub_type && (
-                      <div className="text-sm text-gray-500">
-                        {case_.sub_type}
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="text-sm font-medium text-gray-900">
-                      {case_.contact.first_name} {case_.contact.last_name}
-                    </div>
-                    <div className="text-sm text-gray-500">
-                      {case_.contact.email}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span 
-                      className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
-                      style={getTypeStyle(case_.type)}
-                    >
-                      {getTypeLabel(case_.type)}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <select
-                      value={case_.status}
-                      onChange={(e) => handleStatusChange(case_.id, e.target.value)}
-                      className="px-2 py-1 text-xs font-medium rounded-full"
-                      style={getStatusStyle(case_.status)}
-                    >
-                      {caseStatuses.map(status => (
-                        <option key={status.id} value={status.value}>
-                          {status.label}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <select
-                      value={case_.owner_id || ''}
-                      onChange={(e) => handleAssign(case_.id, e.target.value)}
-                      className="text-sm rounded-md border-gray-300 focus:border-primary-500 focus:ring-primary-500"
-                    >
-                      <option value="">Unassigned</option>
-                      {staff.map((member) => (
-                        <option key={member.id} value={member.id}>
-                          {member.name}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(case_.created_at).toLocaleDateString()}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex justify-end space-x-2">
-                      <Link
-                        to={`/admin/cases/${case_.id}`}
-                        className="text-primary-600 hover:text-primary-900"
-                      >
-                        <Eye className="w-5 h-5" />
-                      </Link>
-                      <Link
-                        to={`/admin/cases/${case_.id}/edit`}
-                        className="text-blue-600 hover:text-blue-900"
-                      >
-                        <Edit className="w-5 h-5" />
-                      </Link>
-                      <button
-                        onClick={() => handleDelete(case_.id)}
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
-                    </div>
-                  </td>
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Title
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Client
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Type
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Assigned To
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Created
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {sortedCases.map((case_) => (
+                  <tr key={case_.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <input
+                        type="checkbox"
+                        checked={selectedCases.includes(case_.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedCases(prev => [...prev, case_.id]);
+                          } else {
+                            setSelectedCases(prev => prev.filter(id => id !== case_.id));
+                          }
+                        }}
+                        className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                      />
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm font-medium text-gray-900">
+                        {case_.title}
+                      </div>
+                      {case_.sub_type && (
+                        <div className="text-sm text-gray-500">
+                          {case_.sub_type}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm font-medium text-gray-900">
+                        {case_.contact.first_name} {case_.contact.last_name}
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        {case_.contact.email}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span 
+                        className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
+                        style={getTypeStyle(case_.type)}
+                      >
+                        {getTypeLabel(case_.type)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <select
+                        value={case_.status}
+                        onChange={(e) => handleStatusChange(case_.id, e.target.value)}
+                        className="px-2 py-1 text-xs font-medium rounded-full"
+                        style={getStatusStyle(case_.status)}
+                      >
+                        {caseStatuses.map(status => (
+                          <option key={status.id} value={status.value}>
+                            {status.label}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <select
+                        value={case_.owner_id || ''}
+                        onChange={(e) => handleAssign(case_.id, e.target.value)}
+                        className="text-sm rounded-md border-gray-300 focus:border-primary-500 focus:ring-primary-500"
+                      >
+                        <option value="">Unassigned</option>
+                        {staff.map((member) => (
+                          <option key={member.id} value={member.id}>
+                            {member.name}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {new Date(case_.created_at).toLocaleDateString()}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <div className="flex justify-end space-x-2">
+                        <Link
+                          to={`/admin/cases/${case_.id}`}
+                          className="text-primary-600 hover:text-primary-900"
+                        >
+                          <Eye className="w-5 h-5" />
+                        </Link>
+                        <Link
+                          to={`/admin/cases/${case_.id}/edit`}
+                          className="text-blue-600 hover:text-blue-900"
+                        >
+                          <Edit className="w-5 h-5" />
+                        </Link>
+                        <button
+                          onClick={() => handleDelete(case_.id)}
+                          className="text-red-600 hover:text-red-900"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <KanbanBoard
+            items={sortedCases}
+            statuses={caseStatuses}
+            onStatusChange={handleStatusChange}
+            renderCard={(case_) => <CaseCard case_={case_} />}
+          />
+        )}
       </div>
     </div>
   );

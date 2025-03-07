@@ -15,6 +15,7 @@ type FormData = {
   title: string;
   description: string;
   resume: File | null;
+  attachment: File | null;
 };
 
 type PicklistValue = {
@@ -35,8 +36,25 @@ const INITIAL_FORM_DATA: FormData = {
   subType: '',
   title: '',
   description: '',
-  resume: null
+  resume: null,
+  attachment: null
 };
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const ALLOWED_FILE_TYPES = [
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/zip',
+  'application/x-zip-compressed'
+];
 
 export function ContactSection() {
   const [formData, setFormData] = useState<FormData>(INITIAL_FORM_DATA);
@@ -44,6 +62,7 @@ export function ContactSection() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const attachmentInputRef = useRef<HTMLInputElement>(null);
   const [caseTypes, setCaseTypes] = useState<PicklistValue[]>([]);
 
   useEffect(() => {
@@ -75,10 +94,27 @@ export function ContactSection() {
     }
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const validateFile = (file: File): string | null => {
+    if (file.size > MAX_FILE_SIZE) {
+      return 'File size must be less than 10MB';
+    }
+    if (!ALLOWED_FILE_TYPES.includes(file.type)) {
+      return 'Invalid file type. Please upload a PDF, Word, Excel, PowerPoint, Image, or ZIP file';
+    }
+    return null;
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, type: 'resume' | 'attachment') => {
     const file = e.target.files?.[0];
     if (file) {
-      setFormData(prev => ({ ...prev, resume: file }));
+      const error = validateFile(file);
+      if (error) {
+        setError(error);
+        e.target.value = '';
+        return;
+      }
+      setFormData(prev => ({ ...prev, [type]: file }));
+      setError(null);
     }
   };
 
@@ -135,9 +171,12 @@ export function ContactSection() {
         contactId = existingCustomers[0].customer_id;
       }
 
-      // Upload resume if exists
+      // Upload files if they exist
       let resumeUrl = null;
-      if (formData.resume && formData.type === 'Career') {
+      let attachmentUrl = null;
+
+      // Upload resume if exists
+      if (formData.resume) {
         const fileExt = formData.resume.name.split('.').pop();
         const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
         
@@ -154,6 +193,24 @@ export function ContactSection() {
         resumeUrl = publicUrl;
       }
 
+      // Upload attachment if exists
+      if (formData.attachment) {
+        const fileExt = formData.attachment.name.split('.').pop();
+        const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
+        
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('Sumiland Design')
+          .upload(`attachments/${fileName}`, formData.attachment);
+
+        if (uploadError) throw uploadError;
+        
+        const { data: { publicUrl } } = supabase.storage
+          .from('Sumiland Design')
+          .getPublicUrl(`attachments/${fileName}`);
+          
+        attachmentUrl = publicUrl;
+      }
+
       // Create case
       const { error: caseError } = await supabase
         .from('cases')
@@ -166,6 +223,7 @@ export function ContactSection() {
           organization_id: orgData.id,
           description: formData.description,
           resume_url: resumeUrl,
+          attachment_url: attachmentUrl,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }]);
@@ -176,6 +234,9 @@ export function ContactSection() {
       setFormData(INITIAL_FORM_DATA);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
+      }
+      if (attachmentInputRef.current) {
+        attachmentInputRef.current.value = '';
       }
     } catch (err) {
       console.error('Error submitting form:', err);
@@ -404,7 +465,7 @@ export function ContactSection() {
                         <input
                           type="file"
                           ref={fileInputRef}
-                          onChange={handleFileSelect}
+                          onChange={(e) => handleFileSelect(e, 'resume')}
                           accept=".pdf,.doc,.docx"
                           className="hidden"
                           required
@@ -464,23 +525,75 @@ export function ContactSection() {
                 )}
 
                 {formData.type && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      {formData.type === 'Career' ? 'Brief Introduction' : 'Description'} *
-                    </label>
-                    <textarea
-                      value={formData.description}
-                      onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                      rows={5}
-                      className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-                      placeholder={
-                        formData.type === 'Career'
-                          ? "Tell us about yourself and why you'd like to join our team"
-                          : "Please provide details about your request"
-                      }
-                      required
-                    />
-                  </div>
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        {formData.type === 'Career' ? 'Brief Introduction' : 'Description'} *
+                      </label>
+                      <textarea
+                        value={formData.description}
+                        onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                        rows={5}
+                        className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                        placeholder={
+                          formData.type === 'Career'
+                            ? "Tell us about yourself and why you'd like to join our team"
+                            : "Please provide details about your request"
+                        }
+                        required
+                      />
+                    </div>
+
+                    {/* Attachment field for all request types */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Attachment
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="file"
+                          ref={attachmentInputRef}
+                          onChange={(e) => handleFileSelect(e, 'attachment')}
+                          accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.xls,.xlsx,.ppt,.pptx,.zip"
+                          className="hidden"
+                        />
+                        <div 
+                          onClick={() => attachmentInputRef.current?.click()}
+                          className={cn(
+                            "w-full px-4 py-4 rounded-lg border-2 border-dashed cursor-pointer transition-colors",
+                            formData.attachment
+                              ? "border-primary-500 bg-primary-50"
+                              : "border-gray-300 hover:border-primary-500 hover:bg-gray-50"
+                          )}
+                        >
+                          {formData.attachment ? (
+                            <div className="flex items-center justify-between">
+                              <span className="text-primary-600">{formData.attachment.name}</span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setFormData(prev => ({ ...prev, attachment: null }));
+                                  if (attachmentInputRef.current) {
+                                    attachmentInputRef.current.value = '';
+                                  }
+                                }}
+                                className="p-1 hover:bg-white rounded-full"
+                              >
+                                <X className="w-5 h-5 text-primary-500" />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center">
+                              <Upload className="w-8 h-8 text-gray-400 mb-2" />
+                              <span className="text-gray-500">Click to upload attachment (PDF, Word, Excel, PowerPoint, Images, ZIP)</span>
+                              <span className="text-sm text-gray-400 mt-1">Max file size: 10MB</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </>
                 )}
               </div>
             </div>

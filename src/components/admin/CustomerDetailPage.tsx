@@ -5,7 +5,7 @@ import {
   ArrowLeft, Building2, Mail, Phone, Calendar,
   Edit, AlertCircle, Send, Reply, X, User,
   Globe, CheckCircle, ChevronDown, ChevronUp,
-  FileText, ShoppingBag, UserCheck, MessageSquare
+  FileText, ShoppingBag, UserCheck, MessageSquare, Target
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { cn, formatCurrency } from '../../lib/utils';
@@ -437,7 +437,7 @@ export function CustomerDetailPage() {
     { id: 'quotes', label: 'Quotes', icon: FileText, count: relatedQuotes.length },
     { id: 'orders', label: 'Orders', icon: ShoppingBag, count: relatedOrders.length },
     { id: 'cases', label: 'Cases', icon: MessageSquare, count: relatedCases.length },
-    { id: 'opportunities', label: 'Opportunities', icon: MessageSquare, count: relatedOpportunities.length }
+    { id: 'opportunities', label: 'Opportunities', icon: Target, count: relatedOpportunities.length }
   ];
 
   if (loading) {
