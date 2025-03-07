@@ -21,6 +21,7 @@ type Case = {
   owner_id: string | null;
   description: string;
   resume_url: string | null;
+  attachment_url: string | null; // Added attachment_url
   created_at: string;
   organization_id: string;
   contact: {
@@ -533,21 +534,39 @@ export function CaseDetailPage() {
                   <div className="text-sm font-medium text-gray-500 mb-1">Description</div>
                   <p className="text-gray-700 whitespace-pre-wrap">{caseData.description}</p>
                 </div>
-                {caseData.resume_url && (
-                  <div>
-                    <div className="text-sm font-medium text-gray-500 mb-1">Resume</div>
-                    <a
-                      href={caseData.resume_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
-                    >
-                      <FileText className="w-4 h-4 mr-2" />
-                      View Resume
-                      <Download className="w-4 h-4 ml-2" />
-                    </a>
-                  </div>
-                )}
+                {/* Files Section */}
+                <div className="flex flex-wrap gap-4">
+                  {caseData.resume_url && (
+                    <div>
+                      <div className="text-sm font-medium text-gray-500 mb-1">Resume</div>
+                      <a
+                        href={caseData.resume_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                      >
+                        <FileText className="w-4 h-4 mr-2" />
+                        View Resume
+                        <Download className="w-4 h-4 ml-2" />
+                      </a>
+                    </div>
+                  )}
+                  {caseData.attachment_url && (
+                    <div>
+                      <div className="text-sm font-medium text-gray-500 mb-1">Attachment</div>
+                      <a
+                        href={caseData.attachment_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                      >
+                        <FileText className="w-4 h-4 mr-2" />
+                        View Attachment
+                        <Download className="w-4 h-4 ml-2" />
+                      </a>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 

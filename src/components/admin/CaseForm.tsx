@@ -204,6 +204,8 @@ export function CaseForm() {
         updated_by: userData.user.id
       };
 
+      let caseId: string;
+
       if (id) {
         // Update existing case
         const { error: updateError } = await supabase
@@ -212,6 +214,7 @@ export function CaseForm() {
           .eq('id', id);
 
         if (updateError) throw updateError;
+        caseId = id;
       } else {
         // Create new case
         const { data: newCase, error: insertError } = await supabase
@@ -225,21 +228,17 @@ export function CaseForm() {
           .single();
 
         if (insertError) throw insertError;
-
-        // Set the new case ID for custom fields
-        if (newCase) {
-          id = newCase.id;
-        }
+        caseId = newCase.id;
       }
 
       // Save custom field values
-      if (userData.user) {
+      if (caseId && userData.user) {
         for (const [fieldId, value] of Object.entries(customFields)) {
           const { error: valueError } = await supabase
             .from('custom_field_values')
             .upsert({
               organization_id: orgData.organization_id,
-              entity_id: id,
+              entity_id: caseId,
               field_id: fieldId,
               value,
               created_by: userData.user.id,
