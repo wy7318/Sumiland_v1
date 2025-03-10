@@ -21,16 +21,20 @@ type Props<T extends BaseItem> = {
 };
 
 export function KanbanColumn<T extends BaseItem>({ status, items, renderCard }: Props<T>) {
-  const { setNodeRef } = useDroppable({
+  const { setNodeRef, isOver } = useDroppable({
     id: status.value,
   });
 
   return (
     <div
       ref={setNodeRef}
-      className="bg-gray-50 rounded-lg p-4"
-      style={{ minHeight: '24rem' }}
+      className="bg-gray-50 rounded-lg p-4 flex flex-col h-[calc(100vh-16rem)] min-w-[300px] relative"
+      style={{
+        background: isOver ? '#F3F4F6' : undefined,
+        transition: 'background-color 0.2s ease'
+      }}
     >
+      {/* Header */}
       <div 
         className="flex items-center justify-between mb-4 pb-2 border-b"
         style={{ borderColor: status.color || '#E5E7EB' }}
@@ -46,18 +50,30 @@ export function KanbanColumn<T extends BaseItem>({ status, items, renderCard }: 
         </span>
       </div>
 
-      <SortableContext 
-        items={items.map(item => item.id)}
-        strategy={verticalListSortingStrategy}
-      >
-        <div className="space-y-4">
-          {items.map((item) => (
-            <div key={item.id}>
-              {renderCard(item)}
-            </div>
-          ))}
-        </div>
-      </SortableContext>
+      {/* Scrollable Content Area */}
+      <div className="flex-1 overflow-y-auto">
+        <SortableContext 
+          items={items.map(item => item.id)}
+          strategy={verticalListSortingStrategy}
+        >
+          <div className="space-y-4 min-h-full">
+            {items.map((item) => (
+              <div key={`${status.value}-${item.id}`} className="relative">
+                {renderCard(item)}
+              </div>
+            ))}
+          </div>
+        </SortableContext>
+      </div>
+
+      {/* Droppable Overlay - Covers entire column */}
+      <div 
+        className="absolute inset-0 rounded-lg pointer-events-none"
+        style={{
+          backgroundColor: isOver ? 'rgba(99, 102, 241, 0.1)' : undefined,
+          transition: 'background-color 0.2s ease'
+        }}
+      />
     </div>
   );
 }

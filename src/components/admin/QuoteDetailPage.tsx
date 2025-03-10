@@ -10,6 +10,7 @@ import { supabase } from '../../lib/supabase';
 import { cn, formatCurrency } from '../../lib/utils';
 import { AccountDetailsModal } from './AccountDetailsModal';
 import { CustomFieldsSection } from './CustomFieldsSection';
+import { useAuth } from '../../contexts/AuthContext';
 
 type Quote = {
   quote_id: string;
@@ -57,6 +58,7 @@ type PicklistValue = {
 export function QuoteDetailPage() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const { organizations, user } = useAuth();
   const [quote, setQuote] = useState<Quote | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -79,6 +81,7 @@ export function QuoteDetailPage() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'quote_status')
         .eq('is_active', true)
+        .eq('organization_id', organizations.map(org => org.id))
         .order('display_order', { ascending: true });
 
       if (statusError) throw statusError;

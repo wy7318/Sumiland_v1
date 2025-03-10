@@ -67,6 +67,7 @@ export function ProductsPage() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'product_status')
         .eq('is_active', true)
+        .eq('organization_id', organizations.map(org => org.id))
         .order('display_order', { ascending: true });
 
       if (statusError) throw statusError;
@@ -78,6 +79,7 @@ export function ProductsPage() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'product_stock_unit')
         .eq('is_active', true)
+        .eq('organization_id', organizations.map(org => org.id))
         .order('display_order', { ascending: true });
 
       if (unitError) throw unitError;
@@ -89,6 +91,7 @@ export function ProductsPage() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'product_category')
         .eq('is_active', true)
+        .eq('organization_id', organizations.map(org => org.id))
         .order('display_order', { ascending: true });
 
       if (categoryError) throw categoryError;

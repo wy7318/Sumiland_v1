@@ -78,6 +78,7 @@ export function VendorsPage() {
                 .select('id, value, label, is_default, is_active, color, text_color')
                 .eq('type', 'account_type')
                 .eq('is_active', true)
+                .eq('organization_id', organizations.map(org => org.id))
                 .order('display_order', { ascending: true });
 
             if (typeError) throw typeError;
@@ -89,6 +90,7 @@ export function VendorsPage() {
                 .select('id, value, label, is_default, is_active, color, text_color')
                 .eq('type', 'account_status')
                 .eq('is_active', true)
+                .eq('organization_id', organizations.map(org => org.id))
                 .order('display_order', { ascending: true });
 
             if (statusError) throw statusError;

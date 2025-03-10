@@ -36,11 +36,10 @@ export function LeadKanbanColumn({ status, leads }: Props) {
   return (
     <div
       ref={setNodeRef}
-      className="bg-gray-50 rounded-lg p-4"
-      style={{ minHeight: '24rem' }}
+      className="bg-gray-50 rounded-lg p-4 flex flex-col h-[calc(100vh-16rem)]"
     >
       <div 
-        className="flex items-center justify-between mb-4 pb-2 border-b"
+        className="flex items-center justify-between mb-4 pb-2 border-b flex-shrink-0"
         style={{ borderColor: status.color || '#E5E7EB' }}
       >
         <h3 
@@ -58,7 +57,7 @@ export function LeadKanbanColumn({ status, leads }: Props) {
         items={leads.map(l => l.id)}
         strategy={verticalListSortingStrategy}
       >
-        <div className="space-y-4">
+        <div className="space-y-4 overflow-y-auto flex-1 pr-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
           {leads.map(lead => (
             <LeadKanbanCard
               key={lead.id}
