@@ -79,6 +79,7 @@ export function ProductForm() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'product_stock_unit')
         .eq('is_active', true)
+        .eq('organization_id', organizations.map(org => org.id))
         .order('display_order', { ascending: true });
 
       if (stockUnitError) throw stockUnitError;
@@ -98,6 +99,7 @@ export function ProductForm() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'product_weight_unit')
         .eq('is_active', true)
+        .eq('organization_id', organizations.map(org => org.id))
         .order('display_order', { ascending: true });
 
       if (weightUnitError) throw weightUnitError;
@@ -115,6 +117,7 @@ export function ProductForm() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'product_category')
         .eq('is_active', true)
+        .eq('organization_id', organizations.map(org => org.id))
         .order('display_order', { ascending: true });
   
       if (error) throw error;

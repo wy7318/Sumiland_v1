@@ -8,6 +8,7 @@ import {
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { cn, formatCurrency } from '../../lib/utils';
+import { useAuth } from '../../contexts/AuthContext';
 
 type PicklistValue = {
   id: string;
@@ -55,6 +56,7 @@ type Order = {
 export function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const { organizations, user } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -76,6 +78,7 @@ export function OrdersPage() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'order_status')
         .eq('is_active', true)
+        .eq('organization_id', organizations.map(org => org.id))
         .order('display_order', { ascending: true });
 
       if (statusError) throw statusError;

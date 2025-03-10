@@ -10,6 +10,7 @@ import { supabase } from '../../lib/supabase';
 import { cn, formatCurrency } from '../../lib/utils';
 import { CustomFieldsSection } from './CustomFieldsSection';
 import { AccountDetailsModal } from './AccountDetailsModal';
+import { useAuth } from '../../contexts/AuthContext';
 
 type Opportunity = {
   id: string;
@@ -87,6 +88,7 @@ export function OpportunityDetailPage() {
   const { id } = useParams();
   const [opportunity, setOpportunity] = useState<Opportunity | null>(null);
   const [loading, setLoading] = useState(true);
+  const { organizations, user } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [feeds, setFeeds] = useState<Feed[]>([]);
   const [newComment, setNewComment] = useState('');
@@ -118,6 +120,7 @@ export function OpportunityDetailPage() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'opportunity_stage')
         .eq('is_active', true)
+        .eq('organization_id', organizations.map(org => org.id))
         .order('display_order', { ascending: true });
 
       if (stageError) throw stageError;
@@ -129,6 +132,7 @@ export function OpportunityDetailPage() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'opportunity_type')
         .eq('is_active', true)
+        .eq('organization_id', organizations.map(org => org.id))
         .order('display_order', { ascending: true });
 
       if (typeError) throw typeError;
@@ -140,6 +144,7 @@ export function OpportunityDetailPage() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'opportunity_product_status')
         .eq('is_active', true)
+        .eq('organization_id', organizations.map(org => org.id))
         .order('display_order', { ascending: true });
 
       if (statusError) throw statusError;

@@ -81,6 +81,7 @@ export function LeadForm() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'lead_status')
         .eq('is_active', true)
+        .eq('organization_id', organizations.map(org => org.id))
         .order('display_order', { ascending: true });
 
       if (statusError) throw statusError;
@@ -100,6 +101,7 @@ export function LeadForm() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'lead_source')
         .eq('is_active', true)
+        .eq('organization_id', organizations.map(org => org.id))
         .order('display_order', { ascending: true });
 
       if (sourceError) throw sourceError;

@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Plus, Search, Filter, ChevronDown, ChevronUp, Edit, 
-  Trash2, AlertCircle, Save, X, Check, List, Palette 
+  Plus, Search, Filter, ChevronDown, ChevronUp, Edit, Trash2, 
+  Settings, AlertCircle, Save, X, Check, List, Palette 
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { cn } from '../../lib/utils';
+import { useAuth } from '../../contexts/AuthContext';
 
 type PicklistValue = {
   id: string;
@@ -13,8 +14,8 @@ type PicklistValue = {
   label: string;
   is_default: boolean;
   is_active: boolean;
-  color?: string;
-  text_color?: string;
+  color: string | null;
+  text_color: string | null;
 };
 
 // Define available tables and their picklist fields
@@ -108,6 +109,7 @@ const PICKLIST_TYPE_MAPPING = {
 } as const;
 
 export function PicklistManagementPage() {
+  const { organizations, user } = useAuth();
   const [values, setValues] = useState<PicklistValue[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -127,26 +129,11 @@ export function PicklistManagementPage() {
     text_color: ''
   });
 
-  // Function to generate value from label
-  const generateValue = (label: string): string => {
-    return label
-      .toLowerCase() // Convert to lowercase
-      .trim() // Remove leading/trailing spaces
-      .replace(/[^a-z0-9\s-]/g, '') // Remove special characters except spaces and hyphens
-      .replace(/\s+/g, '_') // Replace spaces with underscores
-      .replace(/-+/g, '_') // Replace multiple hyphens with single underscore
-      .replace(/^_+|_+$/g, ''); // Remove leading/trailing underscores
-  };
-
-  // Get the picklist type based on current selections
-  const getPicklistType = () => {
-    const key = `${selectedTable}.${selectedField}` as keyof typeof PICKLIST_TYPE_MAPPING;
-    return PICKLIST_TYPE_MAPPING[key];
-  };
-
   useEffect(() => {
-    fetchPicklistValues();
-  }, [selectedTable, selectedField]);
+    if (organizations.length > 0) {
+      fetchPicklistValues();
+    }
+  }, [selectedTable, selectedField, organizations]);
 
   const fetchPicklistValues = async () => {
     try {
@@ -157,6 +144,7 @@ export function PicklistManagementPage() {
         .from('picklist_values')
         .select('*')
         .eq('type', picklistType)
+        .in('organization_id', organizations.map(org => org.id))
         .order('display_order', { ascending: true })
         .order('label', { ascending: true });
 
@@ -170,9 +158,29 @@ export function PicklistManagementPage() {
     }
   };
 
+  // Get the picklist type based on current selections
+  const getPicklistType = () => {
+    const key = `${selectedTable}.${selectedField}` as keyof typeof PICKLIST_TYPE_MAPPING;
+    return PICKLIST_TYPE_MAPPING[key];
+  };
+
+  // Function to generate value from label
+  const generateValue = (label: string): string => {
+    return label
+      .toLowerCase() // Convert to lowercase
+      .trim() // Remove leading/trailing spaces
+      .replace(/[^a-z0-9\s-]/g, '') // Remove special characters except spaces and hyphens
+      .replace(/\s+/g, '_') // Replace spaces with underscores
+      .replace(/-+/g, '_') // Replace multiple hyphens with single underscore
+      .replace(/^_+|_+$/g, ''); // Remove leading/trailing underscores
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
+    if (!formData.value.trim() || !formData.label.trim()) {
+      setError('Label and value are required');
+      return;
+    }
 
     try {
       const { data: userData } = await supabase.auth.getUser();
@@ -208,7 +216,9 @@ export function PicklistManagementPage() {
             type: picklistType,
             organization_id: orgData.organization_id,
             created_by: userData.user.id,
-            updated_by: userData.user.id
+            updated_by: userData.user.id,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
           }]);
 
         if (insertError) throw insertError;
@@ -679,4 +689,3 @@ export function PicklistManagementPage() {
     </div>
   );
 }
-

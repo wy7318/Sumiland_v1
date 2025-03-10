@@ -222,6 +222,7 @@ export function OpportunityForm() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'opportunity_stage')
         .eq('is_active', true)
+        .eq('organization_id', organizations.map(org => org.id))
         .order('display_order', { ascending: true });
 
       if (stageError) throw stageError;
@@ -241,6 +242,7 @@ export function OpportunityForm() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'opportunity_type')
         .eq('is_active', true)
+        .eq('organization_id', organizations.map(org => org.id))
         .order('display_order', { ascending: true });
 
       if (typeError) throw typeError;
@@ -252,6 +254,7 @@ export function OpportunityForm() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'opportunity_status')
         .eq('is_active', true)
+        .eq('organization_id', organizations.map(org => org.id))
         .order('display_order', { ascending: true });
 
       if (statusError) throw statusError;
@@ -271,6 +274,7 @@ export function OpportunityForm() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'opportunity_product_status')
         .eq('is_active', true)
+        .eq('organization_id', organizations.map(org => org.id))
         .order('display_order', { ascending: true });
 
       if (productStatusError) throw productStatusError;
@@ -282,6 +286,7 @@ export function OpportunityForm() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'lead_source')
         .eq('is_active', true)
+        .eq('organization_id', organizations.map(org => org.id))
         .order('display_order', { ascending: true });
 
       if (sourceError) throw sourceError;

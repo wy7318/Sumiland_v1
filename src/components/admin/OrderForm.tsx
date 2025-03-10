@@ -48,7 +48,7 @@ type PicklistValue = {
 export function OrderForm() {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { user } = useAuth();
+  const { organizations, user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [order, setOrder] = useState<Order | null>(null);
@@ -80,6 +80,7 @@ export function OrderForm() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'order_status')
         .eq('is_active', true)
+        .eq('organization_id', organizations.map(org => org.id))
         .order('display_order', { ascending: true });
 
       if (statusError) throw statusError;

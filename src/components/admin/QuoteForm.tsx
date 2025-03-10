@@ -211,6 +211,7 @@ export function QuoteForm() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'quote_status')
         .eq('is_active', true)
+        .eq('organization_id', organizations.map(org => org.id))
         .order('display_order', { ascending: true });
 
       if (statusError) throw statusError;

@@ -72,6 +72,7 @@ export function CaseForm() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'case_type')
         .eq('is_active', true)
+        .eq('organization_id', organizations.map(org => org.id))
         .order('display_order', { ascending: true })
         .order('label', { ascending: true });
 
@@ -92,6 +93,7 @@ export function CaseForm() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'case_status')
         .eq('is_active', true)
+        .eq('organization_id', organizations.map(org => org.id))
         .order('display_order', { ascending: true })
         .order('label', { ascending: true });
 

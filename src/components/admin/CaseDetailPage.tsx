@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { cn } from '../../lib/utils';
+import { useAuth } from '../../contexts/AuthContext';
 import { CustomFieldsSection } from './CustomFieldsSection';
 import { UserSearch } from './UserSearch';
 
@@ -67,6 +68,7 @@ export function CaseDetailPage() {
   const navigate = useNavigate();
   const { id } = useParams();
   const [caseData, setCaseData] = useState<Case | null>(null);
+  const { organizations, user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [feeds, setFeeds] = useState<Feed[]>([]);
@@ -97,6 +99,7 @@ export function CaseDetailPage() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'case_type')
         .eq('is_active', true)
+        .eq('organization_id', organizations.map(org => org.id))
         .order('display_order', { ascending: true });
 
       if (typeError) throw typeError;
@@ -108,6 +111,7 @@ export function CaseDetailPage() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'case_status')
         .eq('is_active', true)
+        .eq('organization_id', organizations.map(org => org.id))
         .order('display_order', { ascending: true });
 
       if (statusError) throw statusError;
