@@ -7,6 +7,7 @@ import { ImageUpload } from './ImageUpload';
 import { useAuth } from '../../contexts/AuthContext';
 import { CustomFieldsForm } from './CustomFieldsForm';
 import { cn } from '../../lib/utils';
+import { useOrganization } from '../../contexts/OrganizationContext';
 
 type PicklistValue = {
   id: string;
@@ -43,6 +44,7 @@ type ProductFormData = {
 export function ProductForm() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const { selectedOrganization } = useOrganization();
   const { organizations, user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -69,7 +71,7 @@ export function ProductForm() {
     if (id) {
       fetchProduct();
     }
-  }, [id, organizations]);
+  }, [id, selectedOrganization]);
 
   const fetchPicklists = async () => {
     try {
@@ -79,7 +81,7 @@ export function ProductForm() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'product_stock_unit')
         .eq('is_active', true)
-        .eq('organization_id', organizations.map(org => org.id))
+        .eq('organization_id', selectedOrganization?.id)
         .order('display_order', { ascending: true });
 
       if (stockUnitError) throw stockUnitError;
@@ -99,7 +101,7 @@ export function ProductForm() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'product_weight_unit')
         .eq('is_active', true)
-        .eq('organization_id', organizations.map(org => org.id))
+        .eq('organization_id', selectedOrganization?.id)
         .order('display_order', { ascending: true });
 
       if (weightUnitError) throw weightUnitError;
@@ -117,7 +119,7 @@ export function ProductForm() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'product_category')
         .eq('is_active', true)
-        .eq('organization_id', organizations.map(org => org.id))
+        .eq('organization_id', selectedOrganization?.id)
         .order('display_order', { ascending: true });
   
       if (error) throw error;
@@ -133,7 +135,7 @@ export function ProductForm() {
         .from('products')
         .select('*')
         .eq('id', id)
-        .in('organization_id', organizations.map(org => org.id))
+        .eq('organization_id', selectedOrganization?.id)
         .single();
 
       if (error) throw error;
@@ -177,7 +179,7 @@ export function ProductForm() {
             updated_at: new Date().toISOString()
           })
           .eq('id', id)
-          .eq('organization_id', organizations[0].id);
+          .eq('organization_id', selectedOrganization?.id);
 
         if (updateError) throw updateError;
       } else {
@@ -186,7 +188,7 @@ export function ProductForm() {
           .from('products')
           .insert([{
             ...productData,
-            organization_id: organizations[0].id,
+            organization_id: selectedOrganization?.id,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           }])
@@ -203,7 +205,7 @@ export function ProductForm() {
           const { error: valueError } = await supabase
             .from('custom_field_values')
             .upsert({
-              organization_id: organizations[0].id,
+              organization_id: selectedOrganization?.id,
               entity_id: productId,
               field_id: fieldId,
               value,
@@ -470,7 +472,7 @@ export function ProductForm() {
         <CustomFieldsForm
           entityType="product"
           entityId={id}
-          organizationId={organizations[0]?.id}
+          organizationId={selectedOrganization?.id}
           onChange={(customFieldValues) => {
             setFormData(prev => ({
               ...prev,

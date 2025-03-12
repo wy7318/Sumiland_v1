@@ -3,6 +3,8 @@ import { motion } from 'framer-motion';
 import { AlertCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { cn } from '../../lib/utils';
+import { useOrganization } from '../../contexts/OrganizationContext';
+
 
 type CustomField = {
   id: string;
@@ -37,6 +39,7 @@ export function CustomFieldsForm({
   const [values, setValues] = useState<Record<string, any>>(initialValues);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+  const { selectedOrganization } = useOrganization();
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {

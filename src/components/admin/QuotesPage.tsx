@@ -11,6 +11,7 @@ import { generateQuotePDF } from '../../lib/pdf';
 import { cn, formatCurrency } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
 import { KanbanBoard, KanbanCard } from './KanbanBoard';
+import { useOrganization } from '../../contexts/OrganizationContext';
 
 type Quote = {
   quote_id: string;
@@ -108,6 +109,7 @@ function QuoteCard({ quote }: { quote: KanbanQuote }) {
 export function QuotesPage() {
   const navigate = useNavigate();
   const { organizations } = useAuth();
+  const { selectedOrganization } = useOrganization();
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -130,7 +132,7 @@ export function QuotesPage() {
   useEffect(() => {
     fetchPicklists();
     fetchQuotes();
-  }, [organizations]);
+  }, [selectedOrganization]);
 
   const fetchPicklists = async () => {
     try {
@@ -139,7 +141,7 @@ export function QuotesPage() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'quote_status')
         .eq('is_active', true)
-        .eq('organization_id', organizations.map(org => org.id))
+        .eq('organization_id', selectedOrganization?.id)
         .order('display_order', { ascending: true });
 
       if (statusError) throw statusError;
@@ -162,7 +164,7 @@ export function QuotesPage() {
           vendor:vendors(*),
           items:quote_dtl(*)
         `)
-        .in('organization_id', organizations.map(org => org.id))
+        .eq('organization_id', selectedOrganization?.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;

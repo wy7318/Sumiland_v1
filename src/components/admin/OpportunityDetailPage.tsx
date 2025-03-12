@@ -11,6 +11,8 @@ import { cn, formatCurrency } from '../../lib/utils';
 import { CustomFieldsSection } from './CustomFieldsSection';
 import { AccountDetailsModal } from './AccountDetailsModal';
 import { useAuth } from '../../contexts/AuthContext';
+import { useOrganization } from '../../contexts/OrganizationContext';
+
 
 type Opportunity = {
   id: string;
@@ -89,6 +91,7 @@ export function OpportunityDetailPage() {
   const [opportunity, setOpportunity] = useState<Opportunity | null>(null);
   const [loading, setLoading] = useState(true);
   const { organizations, user } = useAuth();
+  const { selectedOrganization } = useOrganization();
   const [error, setError] = useState<string | null>(null);
   const [feeds, setFeeds] = useState<Feed[]>([]);
   const [newComment, setNewComment] = useState('');
@@ -120,7 +123,7 @@ export function OpportunityDetailPage() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'opportunity_stage')
         .eq('is_active', true)
-        .eq('organization_id', organizations.map(org => org.id))
+        .eq('organization_id', selectedOrganization?.id)
         .order('display_order', { ascending: true });
 
       if (stageError) throw stageError;
@@ -132,7 +135,7 @@ export function OpportunityDetailPage() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'opportunity_type')
         .eq('is_active', true)
-        .eq('organization_id', organizations.map(org => org.id))
+        .eq('organization_id', selectedOrganization?.id)
         .order('display_order', { ascending: true });
 
       if (typeError) throw typeError;
@@ -144,7 +147,7 @@ export function OpportunityDetailPage() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'opportunity_product_status')
         .eq('is_active', true)
-        .eq('organization_id', organizations.map(org => org.id))
+        .eq('organization_id', selectedOrganization?.id)
         .order('display_order', { ascending: true });
 
       if (statusError) throw statusError;
@@ -211,7 +214,7 @@ export function OpportunityDetailPage() {
         .eq('reference_id', id)
         .eq('parent_type', 'Opportunity')
         .eq('status', 'Active')
-        .eq('organization_id', opportunity.organization_id)
+        .eq('organization_id', selectedOrganization?.id)
         .order('created_at', { ascending: true });
 
       if (error) throw error;
@@ -274,7 +277,7 @@ export function OpportunityDetailPage() {
           parent_id: replyTo?.id || null,
           parent_type: 'Opportunity',
           reference_id: id,
-          organization_id: opportunity.organization_id,
+          organization_id: selectedOrganization?.id,
           created_by: userData.user.id,
           created_at: new Date().toISOString(),
           status: 'Active'
@@ -305,7 +308,7 @@ export function OpportunityDetailPage() {
         })
         .eq('id', feedId)
         .eq('created_by', userData.user.id)
-        .eq('organization_id', opportunity.organization_id);
+        .eq('organization_id', selectedOrganization?.id);
 
       if (error) throw error;
       setEditingFeed(null);
@@ -634,7 +637,7 @@ export function OpportunityDetailPage() {
               <CustomFieldsSection
                 entityType="opportunity"
                 entityId={id}
-                organizationId={opportunity.organization_id}
+                organizationId={selectedOrganization?.id}
                 className="bg-gray-50 rounded-lg p-4"
               />
             </div>

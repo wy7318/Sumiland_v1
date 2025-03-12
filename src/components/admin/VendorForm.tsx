@@ -6,6 +6,8 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { cn } from '../../lib/utils';
 import { CustomFieldsForm } from './CustomFieldsForm';
+import { useOrganization } from '../../contexts/OrganizationContext';
+
 
 type Customer = {
   customer_id: string;
@@ -72,6 +74,7 @@ const initialFormData: FormData = {
 export function VendorForm() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const { selectedOrganization } = useOrganization();
   const { organizations, user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -93,7 +96,7 @@ export function VendorForm() {
     } else if (organizations.length > 0) {
       setFormData(prev => ({
         ...prev,
-        organization_id: organizations[0].id
+        organization_id: selectedOrganization?.id
       }));
     }
 
@@ -106,7 +109,7 @@ export function VendorForm() {
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [id, organizations]);
+  }, [id, selectedOrganization]);
 
   useEffect(() => {
     if (customerSearch) {
@@ -131,7 +134,7 @@ export function VendorForm() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'account_type')
         .eq('is_active', true)
-        .eq('organization_id', organizations.map(org => org.id))
+        .eq('organization_id', selectedOrganization?.id)
         .order('display_order', { ascending: true })
         .order('label', { ascending: true });
 
@@ -152,7 +155,7 @@ export function VendorForm() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'account_status')
         .eq('is_active', true)
-        .eq('organization_id', organizations.map(org => org.id))
+        .eq('organization_id', selectedOrganization?.id)
         .order('display_order', { ascending: true })
         .order('label', { ascending: true });
 
@@ -187,7 +190,7 @@ export function VendorForm() {
           )
         `)
         .eq('id', id)
-        .in('organization_id', organizations.map(org => org.id))
+        .eq('organization_id', selectedOrganization?.id)
         .single();
 
       if (error) throw error;
@@ -228,7 +231,7 @@ export function VendorForm() {
       const { data, error } = await supabase
         .from('customers')
         .select('*')
-        .in('organization_id', organizations.map(org => org.id))
+        .eq('organization_id', selectedOrganization?.id)
         .order('first_name');
 
       if (error) throw error;
@@ -747,7 +750,7 @@ export function VendorForm() {
         <CustomFieldsForm
           entityType="vendor"
           entityId={id}
-          organizationId={formData.organization_id}
+          organizationId={selectedOrganization?.id}
           onChange={(customFieldValues) => {
             setFormData(prev => ({
               ...prev,
