@@ -8,6 +8,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { cn } from '../../lib/utils';
+import { useOrganization } from '../../contexts/OrganizationContext';
 
 type Customer = {
   customer_id: string;
@@ -34,6 +35,7 @@ type Customer = {
 
 export function CustomersPage() {
   const { organizations } = useAuth();
+  const { selectedOrganization } = useOrganization();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -44,7 +46,7 @@ export function CustomersPage() {
 
   useEffect(() => {
     fetchCustomers();
-  }, [organizations]);
+  }, [selectedOrganization]);
 
   const fetchCustomers = async () => {
     try {
@@ -58,7 +60,7 @@ export function CustomersPage() {
             type
           )
         `)
-        .in('organization_id', organizations.map(org => org.id))
+        .eq('organization_id', selectedOrganization?.id)
         .order('created_at', { ascending: false });
   
       if (error) throw error;

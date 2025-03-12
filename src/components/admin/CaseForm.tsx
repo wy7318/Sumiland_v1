@@ -6,6 +6,8 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { CustomFieldsForm } from './CustomFieldsForm';
 import { UserSearch } from './UserSearch';
+import { useOrganization } from '../../contexts/OrganizationContext';
+
 
 type PicklistValue = {
   id: string;
@@ -47,6 +49,7 @@ const initialFormData: FormData = {
 export function CaseForm() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const { selectedOrganization } = useOrganization();
   const { organizations, user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -72,7 +75,7 @@ export function CaseForm() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'case_type')
         .eq('is_active', true)
-        .eq('organization_id', organizations.map(org => org.id))
+        .eq('organization_id', selectedOrganization?.id)
         .order('display_order', { ascending: true })
         .order('label', { ascending: true });
 
@@ -93,7 +96,7 @@ export function CaseForm() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'case_status')
         .eq('is_active', true)
-        .eq('organization_id', organizations.map(org => org.id))
+        .eq('organization_id', selectedOrganization?.id)
         .order('display_order', { ascending: true })
         .order('label', { ascending: true });
 
@@ -119,7 +122,7 @@ export function CaseForm() {
       const { data: orgUsers, error: orgUsersError } = await supabase
         .from('user_organizations')
         .select('user_id')
-        .in('organization_id', organizations.map(org => org.id));
+        .eq('organization_id', selectedOrganization?.id);
 
       if (orgUsersError) throw orgUsersError;
 
@@ -194,6 +197,7 @@ export function CaseForm() {
         .from('user_organizations')
         .select('organization_id')
         .eq('user_id', userData.user.id)
+        .eq('organization_id', selectedOrganization?.id)
         .single();
 
       if (!orgData?.organization_id) throw new Error('No organization found');
@@ -388,7 +392,7 @@ export function CaseForm() {
               Assigned To
             </label>
             <UserSearch
-              organizationId={formData.organization_id}
+              organizationId={selectedOrganization?.id}
               selectedUserId={formData.owner_id}
               onSelect={(userId) => setFormData(prev => ({ ...prev, owner_id: userId }))}
             />
@@ -412,7 +416,7 @@ export function CaseForm() {
         <CustomFieldsForm
           entityType="case"
           entityId={id}
-          organizationId={organizations[0]?.id}
+          organizationId={selectedOrganization?.id}
           onChange={(customFieldValues) => setCustomFields(customFieldValues)}
           className="border-t border-gray-200 pt-6"
         />

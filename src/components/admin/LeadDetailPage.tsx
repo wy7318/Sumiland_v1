@@ -11,6 +11,7 @@ import { cn } from '../../lib/utils';
 import { CustomFieldsSection } from './CustomFieldsSection';
 import { UserSearch } from './UserSearch';
 import type { Database } from '../../lib/database.types';
+import { useOrganization } from '../../contexts/OrganizationContext';
 
 type Lead = Database['public']['Tables']['leads']['Row'] & {
   owner: {
@@ -47,6 +48,7 @@ type PicklistValue = {
 export function LeadDetailPage() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const { selectedOrganization } = useOrganization();
   const [lead, setLead] = useState<Lead | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -80,6 +82,7 @@ export function LeadDetailPage() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'lead_status')
         .eq('is_active', true)
+        .eq('organization_id', selectedOrganization?.id)
         .order('display_order', { ascending: true });
 
       if (statusError) throw statusError;
@@ -91,6 +94,7 @@ export function LeadDetailPage() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'lead_source')
         .eq('is_active', true)
+        .eq('organization_id', selectedOrganization?.id)
         .order('display_order', { ascending: true });
 
       if (sourceError) throw sourceError;
@@ -137,7 +141,7 @@ export function LeadDetailPage() {
         .eq('reference_id', id)
         .eq('parent_type', 'Lead')
         .eq('status', 'Active')
-        .eq('organization_id', lead.organization_id)
+        .eq('organization_id', selectedOrganization?.id)
         .order('created_at', { ascending: true });
 
       if (error) throw error;
@@ -233,7 +237,7 @@ export function LeadDetailPage() {
         })
         .eq('id', feedId)
         .eq('created_by', userData.user.id)
-        .eq('organization_id', lead.organization_id);
+        .eq('organization_id', selectedOrganization?.id);
 
       if (error) throw error;
       setEditingFeed(null);
@@ -271,7 +275,7 @@ export function LeadDetailPage() {
         .from('customers')
         .select('customer_id')
         .eq('email', lead.email)
-        .eq('organization_id', lead.organization_id)
+        .eq('organization_id', selectedOrganization?.id)
         .maybeSingle();
 
       if (checkError) throw checkError;
