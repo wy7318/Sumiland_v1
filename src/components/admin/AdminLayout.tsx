@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Outlet, useNavigate, Link, useLocation } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   FileText, Image, LogOut, Users, Package, Tag, Quote, MessageSquare, 
-  LayoutDashboard, ChevronLeft, ChevronRight, Settings, ShoppingBag, 
-  Building2, Truck, ClipboardList, BoxSelect as BoxSeam, UserCog, Home,
-  UserPlus, UserCheck, Target
+  LayoutDashboard, Settings, ShoppingBag, Building2, Truck, ClipboardList, 
+  BoxSelect as BoxSeam, UserCog, Home, UserPlus, UserCheck, Target,
+  Search, MoreHorizontal, ChevronRight
 } from 'lucide-react';
 import { getCurrentUser, signOut } from '../../lib/auth';
 import { cn } from '../../lib/utils';
@@ -17,11 +17,34 @@ export function AdminLayout() {
   const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
   const { organizations } = useAuth();
+  
+  const searchRef = useRef<HTMLDivElement>(null);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
+  const settingsMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     checkAuth();
+
+    // Click outside handlers
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setShowSearch(false);
+      }
+      if (moreMenuRef.current && !moreMenuRef.current.contains(event.target as Node)) {
+        setShowMoreMenu(false);
+      }
+      if (settingsMenuRef.current && !settingsMenuRef.current.contains(event.target as Node)) {
+        setShowSettingsMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const checkAuth = async () => {
@@ -50,23 +73,19 @@ export function AdminLayout() {
   );
 
   const menuItems = [
-    { path: '/admin', icon: LayoutDashboard, label: 'Dashboard' },
-    { path: '/admin/posts', icon: FileText, label: 'Blog Posts' },
-    { path: '/admin/portfolio', icon: Image, label: 'Portfolio' },
-    { path: '/admin/cases', icon: MessageSquare, label: 'Cases' },
+    { path: '/admin/vendors', icon: Building2, label: 'Accounts' },
+    { path: '/admin/customers', icon: Users, label: 'Customers' },
     { path: '/admin/leads', icon: UserCheck, label: 'Leads' },
     { path: '/admin/opportunities', icon: Target, label: 'Opportunities' },
+    { path: '/admin/cases', icon: MessageSquare, label: 'Cases' },
     { path: '/admin/quotes', icon: Quote, label: 'Quotes' },
     { path: '/admin/orders', icon: ShoppingBag, label: 'Orders' },
     { path: '/admin/purchase-orders', icon: Truck, label: 'Purchase Orders' },
     { path: '/admin/work-orders', icon: ClipboardList, label: 'Work Orders' },
     { path: '/admin/inventory', icon: BoxSeam, label: 'Inventory' },
-    // Show Products, Customers, Categories and Accounts menus for admin/owner roles
+    // Show Products menu for admin/owner roles
     ...(hasAdminAccess ? [
-      { path: '/admin/products', icon: Package, label: 'Products' },
-      { path: '/admin/customers', icon: Users, label: 'Customers' },
-      { path: '/admin/categories', icon: Tag, label: 'Categories' },
-      { path: '/admin/vendors', icon: Building2, label: 'Accounts' }
+      { path: '/admin/products', icon: Package, label: 'Products' }
     ] : []),
     // Show additional menus for super admin
     ...(isSuperAdmin ? [
@@ -74,6 +93,13 @@ export function AdminLayout() {
       { path: '/admin/users', icon: UserPlus, label: 'User Management' }
     ] : [])
   ];
+
+  const visibleMenuItems = menuItems.slice(0, 7); // Show first 7 items
+  const moreMenuItems = menuItems.slice(7); // Remaining items go to More menu
+
+  const filteredMenuItems = menuItems.filter(item =>
+    item.label.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   if (loading) {
     return (
@@ -84,122 +110,185 @@ export function AdminLayout() {
   }
 
   return (
-    <div className="relative">
-      {/* Sidebar */}
-      <motion.div
-        initial={false}
-        animate={{ width: isExpanded ? 240 : 80 }}
-        className={cn(
-          "fixed left-0 top-0 h-full bg-primary-600 text-white z-50",
-          "flex flex-col transition-all duration-300"
-        )}
-      >
-        {/* Logo and Organization Switcher */}
-        <div className="h-16 flex items-center justify-between px-4 border-b border-primary-500">
-          {isExpanded ? (
-            <div className="flex items-center space-x-4 flex-1 min-w-0">
-              <span className="text-xl font-bold truncate">Admin Panel</span>
-              <OrganizationSwitcher />
-            </div>
-          ) : (
-            <span className="text-xl font-bold mx-auto">AP</span>
-          )}
-          <button
-            onClick={() => setIsExpanded(!isExpanded)}
-            className="p-1 hover:bg-primary-700 rounded-full focus:outline-none focus:ring-2 focus:ring-primary-400 focus:ring-offset-2"
-          >
-            {isExpanded ? (
-              <ChevronLeft className="w-5 h-5" />
-            ) : (
-              <ChevronRight className="w-5 h-5" />
-            )}
-          </button>
-        </div>
+    <div className="min-h-screen bg-gray-50">
+      {/* Floating Top Navigation */}
+      <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-7xl">
+        <div className="bg-white rounded-full shadow-lg p-2 flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            {/* Go Button & Search */}
+            <div ref={searchRef} className="relative">
+              <button
+                onClick={() => setShowSearch(!showSearch)}
+                className="p-3 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-full flex items-center"
+              >
+                <Search className="w-5 h-5 mr-2" />
+                <span className="text-sm font-medium">Go</span>
+              </button>
 
-        {/* Menu Items - Scrollable Area */}
-        <div className="flex-1 flex flex-col h-[calc(100vh-8rem)] overflow-hidden">
-          <nav className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-primary-700 scrollbar-track-transparent py-4">
-            {menuItems.map((item) => (
+              <AnimatePresence>
+                {showSearch && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    className="absolute top-full mt-2 left-0 w-80 bg-white rounded-lg shadow-lg border border-gray-200 p-4"
+                  >
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                      <input
+                        type="text"
+                        placeholder="Search modules..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        autoFocus
+                      />
+                    </div>
+                    {searchQuery && (
+                      <ul className="mt-2 max-h-64 overflow-auto">
+                        {filteredMenuItems.map((item) => (
+                          <li key={item.path}>
+                            <Link
+                              to={item.path}
+                              className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg"
+                              onClick={() => setShowSearch(false)}
+                            >
+                              <item.icon className="w-5 h-5 mr-3 text-gray-400" />
+                              {item.label}
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Main Navigation */}
+            {visibleMenuItems.map((item) => (
               <Link
                 key={item.path}
                 to={item.path}
                 className={cn(
-                  "flex items-center px-4 py-3 transition-colors",
+                  "p-3 text-sm font-medium rounded-full transition-colors flex items-center",
                   isActive(item.path)
-                    ? "bg-primary-700 text-white"
-                    : "text-primary-100 hover:bg-primary-700 hover:text-white"
+                    ? "bg-primary-100 text-primary-900"
+                    : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                 )}
               >
-                <item.icon className="w-5 h-5 flex-shrink-0" />
-                {isExpanded && (
-                  <span className="ml-3 transition-opacity duration-200">
-                    {item.label}
-                  </span>
-                )}
+                <item.icon className="w-5 h-5 mr-2" />
+                {item.label}
               </Link>
             ))}
-          </nav>
-        </div>
 
-        {/* Settings, Home and Sign Out - Fixed Bottom */}
-        <div className="border-t border-primary-500 mt-auto">
-          <Link
-            to="/admin/settings"
-            className={cn(
-              "flex items-center px-4 py-3 text-primary-100",
-              "hover:bg-primary-700 hover:text-white transition-colors",
-              isActive('/admin/settings') && "bg-primary-700 text-white"
+            {/* More Menu */}
+            {moreMenuItems.length > 0 && (
+              <div ref={moreMenuRef} className="relative">
+                <button
+                  onClick={() => setShowMoreMenu(!showMoreMenu)}
+                  className={cn(
+                    "p-3 text-sm font-medium rounded-full transition-colors flex items-center",
+                    showMoreMenu
+                      ? "bg-primary-100 text-primary-900"
+                      : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                  )}
+                >
+                  <MoreHorizontal className="w-5 h-5 mr-2" />
+                  More
+                </button>
+
+                <AnimatePresence>
+                  {showMoreMenu && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 10 }}
+                      className="absolute top-full mt-2 right-0 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1"
+                    >
+                      {moreMenuItems.map((item) => (
+                        <Link
+                          key={item.path}
+                          to={item.path}
+                          className={cn(
+                            "flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100",
+                            isActive(item.path) && "bg-gray-50"
+                          )}
+                          onClick={() => setShowMoreMenu(false)}
+                        >
+                          <item.icon className="w-5 h-5 mr-3 text-gray-400" />
+                          {item.label}
+                        </Link>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             )}
-          >
-            <Settings className="w-4 h-4 flex-shrink-0" />
-            {isExpanded && (
-              <span className="ml-3 transition-opacity duration-200">
-                Settings
-              </span>
-            )}
-          </Link>
-          <Link
-            to="/"
-            className={cn(
-              "flex items-center px-4 py-3 text-primary-100",
-              "hover:bg-primary-700 hover:text-white transition-colors"
-            )}
-          >
-            <Home className="w-4 h-4 flex-shrink-0" />
-            {isExpanded && (
-              <span className="ml-3 transition-opacity duration-200">
-                Home
-              </span>
-            )}
-          </Link>
-          <button
-            onClick={handleSignOut}
-            className={cn(
-              "flex items-center w-full px-4 py-3 text-primary-100",
-              "hover:bg-primary-700 hover:text-white transition-colors"
-            )}
-          >
-            <LogOut className="w-4 h-4 flex-shrink-0" />
-            {isExpanded && (
-              <span className="ml-3 transition-opacity duration-200">
-                Sign Out
-              </span>
-            )}
-          </button>
+          </div>
+
+          <div className="flex items-center space-x-4">
+            {/* Organization Switcher */}
+            <OrganizationSwitcher />
+
+            {/* Settings Menu */}
+            <div ref={settingsMenuRef} className="relative">
+              <button
+                onClick={() => setShowSettingsMenu(!showSettingsMenu)}
+                className={cn(
+                  "p-3 text-sm font-medium rounded-full transition-colors flex items-center",
+                  showSettingsMenu
+                    ? "bg-gray-100 text-gray-900"
+                    : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                )}
+              >
+                <Settings className="w-5 h-5 mr-2" />
+                Menu
+              </button>
+
+              <AnimatePresence>
+                {showSettingsMenu && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    className="absolute top-full right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1"
+                  >
+                    <Link
+                      to="/admin/settings"
+                      className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      onClick={() => setShowSettingsMenu(false)}
+                    >
+                      <Settings className="w-4 h-4 mr-3" />
+                      Settings
+                    </Link>
+                    <Link
+                      to="/"
+                      className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      onClick={() => setShowSettingsMenu(false)}
+                    >
+                      <Home className="w-4 h-4 mr-3" />
+                      Home
+                    </Link>
+                    <button
+                      onClick={handleSignOut}
+                      className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    >
+                      <LogOut className="w-4 h-4 mr-3" />
+                      Sign Out
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
         </div>
-      </motion.div>
+      </div>
 
       {/* Main Content */}
-      <div
-        className={cn(
-          "flex-1 transition-all duration-300",
-          isExpanded ? "ml-60" : "ml-20"
-        )}
-      >
-        <main className="p-8">
-          <Outlet />
-        </main>
-      </div>
+      <main className="pt-24 pb-8 px-4 max-w-7xl mx-auto">
+        <Outlet />
+      </main>
     </div>
   );
 }

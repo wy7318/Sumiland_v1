@@ -1,75 +1,79 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Palette, Laptop, Package2, PenTool, X, Check, ArrowRight, ExternalLink } from 'lucide-react';
+import { 
+  BarChart2, Users, LineChart, Zap, 
+  ArrowRight, X, Check, Database, 
+  MessageSquare, Gauge
+} from 'lucide-react';
 import { cn } from '../lib/utils';
-import { usePortfolio } from '../hooks/usePortfolio';
 
 const services = [
   {
-    id: 'design',
-    icon: <Palette className="w-8 h-8" />,
-    title: 'Design',
-    shortDesc: 'Crafting unique brand identities',
-    description: 'Our design service combines creativity with strategic thinking to create memorable brand marks that stand the test of time.',
+    id: 'analytics',
+    icon: <BarChart2 className="w-8 h-8" />,
+    title: 'Advanced Analytics',
+    shortDesc: 'Data-driven insights for growth',
+    description: 'Turn your customer data into actionable insights with our powerful analytics tools.',
     benefits: [
-      'Custom-tailored designs that reflect your brand values',
-      'Multiple concept variations to choose from',
-      'Comprehensive brand guidelines',
-      'File formats for all use cases'
+      'Real-time data visualization',
+      'Custom report generation',
+      'Predictive analytics',
+      'Performance tracking'
     ],
-    portfolioCategory: 'Design',
-    relatedServices: ['branding', 'package-design']
+    features: ['Dashboards', 'Reports', 'Forecasting']
   },
   {
-    id: 'website-design',
-    icon: <Laptop className="w-8 h-8" />,
-    title: 'Website Design',
-    shortDesc: 'Building stunning digital experiences',
-    description: 'We create beautiful, responsive websites that engage your audience and drive results through thoughtful UX design and modern development practices.',
+    id: 'customer-management',
+    icon: <Users className="w-8 h-8" />,
+    title: 'Customer Management',
+    shortDesc: 'Centralized customer information',
+    description: 'Keep all your customer information organized and accessible in one place.',
     benefits: [
-      'Responsive design for all devices',
-      'SEO-optimized structure',
-      'Fast loading speeds',
-      'Interactive elements'
+      'Contact management',
+      'Interaction history',
+      'Customer segmentation',
+      'Communication tracking'
     ],
-    portfolioCategory: 'Application Development',
-    relatedServices: ['branding', 'design']
+    features: ['Profiles', 'History', 'Notes']
   },
   {
-    id: 'package-design',
-    icon: <Package2 className="w-8 h-8" />,
-    title: 'Package Design',
-    shortDesc: 'Creating memorable unboxing moments',
-    description: 'Our package design service helps your product stand out on shelves and creates an unforgettable unboxing experience for your customers.',
+    id: 'automation',
+    icon: <Zap className="w-8 h-8" />,
+    title: 'Sales Automation',
+    shortDesc: 'Streamline your sales process',
+    description: 'Automate repetitive tasks and focus on what matters - closing deals.',
     benefits: [
-      'Eye-catching designs that sell',
-      'Sustainable material options',
-      'Print-ready files',
-      'Mockup presentations'
+      'Workflow automation',
+      'Lead scoring',
+      'Email sequences',
+      'Task management'
     ],
-    portfolioCategory: 'Package Design',
-    relatedServices: ['design', 'branding']
+    features: ['Workflows', 'Triggers', 'Actions']
   },
   {
-    id: 'branding',
-    icon: <PenTool className="w-8 h-8" />,
-    title: 'Branding',
-    shortDesc: 'Developing cohesive brand strategies',
-    description: 'We help businesses build strong, cohesive brand identities that resonate with their target audience and stand out in the market.',
+    id: 'reporting',
+    icon: <LineChart className="w-8 h-8" />,
+    title: 'Performance Reporting',
+    shortDesc: 'Comprehensive business insights',
+    description: 'Get detailed reports and insights about your business performance.',
     benefits: [
-      'Comprehensive brand strategy',
-      'Visual identity system',
-      'Brand voice & messaging',
-      'Style guidelines'
+      'Custom report builder',
+      'KPI tracking',
+      'Goal monitoring',
+      'Export capabilities'
     ],
-    portfolioCategory: 'Branding',
-    relatedServices: ['design', 'website-design']
+    features: ['Reports', 'Analytics', 'Exports']
   }
 ];
 
-function ServiceCard({ service, isExpanded, onClick, onClose }: any) {
-  const { items: portfolioItems } = usePortfolio(service.portfolioCategory);
+type ServiceCardProps = {
+  service: typeof services[0];
+  isExpanded: boolean;
+  onClick: (id?: string) => void;
+  onClose: () => void;
+};
 
+function ServiceCard({ service, isExpanded, onClick, onClose }: ServiceCardProps) {
   return (
     <motion.div
       layout
@@ -121,7 +125,7 @@ function ServiceCard({ service, isExpanded, onClick, onClose }: any) {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               <div>
-                <h4 className="text-lg font-semibold mb-4">About This Service</h4>
+                <h4 className="text-lg font-semibold mb-4">About This Feature</h4>
                 <p className="text-gray-600 mb-6">{service.description}</p>
 
                 <h4 className="text-lg font-semibold mb-4">Key Benefits</h4>
@@ -136,47 +140,27 @@ function ServiceCard({ service, isExpanded, onClick, onClose }: any) {
               </div>
 
               <div>
-                <h4 className="text-lg font-semibold mb-4">Portfolio Examples</h4>
-                <div className="grid grid-cols-1 gap-4 mb-6">
-                  {portfolioItems.slice(0, 2).map((item) => (
-                    <div key={item.id} className="relative rounded-lg overflow-hidden">
-                      <img
-                        src={item.image_url}
-                        alt={item.title}
-                        className="w-full h-48 object-cover"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 hover:opacity-100 transition-opacity duration-300">
-                        <div className="absolute bottom-0 left-0 right-0 p-4">
-                          <h5 className="text-white font-medium mb-1">{item.title}</h5>
-                          <p className="text-white/80 text-sm line-clamp-2">{item.description}</p>
-                        </div>
-                      </div>
+                <h4 className="text-lg font-semibold mb-4">Core Features</h4>
+                <div className="grid grid-cols-1 gap-4">
+                  {service.features.map((feature: string, index: number) => (
+                    <div
+                      key={index}
+                      className="p-4 rounded-lg border border-gray-200 hover:border-primary-500 hover:shadow-md transition-all duration-300"
+                    >
+                      <h5 className="font-medium text-gray-900">{feature}</h5>
                     </div>
                   ))}
                 </div>
 
-                <h4 className="text-lg font-semibold mb-4">Related Services</h4>
-                <div className="space-y-3">
-                  {service.relatedServices.map((id: string) => {
-                    const relatedService = services.find(s => s.id === id);
-                    if (!relatedService) return null;
-                    return (
-                      <button
-                        key={id}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onClick(relatedService.id);
-                        }}
-                        className="w-full flex items-center justify-between p-4 rounded-lg border hover:border-primary-500 hover:bg-primary-50 transition-colors"
-                      >
-                        <div className="flex items-center space-x-3">
-                          <div className="text-primary-500">{relatedService.icon}</div>
-                          <span className="font-medium">{relatedService.title}</span>
-                        </div>
-                        <ArrowRight className="w-5 h-5 text-primary-500" />
-                      </button>
-                    );
-                  })}
+                <div className="mt-8">
+                  <h4 className="text-lg font-semibold mb-4">Get Started</h4>
+                  <a
+                    href="#contact"
+                    className="inline-flex items-center px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+                  >
+                    Try It Now
+                    <ArrowRight className="w-4 h-4 ml-2" />
+                  </a>
                 </div>
               </div>
             </div>
@@ -191,16 +175,19 @@ export function ServicesSection() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   return (
-    <section className="py-20 px-4" id="services">
+    <section className="py-20 px-4" id="features">
       <div className="max-w-7xl mx-auto">
-        <motion.h2
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          className="text-4xl font-bold text-center mb-16"
+          className="text-center mb-16"
         >
-          Our Services
-        </motion.h2>
+          <h2 className="text-4xl font-bold mb-4">Powerful Features</h2>
+          <p className="text-xl text-gray-600">
+            Everything you need to manage and grow your business
+          </p>
+        </motion.div>
 
         <motion.div 
           layout 
@@ -211,7 +198,7 @@ export function ServicesSection() {
               key={service.id}
               service={service}
               isExpanded={expandedId === service.id}
-              onClick={(id: string) => setExpandedId(id || service.id)}
+              onClick={(id) => setExpandedId(id || service.id)}
               onClose={() => setExpandedId(null)}
             />
           ))}
