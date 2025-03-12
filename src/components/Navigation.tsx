@@ -26,7 +26,6 @@ export function Navigation() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Add click outside handler
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -43,7 +42,6 @@ export function Navigation() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Close profile menu when route changes
   useEffect(() => {
     setIsProfileMenuOpen(false);
   }, [location.pathname]);
@@ -73,24 +71,21 @@ export function Navigation() {
     setIsMobileMenuOpen(false);
   };
 
-  // Hide main navigation on admin pages
   if (location.pathname.startsWith('/admin')) {
     return null;
   }
 
   const navItems = [
     { href: '/', label: 'Home', action: () => window.scrollTo({ top: 0, behavior: 'smooth' }) },
-    { href: '/#services', label: 'Services', action: () => scrollToSection('services') },
-    { href: '/#portfolio', label: 'Portfolio', action: () => scrollToSection('portfolio') },
+    { href: '/#features', label: 'Features', action: () => scrollToSection('features') },
+    { href: '/#pricing', label: 'Pricing', action: () => scrollToSection('pricing') },
     { href: '/blog', label: 'Blog' },
     { href: '/#contact', label: 'Contact', action: () => scrollToSection('contact') },
   ];
 
   const handleNavClick = (item: typeof navItems[0], e: React.MouseEvent) => {
-    e.preventDefault(); // Always prevent default
+    e.preventDefault();
     if (location.pathname !== '/' && item.href.startsWith('/#')) {
-      // If we're not on the home page and trying to scroll to a section,
-      // navigate to home first
       navigate('/', { state: { scrollTo: item.href.substring(2) } });
     } else if (item.action) {
       item.action();
@@ -99,22 +94,11 @@ export function Navigation() {
     }
   };
 
-  const handleAuthClick = (path: string) => {
-    navigate(path);
-    setIsMobileMenuOpen(false);
-  };
-
-  const toggleProfileMenu = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent event bubbling
-    setIsProfileMenuOpen(prev => !prev);
-  };
-
   return (
     <motion.header
       className={cn(
-        'fixed top-0 left-0 right-0 transition-all duration-300',
-        isScrolled ? 'bg-white/80 backdrop-blur-md shadow-sm' : 'bg-white/50 backdrop-blur-sm',
-        'z-40'
+        'fixed top-0 left-0 right-0 transition-all duration-300 z-40',
+        isScrolled ? 'bg-white/80 backdrop-blur-md shadow-sm' : 'bg-transparent'
       )}
       initial={{ y: -100 }}
       animate={{ y: 0 }}
@@ -123,7 +107,7 @@ export function Navigation() {
       <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <Link to="/" className="text-2xl font-bold text-primary-600">
-            SUMILAND & SUB STUDIO
+            XELYTIC
           </Link>
 
           {/* Desktop Navigation */}
@@ -149,7 +133,7 @@ export function Navigation() {
               ) : user ? (
                 <button
                   ref={profileButtonRef}
-                  onClick={toggleProfileMenu}
+                  onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
                   className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center hover:bg-primary-200 transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
                 >
                   <User className="w-5 h-5 text-primary-600" />
@@ -157,17 +141,15 @@ export function Navigation() {
               ) : (
                 <div className="flex items-center space-x-4">
                   <button
-                    onClick={() => handleAuthClick('/signup')}
-                    className="inline-flex items-center px-4 py-2 border border-primary-600 text-sm font-medium rounded-md text-primary-600 hover:bg-primary-50"
+                    onClick={() => navigate('/signup')}
+                    className="px-4 py-2 text-primary-600 hover:text-primary-700"
                   >
-                    <UserPlus className="w-4 h-4 mr-2" />
                     Sign Up
                   </button>
                   <button
-                    onClick={() => handleAuthClick('/login')}
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
+                    onClick={() => navigate('/login')}
+                    className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
                   >
-                    <LogIn className="w-4 h-4 mr-2" />
                     Sign In
                   </button>
                 </div>
@@ -180,12 +162,11 @@ export function Navigation() {
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
-                    className="fixed right-4 mt-2 w-48 bg-white rounded-lg shadow-lg py-1 z-[100]"
-                    style={{ top: "4rem" }}
+                    className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-1 z-50"
                   >
                     <Link
                       to="/admin"
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 focus:outline-none focus:bg-gray-100"
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                       onClick={() => setIsProfileMenuOpen(false)}
                     >
                       <LayoutDashboard className="w-4 h-4 inline-block mr-2" />
@@ -193,7 +174,7 @@ export function Navigation() {
                     </Link>
                     <button
                       onClick={handleSignOut}
-                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 focus:outline-none focus:bg-gray-100"
+                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                     >
                       <LogOut className="w-4 h-4 inline-block mr-2" />
                       Sign Out
@@ -265,22 +246,20 @@ export function Navigation() {
                   </>
                 ) : (
                   <>
-                    <a
-                      href="/signup"
-                      onClick={(e) => handleAuthClick(e, '/signup')}
+                    <Link
+                      to="/signup"
                       className="flex items-center px-4 py-2 text-gray-600 hover:text-primary-500"
                     >
                       <UserPlus className="w-4 h-4 mr-2" />
                       Sign Up
-                    </a>
-                    <a
-                      href="/login"
-                      onClick={(e) => handleAuthClick(e, '/login')}
+                    </Link>
+                    <Link
+                      to="/login"
                       className="flex items-center px-4 py-2 text-gray-600 hover:text-primary-500"
                     >
                       <LogIn className="w-4 h-4 mr-2" />
                       Sign In
-                    </a>
+                    </Link>
                   </>
                 )}
               </div>
