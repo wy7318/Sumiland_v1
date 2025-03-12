@@ -10,6 +10,8 @@ import {
 import { supabase } from '../../lib/supabase';
 import { cn, formatCurrency } from '../../lib/utils';
 import { CustomFieldsSection } from './CustomFieldsSection';
+import { useOrganization } from '../../contexts/OrganizationContext';
+
 
 type Customer = {
   customer_id: string;
@@ -107,6 +109,7 @@ type RelatedTab = {
 export function CustomerDetailPage() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const { selectedOrganization } = useOrganization();
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -148,6 +151,7 @@ export function CustomerDetailPage() {
           )
         `)
         .eq('customer_id', id)
+        .eq('organization_id', selectedOrganization?.id)
         .single();
 
       if (error) throw error;
@@ -169,7 +173,7 @@ export function CustomerDetailPage() {
         .from('leads')
         .select('*')
         .eq('email', customer.email)
-        .eq('organization_id', customer.organization_id)
+        .eq('organization_id', selectedOrganization?.id)
         .order('created_at', { ascending: false });
 
       if (leadsError) throw leadsError;
@@ -180,7 +184,7 @@ export function CustomerDetailPage() {
         .from('quote_hdr')
         .select('*')
         .eq('customer_id', customer.customer_id)
-        .eq('organization_id', customer.organization_id)
+        .eq('organization_id', selectedOrganization?.id)
         .order('created_at', { ascending: false });
 
       if (quotesError) throw quotesError;
@@ -191,7 +195,7 @@ export function CustomerDetailPage() {
         .from('opportunities')
         .select('*')
         .eq('contact_id', customer.customer_id)
-        .eq('organization_id', customer.organization_id)
+        .eq('organization_id', selectedOrganization?.id)
         .order('created_at', { ascending: false });
       
       if (opportunitiesError) throw opportunitiesError;
@@ -203,7 +207,7 @@ export function CustomerDetailPage() {
         .from('order_hdr')
         .select('*')
         .eq('customer_id', customer.customer_id)
-        .eq('organization_id', customer.organization_id)
+        .eq('organization_id', selectedOrganization?.id)
         .order('created_at', { ascending: false });
 
       if (ordersError) throw ordersError;
@@ -214,7 +218,7 @@ export function CustomerDetailPage() {
         .from('cases')
         .select('*')
         .eq('contact_id', customer.customer_id)
-        .eq('organization_id', customer.organization_id)
+        .eq('organization_id', selectedOrganization?.id)
         .order('created_at', { ascending: false });
 
       if (casesError) throw casesError;
@@ -238,7 +242,7 @@ export function CustomerDetailPage() {
         .eq('reference_id', id)
         .eq('parent_type', 'Customer')
         .eq('status', 'Active')
-        .eq('organization_id', customer.organization_id)
+        .eq('organization_id', selectedOrganization?.id)
         .order('created_at', { ascending: true });
 
       if (error) throw error;
@@ -294,7 +298,7 @@ export function CustomerDetailPage() {
         })
         .eq('id', feedId)
         .eq('created_by', userData.user.id)
-        .eq('organization_id', customer.organization_id);
+        .eq('organization_id', selectedOrganization?.id);
 
       if (error) throw error;
       setEditingFeed(null);

@@ -10,6 +10,8 @@ import { supabase } from '../../lib/supabase';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
 import { KanbanBoard, KanbanCard } from './KanbanBoard';
+import { useOrganization } from '../../contexts/OrganizationContext';
+
 
 type Lead = {
   id: string;
@@ -99,6 +101,7 @@ function LeadCard({ lead }: { lead: Lead }) {
 
 export function LeadsPage() {
   const { organizations } = useAuth();
+  const { selectedOrganization } = useOrganization();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -127,7 +130,7 @@ export function LeadsPage() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'lead_status')
         .eq('is_active', true)
-        .eq('organization_id', organizations.map(org => org.id))
+        .eq('organization_id', selectedOrganization?.id)
         .order('display_order', { ascending: true });
 
       if (statusError) throw statusError;
@@ -139,7 +142,7 @@ export function LeadsPage() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'lead_source')
         .eq('is_active', true)
-        .eq('organization_id', organizations.map(org => org.id))
+        .eq('organization_id', selectedOrganization?.id)
         .order('display_order', { ascending: true });
 
       if (sourceError) throw sourceError;
@@ -153,7 +156,7 @@ export function LeadsPage() {
   const fetchLeads = async () => {
     try {
       setLoading(true);
-      
+      console.log(selectedOrganization?.id);
       // Get all leads with owner details
       const { data, error } = await supabase
         .from('leads')
@@ -161,7 +164,7 @@ export function LeadsPage() {
           *,
           owner:profiles!leads_owner_id_fkey(name)
         `)
-        .in('organization_id', organizations.map(org => org.id))
+        .eq('organization_id', selectedOrganization?.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -180,7 +183,7 @@ export function LeadsPage() {
       const { data: orgUsers, error: orgUsersError } = await supabase
         .from('user_organizations')
         .select('user_id')
-        .in('organization_id', organizations.map(org => org.id));
+        .eq('organization_id', selectedOrganization?.id);
 
       if (orgUsersError) throw orgUsersError;
 

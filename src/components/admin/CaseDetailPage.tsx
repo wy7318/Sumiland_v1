@@ -11,6 +11,7 @@ import { cn } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
 import { CustomFieldsSection } from './CustomFieldsSection';
 import { UserSearch } from './UserSearch';
+import { useOrganization } from '../../contexts/OrganizationContext';
 
 type Case = {
   id: string;
@@ -22,7 +23,7 @@ type Case = {
   owner_id: string | null;
   description: string;
   resume_url: string | null;
-  attachment_url: string | null; // Added attachment_url
+  attachment_url: string | null;
   created_at: string;
   organization_id: string;
   contact: {
@@ -31,7 +32,7 @@ type Case = {
     email: string;
     phone: string | null;
     company: string | null;
-  };
+  } | null; // Make contact optional
   owner: {
     id: string;
     name: string;
@@ -67,6 +68,7 @@ type PicklistValue = {
 export function CaseDetailPage() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const { selectedOrganization } = useOrganization();
   const [caseData, setCaseData] = useState<Case | null>(null);
   const { organizations, user } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -99,7 +101,7 @@ export function CaseDetailPage() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'case_type')
         .eq('is_active', true)
-        .eq('organization_id', organizations.map(org => org.id))
+        .eq('organization_id', selectedOrganization?.id)
         .order('display_order', { ascending: true });
 
       if (typeError) throw typeError;
@@ -111,7 +113,7 @@ export function CaseDetailPage() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'case_status')
         .eq('is_active', true)
-        .eq('organization_id', organizations.map(org => org.id))
+        .eq('organization_id', selectedOrganization?.id)
         .order('display_order', { ascending: true });
 
       if (statusError) throw statusError;
@@ -477,45 +479,48 @@ export function CaseDetailPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Contact Information */}
-            <div>
-              <h2 className="text-lg font-semibold mb-4">Contact Information</h2>
-              <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-                <div className="flex items-center">
-                  <User className="w-5 h-5 text-gray-400 mr-3" />
-                  <div>
-                    <div className="font-medium">
-                      {caseData.contact.first_name} {caseData.contact.last_name}
-                    </div>
-                    {caseData.contact.company && (
-                      <div className="text-sm text-gray-500">
-                        {caseData.contact.company}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className="flex items-center">
-                  <Mail className="w-5 h-5 text-gray-400 mr-3" />
-                  <a
-                    href={`mailto:${caseData.contact.email}`}
-                    className="text-primary-600 hover:text-primary-700"
-                  >
-                    {caseData.contact.email}
-                  </a>
-                </div>
-                {caseData.contact.phone && (
+          <div>
+            <h2 className="text-lg font-semibold mb-4">Contact Information</h2>
+            <div className="bg-gray-50 rounded-lg p-4 space-y-4">
+              {caseData.contact ? (
+                <>
                   <div className="flex items-center">
-                    <Phone className="w-5 h-5 text-gray-400 mr-3" />
+                    <User className="w-5 h-5 text-gray-400 mr-3" />
+                    <div>
+                      <div className="font-medium">
+                        {caseData.contact.first_name} {caseData.contact.last_name}
+                      </div>
+                      {caseData.contact.company && (
+                        <div className="text-sm text-gray-500">
+                          {caseData.contact.company}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center">
+                    <Mail className="w-5 h-5 text-gray-400 mr-3" />
                     <a
-                      href={`tel:${caseData.contact.phone}`}
+                      href={`mailto:${caseData.contact.email}`}
                       className="text-primary-600 hover:text-primary-700"
                     >
-                      {caseData.contact.phone}
+                      {caseData.contact.email}
                     </a>
                   </div>
-                )}
-              </div>
+                  {caseData.contact.phone && (
+                    <div className="flex items-center">
+                      <Phone className="w-5 h-5 text-gray-400 mr-3" />
+                      <a
+                        href={`tel:${caseData.contact.phone}`}
+                        className="text-primary-600 hover:text-primary-700"
+                      >
+                        {caseData.contact.phone}
+                      </a>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-sm text-gray-400">No contact information available</div>
+              )}
             </div>
 
             {/* Assignment */}

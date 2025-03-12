@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { CustomFieldsForm } from './CustomFieldsForm';
 import { UserSearch } from './UserSearch';
+import { useOrganization } from '../../contexts/OrganizationContext';
 
 type FormData = {
   first_name: string;
@@ -53,6 +54,7 @@ type PicklistValue = {
 export function LeadForm() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const { selectedOrganization } = useOrganization();
   const { organizations, user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -68,7 +70,7 @@ export function LeadForm() {
     } else if (organizations.length > 0) {
       setFormData(prev => ({
         ...prev,
-        organization_id: organizations[0].id
+        organization_id: selectedOrganization?.id
       }));
     }
   }, [id, organizations]);
@@ -81,7 +83,7 @@ export function LeadForm() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'lead_status')
         .eq('is_active', true)
-        .eq('organization_id', organizations.map(org => org.id))
+        .eq('organization_id', selectedOrganization?.id)
         .order('display_order', { ascending: true });
 
       if (statusError) throw statusError;
@@ -101,7 +103,7 @@ export function LeadForm() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'lead_source')
         .eq('is_active', true)
-        .eq('organization_id', organizations.map(org => org.id))
+        .eq('organization_id', selectedOrganization?.id)
         .order('display_order', { ascending: true });
 
       if (sourceError) throw sourceError;

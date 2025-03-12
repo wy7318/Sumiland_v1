@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { CustomFieldsForm } from './CustomFieldsForm';
 import { cn } from '../../lib/utils';
+import { useOrganization } from '../../contexts/OrganizationContext';
 
 type CustomerFormData = {
   first_name: string;
@@ -52,6 +53,7 @@ export function CustomerForm() {
   const navigate = useNavigate();
   const { id } = useParams();
   const location = useLocation();
+  const { selectedOrganization } = useOrganization();
   const { organizations, user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -81,17 +83,17 @@ export function CustomerForm() {
         phone: leadData.phone || '',
         company: leadData.company || '',
         lead_id: leadData.lead_id,
-        organization_id: organizations[0]?.id || ''
+        organization_id: selectedOrganization?.id || ''
       }));
     } else if (id) {
       fetchCustomer();
     } else if (organizations.length > 0) {
       setFormData(prev => ({
         ...prev,
-        organization_id: organizations[0].id
+        organization_id: selectedOrganization?.id
       }));
     }
-  }, [id, organizations, leadData]);
+  }, [id, selectedOrganization, leadData]);
 
   useEffect(() => {
     if (vendorSearch) {
@@ -123,7 +125,7 @@ export function CustomerForm() {
         .from('vendors')
         .select('id, name, type, status')
         .eq('status', 'active')
-        .in('organization_id', organizations.map(org => org.id))
+        .eq('organization_id', selectedOrganization?.id)
         .order('name');
 
       if (error) throw error;
@@ -148,7 +150,7 @@ export function CustomerForm() {
           )
         `)
         .eq('customer_id', id)
-        .in('organization_id', organizations.map(org => org.id))
+        .eq('organization_id', selectedOrganization?.id)
         .single();
 
       if (error) throw error;
@@ -166,7 +168,7 @@ export function CustomerForm() {
           country: customer.country || '',
           company: customer.company || '',
           vendor_id: customer.vendor_id,
-          organization_id: customer.organization_id,
+          organization_id: selectedOrganization?.id,
           lead_id: customer.lead_id
         });
         if (customer.vendor) {
@@ -176,6 +178,7 @@ export function CustomerForm() {
         const { data: customFieldValues, error: customFieldsError } = await supabase
           .from('custom_field_values')
           .select('field_id, value')
+          .eq('organization_id', selectedOrganization?.id)
           .eq('entity_id', id);
 
         if (customFieldsError) throw customFieldsError;
@@ -311,7 +314,7 @@ export function CustomerForm() {
     }
   };
 
-  if (organizations.length === 0) {
+  if (selectedOrganization.length === 0) {
     return (
       <div className="bg-yellow-50 text-yellow-800 p-4 rounded-lg">
         You need to be part of an organization to manage customers.
@@ -582,7 +585,7 @@ export function CustomerForm() {
         <CustomFieldsForm
           entityType="customer"
           entityId={id}
-          organizationId={organizations[0]?.id}
+          organizationId={selectedOrganization?.id}
           onChange={(values) => setCustomFields(values)}
           className="border-t border-gray-200 pt-6"
         />

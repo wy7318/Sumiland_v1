@@ -7,6 +7,7 @@ import {
 import { supabase } from '../../lib/supabase';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
+import { useOrganization } from '../../contexts/OrganizationContext';
 
 type PicklistValue = {
   id: string;
@@ -110,6 +111,7 @@ const PICKLIST_TYPE_MAPPING = {
 
 export function PicklistManagementPage() {
   const { organizations, user } = useAuth();
+  const { selectedOrganization } = useOrganization();
   const [values, setValues] = useState<PicklistValue[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -136,6 +138,8 @@ export function PicklistManagementPage() {
   }, [selectedTable, selectedField, organizations]);
 
   const fetchPicklistValues = async () => {
+    console.log('selectedOrganization?.id : ' + selectedOrganization?.id);
+    console.log('organizations.map(org => org.id) : ' + organizations.map(org => org.id));
     try {
       setLoading(true);
       const picklistType = getPicklistType();
@@ -144,7 +148,7 @@ export function PicklistManagementPage() {
         .from('picklist_values')
         .select('*')
         .eq('type', picklistType)
-        .in('organization_id', organizations.map(org => org.id))
+        .eq('organization_id', selectedOrganization?.id)
         .order('display_order', { ascending: true })
         .order('label', { ascending: true });
 
@@ -191,6 +195,7 @@ export function PicklistManagementPage() {
         .from('user_organizations')
         .select('organization_id')
         .eq('user_id', userData.user.id)
+        .eq('organization_id', selectedOrganization?.id)
         .single();
 
       if (!orgData?.organization_id) throw new Error('No organization found');

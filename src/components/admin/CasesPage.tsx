@@ -10,6 +10,7 @@ import { supabase } from '../../lib/supabase';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
 import { KanbanBoard, KanbanCard } from './KanbanBoard';
+import { useOrganization } from '../../contexts/OrganizationContext';
 
 type Case = {
   id: string;
@@ -30,7 +31,7 @@ type Case = {
     email: string;
     phone: string | null;
     company: string | null;
-  };
+  } | null; // Make contact optional
   owner: {
     name: string;
   } | null;
@@ -54,21 +55,27 @@ function CaseCard({ case_ }: { case_: Case }) {
       <div className="space-y-2">
         <h4 className="font-medium">{case_.title}</h4>
         
-        <div className="flex items-center text-sm text-gray-500">
-          <User className="w-4 h-4 mr-1" />
-          {case_.contact.first_name} {case_.contact.last_name}
-        </div>
+        {case_.contact ? (
+          <>
+            <div className="flex items-center text-sm text-gray-500">
+              <User className="w-4 h-4 mr-1" />
+              {case_.contact.first_name} {case_.contact.last_name}
+            </div>
 
-        <div className="flex items-center text-sm text-gray-500">
-          <Mail className="w-4 h-4 mr-1" />
-          {case_.contact.email}
-        </div>
+            <div className="flex items-center text-sm text-gray-500">
+              <Mail className="w-4 h-4 mr-1" />
+              {case_.contact.email}
+            </div>
 
-        {case_.contact.company && (
-          <div className="flex items-center text-sm text-gray-500">
-            <Building2 className="w-4 h-4 mr-1" />
-            {case_.contact.company}
-          </div>
+            {case_.contact.company && (
+              <div className="flex items-center text-sm text-gray-500">
+                <Building2 className="w-4 h-4 mr-1" />
+                {case_.contact.company}
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="text-sm text-gray-400">No contact information</div>
         )}
 
         {case_.owner ? (
@@ -104,6 +111,7 @@ function CaseCard({ case_ }: { case_: Case }) {
 export function CasesPage() {
   const { organizations } = useAuth();
   const [cases, setCases] = useState<Case[]>([]);
+  const { selectedOrganization } = useOrganization();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -121,7 +129,7 @@ export function CasesPage() {
     fetchPicklists();
     fetchCases();
     fetchStaff();
-  }, [organizations]);
+  }, [selectedOrganization]);
 
   const fetchPicklists = async () => {
     try {
@@ -131,7 +139,7 @@ export function CasesPage() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'case_type')
         .eq('is_active', true)
-        .eq('organization_id', organizations.map(org => org.id))
+        .eq('organization_id', selectedOrganization.id)
         .order('display_order', { ascending: true });
 
       if (typeError) throw typeError;
@@ -143,7 +151,7 @@ export function CasesPage() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'case_status')
         .eq('is_active', true)
-        .eq('organization_id', organizations.map(org => org.id))
+        .eq('organization_id', selectedOrganization.id)
         .order('display_order', { ascending: true });
 
       if (statusError) throw statusError;
@@ -157,40 +165,58 @@ export function CasesPage() {
   const fetchCases = async () => {
     try {
       setLoading(true);
-      
+  
       // First get all cases for user's organizations
       const { data: casesData, error: casesError } = await supabase
         .from('cases')
         .select('*')
+        .eq('organization_id', selectedOrganization?.id)
         .order('created_at', { ascending: false });
-
+  
       if (casesError) throw casesError;
-
+  
       // Then get customer details for these cases
-      const customerIds = casesData?.map(c => c.contact_id) || [];
-      const { data: customersData, error: customersError } = await supabase
-        .from('customers')
-        .select('*')
-        .in('customer_id', customerIds);
-
-      if (customersError) throw customersError;
-
+      const customerIds = casesData
+        ?.map(c => c.contact_id)
+        .filter(id => id !== null) || []; // Filter out null values
+  
+      console.log('customerIds:', customerIds);
+  
+      // Only query customers if there are valid customer IDs
+      let customersData = [];
+      if (customerIds.length > 0) {
+        const { data, error: customersError } = await supabase
+          .from('customers')
+          .select('*')
+          .in('customer_id', customerIds);
+  
+        if (customersError) throw customersError;
+        customersData = data || [];
+      }
+  
       // Get owner details
-      const ownerIds = casesData?.map(c => c.owner_id).filter(Boolean) || [];
-      const { data: ownersData, error: ownersError } = await supabase
-        .from('profiles')
-        .select('id, name')
-        .in('id', ownerIds);
-
-      if (ownersError) throw ownersError;
-
+      const ownerIds = casesData
+        ?.map(c => c.owner_id)
+        .filter(id => id !== null) || []; // Filter out null values
+  
+      let ownersData = [];
+      if (ownerIds.length > 0) {
+        const { data, error: ownersError } = await supabase
+          .from('profiles')
+          .select('id, name')
+          .in('id', ownerIds);
+  
+        if (ownersError) throw ownersError;
+        ownersData = data || [];
+      }
+  
       // Combine the data
       const casesWithDetails = casesData?.map(case_ => ({
         ...case_,
-        contact: customersData?.find(c => c.customer_id === case_.contact_id),
-        owner: ownersData?.find(o => o.id === case_.owner_id)
+        contact: customersData?.find(c => c.customer_id === case_.contact_id) || null, // Handle null contact
+        owner: ownersData?.find(o => o.id === case_.owner_id) || null, // Handle null owner
       })) || [];
-
+  
       setCases(casesWithDetails);
     } catch (err) {
       console.error('Error fetching cases:', err);
@@ -201,14 +227,16 @@ export function CasesPage() {
   };
 
   const fetchStaff = async () => {
+    console.log('organizations: ' + organizations);
+    console.log('selectedOrganization : ' + selectedOrganization.id);
     try {
-      if (!organizations.length) return;
+      // if (!organizations.length) return;
 
       // Get all users from the same organizations
       const { data: orgUsers, error: orgUsersError } = await supabase
         .from('user_organizations')
         .select('user_id')
-        .in('organization_id', organizations.map(org => org.id));
+        .eq('organization_id', selectedOrganization.id);
 
       if (orgUsersError) throw orgUsersError;
 
@@ -317,12 +345,12 @@ export function CasesPage() {
   const filteredCases = cases.filter(case_ => {
     const matchesSearch = 
       case_.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      case_.contact.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      `${case_.contact.first_name} ${case_.contact.last_name}`.toLowerCase().includes(searchQuery.toLowerCase());
-
+      (case_.contact?.email?.toLowerCase() || '').includes(searchQuery.toLowerCase()) || // Handle null contact
+      `${case_.contact?.first_name || ''} ${case_.contact?.last_name || ''}`.toLowerCase().includes(searchQuery.toLowerCase()); // Handle null contact
+  
     const matchesStatus = statusFilter === 'all' || case_.status === statusFilter;
     const matchesType = typeFilter === 'all' || case_.type === typeFilter;
-
+  
     return matchesSearch && matchesStatus && matchesType;
   });
 
@@ -545,12 +573,18 @@ export function CasesPage() {
                       )}
                     </td>
                     <td className="px-6 py-4">
-                      <div className="text-sm font-medium text-gray-900">
-                        {case_.contact.first_name} {case_.contact.last_name}
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        {case_.contact.email}
-                      </div>
+                      {case_.contact ? (
+                        <>
+                          <div className="text-sm font-medium text-gray-900">
+                            {case_.contact.first_name} {case_.contact.last_name}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {case_.contact.email}
+                          </div>
+                        </>
+                      ) : (
+                        <div className="text-sm text-gray-400">No contact information</div>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span 
