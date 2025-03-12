@@ -8,6 +8,7 @@ import { cn } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
 import { CustomFieldsForm } from './CustomFieldsForm';
 import { UserSearch } from './UserSearch';
+import { useOrganization } from '../../contexts/OrganizationContext';
 
 type Customer = {
   customer_id: string;
@@ -86,6 +87,7 @@ export function QuoteForm() {
   const navigate = useNavigate();
   const { id } = useParams();
   const { organizations, user } = useAuth();
+  const { selectedOrganization } = useOrganization();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState<FormData>(initialFormData);
@@ -132,7 +134,7 @@ export function QuoteForm() {
     } else if (organizations.length > 0) {
       setFormData(prev => ({
         ...prev,
-        organization_id: organizations[0].id
+        organization_id: selectedOrganization?.id
       }));
     }
 
@@ -151,7 +153,7 @@ export function QuoteForm() {
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [id, organizations]);
+  }, [id, selectedOrganization]);
 
   useEffect(() => {
     if (customerSearch) {
@@ -211,7 +213,7 @@ export function QuoteForm() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'quote_status')
         .eq('is_active', true)
-        .eq('organization_id', organizations.map(org => org.id))
+        .eq('organization_id', selectedOrganization?.id)
         .order('display_order', { ascending: true });
 
       if (statusError) throw statusError;
@@ -241,6 +243,7 @@ export function QuoteForm() {
           quote_dtl(*)
         `)
         .eq('quote_id', id)
+        .eq('organization_id', selectedOrganization?.id)
         .single();
   
       if (error) throw error;
@@ -301,7 +304,7 @@ export function QuoteForm() {
       const { data, error } = await supabase
         .from('customers')
         .select('*')
-        .in('organization_id', organizations.map(org => org.id))
+        .eq('organization_id', selectedOrganization?.id)
         .order('first_name');
 
       if (error) throw error;
@@ -317,8 +320,7 @@ export function QuoteForm() {
       const { data, error } = await supabase
         .from('vendors')
         .select('*')
-        .in('organization_id', organizations.map(org => org.id))
-        .eq('status', 'active')
+        .eq('organization_id', selectedOrganization?.id)
         .order('name');
 
       if (error) throw error;
@@ -334,7 +336,7 @@ export function QuoteForm() {
       const { data, error } = await supabase
         .from('products')
         .select('*')
-        .in('organization_id', organizations.map(org => org.id))
+        .eq('organization_id', selectedOrganization?.id)
         .eq('status', 'active')
         .order('name');
 
@@ -379,6 +381,7 @@ export function QuoteForm() {
   };
 
   const handleVendorSelect = (vendor: Vendor) => {
+
     setSelectedVendor(vendor);
     setFormData(prev => ({ ...prev, vendor_id: vendor.id }));
     setVendorSearch('');
@@ -1206,7 +1209,7 @@ export function QuoteForm() {
         <CustomFieldsForm
           entityType="quote"
           entityId={id}
-          organizationId={formData.organization_id}
+          organizationId={selectedOrganization?.id}
           onChange={(values) => setCustomFields(values)}
           className="border-t border-gray-200 pt-6"
         />

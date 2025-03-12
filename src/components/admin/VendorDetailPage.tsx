@@ -10,6 +10,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { cn } from '../../lib/utils';
 import { CustomFieldsSection } from './CustomFieldsSection';
+import { useOrganization } from '../../contexts/OrganizationContext';
 
 type Vendor = {
   id: string;
@@ -69,6 +70,7 @@ export function VendorDetailPage() {
   const navigate = useNavigate();
   const { id } = useParams();
   const { organizations, user } = useAuth();
+  const { selectedOrganization } = useOrganization();
   const [vendor, setVendor] = useState<Vendor | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -100,7 +102,7 @@ export function VendorDetailPage() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'account_type')
         .eq('is_active', true)
-        .eq('organization_id', organizations.map(org => org.id))
+        .eq('organization_id', selectedOrganization?.id)
         .order('display_order', { ascending: true });
 
       if (typeError) throw typeError;
@@ -112,7 +114,7 @@ export function VendorDetailPage() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'account_status')
         .eq('is_active', true)
-        .eq('organization_id', organizations.map(org => org.id))
+        .eq('organization_id', selectedOrganization?.id)
         .order('display_order', { ascending: true });
 
       if (statusError) throw statusError;
@@ -581,7 +583,7 @@ export function VendorDetailPage() {
               <CustomFieldsSection
                 entityType="vendor"
                 entityId={id}
-                organizationId={vendor.organization_id}
+                organizationId={selectedOrganization?.id}
                 className="bg-gray-50 rounded-lg p-4"
               />
             </div>

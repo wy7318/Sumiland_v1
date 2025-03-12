@@ -7,6 +7,7 @@ import {
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { cn } from '../../lib/utils';
+import { useOrganization } from '../../contexts/OrganizationContext';
 
 type CustomField = {
   id: string;
@@ -67,6 +68,7 @@ const initialFormData = {
 
 export function CustomFieldsPage() {
   const { user, organizations } = useAuth();
+  const { selectedOrganization } = useOrganization();
   const [fields, setFields] = useState<CustomField[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -80,7 +82,7 @@ export function CustomFieldsPage() {
 
   useEffect(() => {
     fetchFields();
-  }, [organizations]);
+  }, [selectedOrganization]);
 
   const fetchFields = async () => {
     try {
@@ -88,7 +90,7 @@ export function CustomFieldsPage() {
       const { data, error } = await supabase
         .from('custom_fields')
         .select('*')
-        .in('organization_id', organizations.map(org => org.id))
+        .eq('organization_id', selectedOrganization?.id)
         .order('entity_type')
         .order('display_order');
 
@@ -115,7 +117,7 @@ export function CustomFieldsPage() {
     try {
       const fieldData = {
         ...formData,
-        organization_id: organizations[0]?.id,
+        organization_id: selectedOrganization?.id,
         field_name: formData.field_name.toLowerCase().replace(/\s+/g, '_'),
         options: formData.field_type === 'select' || formData.field_type === 'multi_select'
           ? formData.options

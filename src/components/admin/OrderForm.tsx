@@ -6,6 +6,8 @@ import { supabase } from '../../lib/supabase';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
 import { CustomFieldsForm } from './CustomFieldsForm';
+import { useOrganization } from '../../contexts/OrganizationContext';
+
 
 type Order = {
   order_id: string;
@@ -49,6 +51,7 @@ export function OrderForm() {
   const navigate = useNavigate();
   const { id } = useParams();
   const { organizations, user } = useAuth();
+  const { selectedOrganization } = useOrganization();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [order, setOrder] = useState<Order | null>(null);
@@ -80,7 +83,7 @@ export function OrderForm() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'order_status')
         .eq('is_active', true)
-        .eq('organization_id', organizations.map(org => org.id))
+        .eq('organization_id', selectedOrganization?.id)
         .order('display_order', { ascending: true });
 
       if (statusError) throw statusError;
@@ -218,7 +221,7 @@ export function OrderForm() {
           const { error: valueError } = await supabase
             .from('custom_field_values')
             .upsert({
-              organization_id: order.organization_id,
+              organization_id: selectedOrganization?.id,
               entity_id: id,
               field_id: fieldId,
               value,
@@ -486,7 +489,7 @@ export function OrderForm() {
         <CustomFieldsForm
           entityType="order"
           entityId={id}
-          organizationId={order.organization_id}
+          organizationId={selectedOrganization?.id}
           onChange={(values) => setCustomFields(values)}
           className="border-t border-gray-200 pt-6"
         />

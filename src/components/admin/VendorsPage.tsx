@@ -9,6 +9,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { cn } from '../../lib/utils';
+import { useOrganization } from '../../contexts/OrganizationContext';
 
 type PicklistValue = {
     id: string;
@@ -52,6 +53,7 @@ export function VendorsPage() {
     const { organizations } = useAuth();
     const [vendors, setVendors] = useState<Vendor[]>([]);
     const [loading, setLoading] = useState(true);
+    const { selectedOrganization } = useOrganization();
     const [error, setError] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -67,7 +69,7 @@ export function VendorsPage() {
     useEffect(() => {
         fetchPicklists();
         fetchVendors();
-    }, [organizations]);
+    }, [selectedOrganization]);
 
     // Fetch picklist values for account_type and account_status
     const fetchPicklists = async () => {
@@ -78,7 +80,7 @@ export function VendorsPage() {
                 .select('id, value, label, is_default, is_active, color, text_color')
                 .eq('type', 'account_type')
                 .eq('is_active', true)
-                .eq('organization_id', organizations.map(org => org.id))
+                .eq('organization_id', selectedOrganization?.id)
                 .order('display_order', { ascending: true });
 
             if (typeError) throw typeError;
@@ -90,7 +92,7 @@ export function VendorsPage() {
                 .select('id, value, label, is_default, is_active, color, text_color')
                 .eq('type', 'account_status')
                 .eq('is_active', true)
-                .eq('organization_id', organizations.map(org => org.id))
+                .eq('organization_id', selectedOrganization?.id)
                 .order('display_order', { ascending: true });
 
             if (statusError) throw statusError;
@@ -116,7 +118,7 @@ export function VendorsPage() {
                         company
                     )
                 `)
-                .in('organization_id', organizations.map(org => org.id))
+                .eq('organization_id', selectedOrganization?.id)
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
@@ -204,7 +206,7 @@ export function VendorsPage() {
                     .from('vendors')
                     .delete()
                     .in('id', selectedVendors)
-                    .in('organization_id', organizations.map(org => org.id));
+                    .eq('organization_id', selectedOrganization?.id);
 
                 if (error) throw error;
             } else {
@@ -215,7 +217,7 @@ export function VendorsPage() {
                         updated_at: new Date().toISOString()
                     })
                     .in('id', selectedVendors)
-                    .in('organization_id', organizations.map(org => org.id));
+                    .eq('organization_id', selectedOrganization?.id);
 
                 if (error) throw error;
             }

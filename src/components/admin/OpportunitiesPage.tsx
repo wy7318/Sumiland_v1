@@ -10,6 +10,7 @@ import { supabase } from '../../lib/supabase';
 import { cn, formatCurrency } from '../../lib/utils';
 import { KanbanBoard, KanbanCard } from './KanbanBoard';
 import { useAuth } from '../../contexts/AuthContext';
+import { useOrganization } from '../../contexts/OrganizationContext';
 
 type Opportunity = {
   id: string;
@@ -118,6 +119,7 @@ export function OpportunitiesPage() {
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [loading, setLoading] = useState(true);
   const { organizations, user } = useAuth();
+  const { selectedOrganization } = useOrganization();
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [stageFilter, setStageFilter] = useState<string>('all');
@@ -141,7 +143,7 @@ export function OpportunitiesPage() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'opportunity_stage')
         .eq('is_active', true)
-        .eq('organization_id', organizations.map(org => org.id))
+        .eq('organization_id', selectedOrganization?.id)
         .order('display_order', { ascending: true });
 
       if (stageError) throw stageError;
@@ -152,7 +154,7 @@ export function OpportunitiesPage() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'opportunity_type')
         .eq('is_active', true)
-        .eq('organization_id', organizations.map(org => org.id))
+        .eq('organization_id', selectedOrganization?.id)
         .order('display_order', { ascending: true });
 
       if (typeError) throw typeError;
@@ -176,6 +178,7 @@ export function OpportunitiesPage() {
           contact:customers(*),
           owner:profiles!opportunities_owner_id_fkey(name)
         `)
+        .eq('organization_id', selectedOrganization?.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;

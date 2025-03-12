@@ -9,6 +9,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { cn, formatCurrency } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
+import { useOrganization } from '../../contexts/OrganizationContext';
 
 type PicklistValue = {
   id: string;
@@ -41,6 +42,7 @@ type Product = {
 
 export function ProductsPage() {
   const { organizations } = useAuth();
+  const { selectedOrganization } = useOrganization();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -57,7 +59,7 @@ export function ProductsPage() {
   useEffect(() => {
     fetchPicklists();
     fetchProducts();
-  }, [organizations]);
+  }, [selectedOrganization]);
 
   const fetchPicklists = async () => {
     try {
@@ -67,7 +69,7 @@ export function ProductsPage() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'product_status')
         .eq('is_active', true)
-        .eq('organization_id', organizations.map(org => org.id))
+        .eq('organization_id', selectedOrganization?.id)
         .order('display_order', { ascending: true });
 
       if (statusError) throw statusError;
@@ -79,7 +81,7 @@ export function ProductsPage() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'product_stock_unit')
         .eq('is_active', true)
-        .eq('organization_id', organizations.map(org => org.id))
+        .eq('organization_id', selectedOrganization?.id)
         .order('display_order', { ascending: true });
 
       if (unitError) throw unitError;
@@ -91,7 +93,7 @@ export function ProductsPage() {
         .select('id, value, label, is_default, is_active, color, text_color')
         .eq('type', 'product_category')
         .eq('is_active', true)
-        .eq('organization_id', organizations.map(org => org.id))
+        .eq('organization_id', selectedOrganization?.id)
         .order('display_order', { ascending: true });
 
       if (categoryError) throw categoryError;
@@ -110,7 +112,7 @@ export function ProductsPage() {
         .select(`
           *
         `)
-        .in('organization_id', organizations.map(org => org.id))
+        .eq('organization_id', selectedOrganization?.id)
         .order(sortBy, { ascending: sortOrder === 'asc' });
 
       if (error) throw error;
