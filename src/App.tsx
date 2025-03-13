@@ -9,6 +9,7 @@ import { Footer } from './components/Footer';
 import { LoginPage } from './components/auth/LoginPage';
 import { SignUpPage } from './components/auth/SignUpPage';
 import { AdminLayout } from './components/admin/AdminLayout';
+import { DashboardPage } from './components/admin/DashboardPage';
 import { PostsPage } from './components/admin/PostsPage';
 import { NewPostPage } from './components/admin/NewPostPage';
 import { EditPostPage } from './components/admin/EditPostPage';
@@ -107,7 +108,7 @@ function App() {
                                     </ProtectedRoute>
                                 }
                             >
-                                <Route index element={<PostsPage />} />
+                                <Route index element={<DashboardPage />} />
                                 <Route path="posts" element={<PostsPage />} />
                                 <Route path="posts/new" element={<NewPostPage />} />
                                 <Route path="posts/:id/edit" element={<EditPostPage />} />
