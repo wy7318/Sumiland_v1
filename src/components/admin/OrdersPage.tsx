@@ -11,17 +11,6 @@ import { cn, formatCurrency } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
 import { useOrganization } from '../../contexts/OrganizationContext';
 
-
-type PicklistValue = {
-  id: string;
-  value: string;
-  label: string;
-  is_default: boolean;
-  is_active: boolean;
-  color: string | null;
-  text_color: string | null;
-};
-
 type Order = {
   order_id: string;
   order_number: string;
@@ -66,31 +55,10 @@ export function OrdersPage() {
   const [paymentStatusFilter, setPaymentStatusFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'created_at' | 'order_number' | 'total_amount'>('created_at');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [orderStatuses, setOrderStatuses] = useState<PicklistValue[]>([]);
 
   useEffect(() => {
-    fetchPicklists();
     fetchOrders();
-  }, []);
-
-  const fetchPicklists = async () => {
-    try {
-      // Fetch order statuses
-      const { data: statusData, error: statusError } = await supabase
-        .from('picklist_values')
-        .select('id, value, label, is_default, is_active, color, text_color')
-        .eq('type', 'order_status')
-        .eq('is_active', true)
-        .eq('organization_id', selectedOrganization?.id)
-        .order('display_order', { ascending: true });
-
-      if (statusError) throw statusError;
-      setOrderStatuses(statusData || []);
-    } catch (err) {
-      console.error('Error fetching picklists:', err);
-      setError('Failed to load picklist values');
-    }
-  };
+  }, [selectedOrganization]);
 
   const fetchOrders = async () => {
     try {
@@ -169,21 +137,6 @@ export function OrdersPage() {
     return (aValue < bValue ? -1 : 1) * multiplier;
   });
 
-  // Get style for status badge
-  const getStatusStyle = (status: string) => {
-    const statusValue = orderStatuses.find(s => s.value === status);
-    if (!statusValue?.color) return {};
-    return {
-      backgroundColor: statusValue.color,
-      color: statusValue.text_color || '#FFFFFF'
-    };
-  };
-
-  // Get label for status
-  const getStatusLabel = (status: string) => {
-    return orderStatuses.find(s => s.value === status)?.label || status;
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -196,7 +149,22 @@ export function OrdersPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Order Management</h1>
-        <Package className="w-8 h-8 text-primary-500" />
+        <div className="flex gap-4">
+          <button
+            onClick={() => exportToCSV()}
+            className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+          >
+            <FileDown className="w-4 h-4 mr-2" />
+            Export CSV
+          </button>
+          <Link
+            to="/admin/orders/new"
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            New Order
+          </Link>
+        </div>
       </div>
 
       {error && (
@@ -228,11 +196,11 @@ export function OrdersPage() {
               className="px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
             >
               <option value="all">All Status</option>
-              {orderStatuses.map(status => (
-                <option key={status.id} value={status.value}>
-                  {status.label}
-                </option>
-              ))}
+              <option value="New">New</option>
+              <option value="In Progress">In Progress</option>
+              <option value="In Review">In Review</option>
+              <option value="Completed">Completed</option>
+              <option value="Cancelled">Cancelled</option>
             </select>
 
             <select
@@ -244,16 +212,6 @@ export function OrdersPage() {
               <option value="Pending">Pending</option>
               <option value="Partial Received">Partial Received</option>
               <option value="Fully Received">Fully Received</option>
-            </select>
-
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-              className="px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-            >
-              <option value="created_at">Sort by Date</option>
-              <option value="order_number">Sort by Order Number</option>
-              <option value="total_amount">Sort by Amount</option>
             </select>
 
             <button
@@ -317,14 +275,20 @@ export function OrdersPage() {
                     <select
                       value={order.status}
                       onChange={(e) => handleStatusChange(order.order_id, e.target.value)}
-                      className="text-sm font-medium rounded-full px-3 py-1"
-                      style={getStatusStyle(order.status)}
+                      className={cn(
+                        "text-sm font-medium rounded-full px-3 py-1",
+                        order.status === 'New' && "bg-blue-100 text-blue-800",
+                        order.status === 'In Progress' && "bg-yellow-100 text-yellow-800",
+                        order.status === 'In Review' && "bg-purple-100 text-purple-800",
+                        order.status === 'Completed' && "bg-green-100 text-green-800",
+                        order.status === 'Cancelled' && "bg-red-100 text-red-800"
+                      )}
                     >
-                      {orderStatuses.map(status => (
-                        <option key={status.id} value={status.value}>
-                          {status.label}
-                        </option>
-                      ))}
+                      <option value="New">New</option>
+                      <option value="In Progress">In Progress</option>
+                      <option value="In Review">In Review</option>
+                      <option value="Completed">Completed</option>
+                      <option value="Cancelled">Cancelled</option>
                     </select>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">

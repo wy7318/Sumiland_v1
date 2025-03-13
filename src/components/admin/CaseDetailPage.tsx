@@ -8,9 +8,12 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { cn } from '../../lib/utils';
-import { useAuth } from '../../contexts/AuthContext';
 import { CustomFieldsSection } from './CustomFieldsSection';
 import { UserSearch } from './UserSearch';
+import { EmailConfigModal } from './EmailConfigModal';
+import { EmailModal } from './EmailModal';
+import { getEmailConfig } from '../../lib/email';
+import { useAuth } from '../../contexts/AuthContext';
 import { useOrganization } from '../../contexts/OrganizationContext';
 
 type Case = {
@@ -32,7 +35,7 @@ type Case = {
     email: string;
     phone: string | null;
     company: string | null;
-  } | null; // Make contact optional
+  } | null;
   owner: {
     id: string;
     name: string;
@@ -68,9 +71,9 @@ type PicklistValue = {
 export function CaseDetailPage() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const { organizations, user } = useAuth();
   const { selectedOrganization } = useOrganization();
   const [caseData, setCaseData] = useState<Case | null>(null);
-  const { organizations, user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [feeds, setFeeds] = useState<Feed[]>([]);
@@ -79,6 +82,8 @@ export function CaseDetailPage() {
   const [editingFeed, setEditingFeed] = useState<Feed | null>(null);
   const [caseTypes, setCaseTypes] = useState<PicklistValue[]>([]);
   const [caseStatuses, setCaseStatuses] = useState<PicklistValue[]>([]);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [showEmailConfigModal, setShowEmailConfigModal] = useState(false);
 
   useEffect(() => {
     fetchPicklists();
@@ -164,7 +169,7 @@ export function CaseDetailPage() {
         .eq('reference_id', id)
         .eq('parent_type', 'Case')
         .eq('status', 'Active')
-        .eq('organization_id', caseData.organization_id)
+        .eq('organization_id', selectedOrganization?.id)
         .order('created_at', { ascending: true });
 
       if (error) throw error;
@@ -229,7 +234,7 @@ export function CaseDetailPage() {
           parent_id: replyTo?.id || null,
           parent_type: 'Case',
           reference_id: id,
-          organization_id: caseData.organization_id,
+          organization_id: selectedOrganization?.id,
           created_by: userData.user.id,
           created_at: new Date().toISOString(),
           status: 'Active'
@@ -260,7 +265,7 @@ export function CaseDetailPage() {
         })
         .eq('id', feedId)
         .eq('created_by', userData.user.id)
-        .eq('organization_id', caseData.organization_id);
+        .eq('organization_id', selectedOrganization?.id);
 
       if (error) throw error;
       setEditingFeed(null);
@@ -284,6 +289,22 @@ export function CaseDetailPage() {
       await fetchFeeds();
     } catch (err) {
       console.error('Error deleting comment:', err);
+    }
+  };
+
+  const handleEmailClick = async () => {
+    if (!user) return;
+    
+    try {
+      const config = await getEmailConfig(user.id);
+      if (!config) {
+        setShowEmailConfigModal(true);
+      } else {
+        setShowEmailModal(true);
+      }
+    } catch (err) {
+      console.error('Error checking email config:', err);
+      setError(err instanceof Error ? err.message : 'Failed to check email configuration');
     }
   };
 
@@ -479,48 +500,60 @@ export function CaseDetailPage() {
             </div>
           </div>
 
-          <div>
-            <h2 className="text-lg font-semibold mb-4">Contact Information</h2>
-            <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-              {caseData.contact ? (
-                <>
-                  <div className="flex items-center">
-                    <User className="w-5 h-5 text-gray-400 mr-3" />
-                    <div>
-                      <div className="font-medium">
-                        {caseData.contact.first_name} {caseData.contact.last_name}
-                      </div>
-                      {caseData.contact.company && (
-                        <div className="text-sm text-gray-500">
-                          {caseData.contact.company}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center">
-                    <Mail className="w-5 h-5 text-gray-400 mr-3" />
-                    <a
-                      href={`mailto:${caseData.contact.email}`}
-                      className="text-primary-600 hover:text-primary-700"
-                    >
-                      {caseData.contact.email}
-                    </a>
-                  </div>
-                  {caseData.contact.phone && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Contact Information */}
+            <div>
+              <h2 className="text-lg font-semibold mb-4">Contact Information</h2>
+              <div className="bg-gray-50 rounded-lg p-4 space-y-4">
+                {caseData.contact ? (
+                  <>
                     <div className="flex items-center">
-                      <Phone className="w-5 h-5 text-gray-400 mr-3" />
-                      <a
-                        href={`tel:${caseData.contact.phone}`}
-                        className="text-primary-600 hover:text-primary-700"
-                      >
-                        {caseData.contact.phone}
-                      </a>
+                      <User className="w-5 h-5 text-gray-400 mr-3" />
+                      <div>
+                        <div className="font-medium">
+                          {caseData.contact.first_name} {caseData.contact.last_name}
+                        </div>
+                        {caseData.contact.company && (
+                          <div className="text-sm text-gray-500">
+                            {caseData.contact.company}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  )}
-                </>
-              ) : (
-                <div className="text-sm text-gray-400">No contact information available</div>
-              )}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center">
+                        <Mail className="w-5 h-5 text-gray-400 mr-3" />
+                        <a
+                          href={`mailto:${caseData.contact.email}`}
+                          className="text-primary-600 hover:text-primary-700"
+                        >
+                          {caseData.contact.email}
+                        </a>
+                      </div>
+                      <button
+                        onClick={handleEmailClick}
+                        className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
+                      >
+                        <Send className="w-4 h-4 mr-2" />
+                        Send Email
+                      </button>
+                    </div>
+                    {caseData.contact.phone && (
+                      <div className="flex items-center">
+                        <Phone className="w-5 h-5 text-gray-400 mr-3" />
+                        <a
+                          href={`tel:${caseData.contact.phone}`}
+                          className="text-primary-600 hover:text-primary-700"
+                        >
+                          {caseData.contact.phone}
+                        </a>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="text-sm text-gray-400">No contact information available</div>
+                )}
+              </div>
             </div>
 
             {/* Assignment */}
@@ -528,7 +561,7 @@ export function CaseDetailPage() {
               <h2 className="text-lg font-semibold mb-4">Assignment</h2>
               <div className="bg-gray-50 rounded-lg p-4 space-y-4">
                 <UserSearch
-                  organizationId={caseData.organization_id}
+                  organizationId={selectedOrganization?.id}
                   selectedUserId={caseData.owner_id}
                   onSelect={handleAssign}
                 />
@@ -584,7 +617,7 @@ export function CaseDetailPage() {
               <CustomFieldsSection
                 entityType="case"
                 entityId={id}
-                organizationId={caseData.organization_id}
+                organizationId={selectedOrganization?.id}
                 className="bg-gray-50 rounded-lg p-4"
               />
             </div>
@@ -642,6 +675,28 @@ export function CaseDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Email Modals */}
+      {showEmailConfigModal && (
+        <EmailConfigModal
+          onClose={() => setShowEmailConfigModal(false)}
+          onSuccess={() => {
+            setShowEmailConfigModal(false);
+            setShowEmailModal(true);
+          }}
+        />
+      )}
+
+      {showEmailModal && caseData.contact && (
+        <EmailModal
+          to={caseData.contact.email}
+          onClose={() => setShowEmailModal(false)}
+          onSuccess={() => {
+            setShowEmailModal(false);
+            // Optionally add a success message or refresh feeds
+          }}
+        />
+      )}
     </div>
   );
 }

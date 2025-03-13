@@ -13,6 +13,13 @@ export const generateQuotePDF = (quote: any) => {
   const pageWidth = doc.internal.pageSize.width;
   const margin = 20; // Left margin in mm
 
+  // Add a subtle gradient background for the header
+  const gradient = doc.context2d.createLinearGradient(0, 0, pageWidth, 0);
+  gradient.addColorStop(0, '#6C5CE7'); // Modern purple
+  gradient.addColorStop(1, '#0984E3'); // Modern blue
+  doc.setFillColor(gradient);
+  doc.rect(0, 0, pageWidth, 60, 'F'); // Header background
+
   // Add logo
   doc.addImage(
     'https://jaytpfztifhtzcruxguj.supabase.co/storage/v1/object/public/Sumiland%20Design//logo_webclip.png',
@@ -22,10 +29,10 @@ export const generateQuotePDF = (quote: any) => {
     40,
     40
   );
-  
+
   // Company Info - Right aligned
   doc.setFontSize(10);
-  doc.setTextColor(100, 100, 100);
+  doc.setTextColor(255, 255, 255); // White text for contrast
   doc.text('Sumiland & Sub Studio', pageWidth - margin, 20, { align: 'right' });
   doc.text('600 E Curry Rd, Tempe, AZ 85288', pageWidth - margin, 25, { align: 'right' });
   doc.text('www.sumisubi.com', pageWidth - margin, 30, { align: 'right' });
@@ -33,22 +40,22 @@ export const generateQuotePDF = (quote: any) => {
 
   // Quote Title and Number
   doc.setFontSize(24);
-  doc.setTextColor(0, 0, 0);
-  // doc.text('QUOTE', margin, 50);
-  
+  doc.setTextColor(255, 255, 255); // White text for contrast
+  doc.text('QUOTE', margin, 50);
+
   doc.setFontSize(12);
-  doc.setTextColor(100, 100, 100);
-  doc.text(`${quote.quote_number}`, margin + 110, 50);
+  doc.setTextColor(255, 255, 255);
+  doc.text(`#${quote.quote_number}`, margin + 110, 50);
 
   // Quote Details
-  const detailsY = 65;
+  const detailsY = 75; // Adjusted for better spacing
   doc.setFontSize(10);
   doc.setTextColor(100, 100, 100);
 
   // Left column
   doc.text('DATE', margin, detailsY);
   doc.text('VALID FOR', margin, detailsY + 7);
-  
+
   doc.setTextColor(0, 0, 0);
   doc.text(new Date(quote.quote_date).toLocaleDateString(), margin + 25, detailsY);
   doc.text('30 days', margin + 25, detailsY + 7);
@@ -56,7 +63,7 @@ export const generateQuotePDF = (quote: any) => {
   // Right column
   doc.setTextColor(100, 100, 100);
   doc.text('BILL TO', pageWidth - margin - 60, detailsY);
-  
+
   doc.setTextColor(0, 0, 0);
   doc.text([
     `${quote.customer.first_name} ${quote.customer.last_name}`,
@@ -85,7 +92,7 @@ export const generateQuotePDF = (quote: any) => {
       tableBody.push([
         {
           content: item.item_desc,
-          styles: { 
+          styles: {
             textColor: [100, 100, 100],
             fontSize: 9
           },
@@ -96,14 +103,14 @@ export const generateQuotePDF = (quote: any) => {
   }
 
   autoTable(doc, {
-    startY: 100,
+    startY: 110, // Adjusted for better spacing
     head: [['Description', 'Qty', 'Unit Price', 'Total']],
     body: tableBody,
     foot: [[
       { content: 'Subtotal', colSpan: 3, styles: { halign: 'right', fontStyle: 'bold' } },
       { content: formatCurrency(quote.total_amount), styles: { fontStyle: 'bold' } }
     ]],
-    theme: 'plain',
+    theme: 'striped', // Use striped theme for a modern look
     styles: {
       fontSize: 10,
       cellPadding: { top: 6, right: 8, bottom: 6, left: 8 },
@@ -111,8 +118,8 @@ export const generateQuotePDF = (quote: any) => {
       lineWidth: 0.5,
     },
     headStyles: {
-      fillColor: [250, 250, 250],
-      textColor: [100, 100, 100],
+      fillColor: [44, 62, 80], // Dark header for contrast
+      textColor: [255, 255, 255], // White text
       fontStyle: 'bold',
       lineWidth: 0,
     },
@@ -137,18 +144,18 @@ export const generateQuotePDF = (quote: any) => {
 
   // Terms & Conditions
   const termsY = doc.lastAutoTable.finalY + 20;
-  
+
   // Terms Header
   doc.setFontSize(14);
-  doc.setTextColor(0, 0, 0);
+  doc.setTextColor(44, 62, 80); // Dark blue for headings
   doc.text('Terms & Conditions', margin, termsY);
 
   // Payment Terms Section
   doc.setFontSize(10);
   doc.setTextColor(70, 70, 70);
-  
+
   const terms = [
-    { 
+    {
       title: 'Payment Terms',
       content: [
         '• 70% of the total quoted amount is required to initiate work.',
@@ -192,7 +199,7 @@ export const generateQuotePDF = (quote: any) => {
   terms.forEach(section => {
     // Section Title
     doc.setFontSize(11);
-    doc.setTextColor(0, 0, 0);
+    doc.setTextColor(44, 62, 80); // Dark blue for headings
     doc.text(section.title, margin, currentY);
     currentY += lineSpacing + 2;
 
@@ -215,6 +222,6 @@ export const generateQuotePDF = (quote: any) => {
   doc.setFontSize(9);
   doc.setTextColor(100, 100, 100);
   doc.text('Thank you for your business!', pageWidth / 2, footerY, { align: 'center' });
-  
+
   return doc;
 };

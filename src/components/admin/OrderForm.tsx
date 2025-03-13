@@ -1,126 +1,209 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Save, X, AlertCircle, DollarSign, Percent } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Save, X, Plus, Trash2, Search, Building2, Package, AlertCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
 import { CustomFieldsForm } from './CustomFieldsForm';
 import { useOrganization } from '../../contexts/OrganizationContext';
 
-
-type Order = {
-  order_id: string;
-  order_number: string;
+type Customer = {
   customer_id: string;
-  status: string;
-  payment_status: 'Pending' | 'Partial Received' | 'Fully Received';
-  payment_amount: number;
-  total_amount: number;
-  tax_percent: number | null; // ✅ Added
-  tax_amount: number | null; // ✅ Added
-  discount_amount: number | null; // ✅ Added
-  subtotal: number; // ✅ Added
-  notes: string | null;
-  quote_id: string | null;
-  organization_id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string | null;
+  company: string | null;
+};
+
+type Vendor = {
+  id: string;
+  name: string;
+  type: string;
+  email: string | null;
+  phone: string | null;
+  contact_person: string | null;
+};
+
+type Product = {
+  id: string;
+  name: string;
+  description: string | null;
+  price: number;
 };
 
 type OrderItem = {
-  order_dtl_id: string;
   product_id: string | null;
-  item_name: string;
-  description: string | null;
+  product_name?: string;
   quantity: number;
   unit_price: number;
   subtotal: number;
-  notes: string | null;
+  notes?: string;
 };
 
-type PicklistValue = {
-  id: string;
-  value: string;
-  label: string;
-  is_default: boolean;
-  is_active: boolean;
-  color: string | null;
-  text_color: string | null;
+type FormData = {
+  customer_id: string;
+  vendor_id: string | null;
+  status: string;
+  payment_status: string;
+  payment_amount: number;
+  total_amount: number;
+  notes: string;
+  items: OrderItem[];
+  organization_id: string;
+};
+
+const initialFormData: FormData = {
+  customer_id: '',
+  vendor_id: null,
+  status: 'New',
+  payment_status: 'Pending',
+  payment_amount: 0,
+  total_amount: 0,
+  notes: '',
+  items: [],
+  organization_id: ''
 };
 
 export function OrderForm() {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { organizations, user } = useAuth();
   const { selectedOrganization } = useOrganization();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [order, setOrder] = useState<Order | null>(null);
-  const [items, setItems] = useState<OrderItem[]>([]);
-  const [paymentAmount, setPaymentAmount] = useState<number>(0);
-  const [paymentPercent, setPaymentPercent] = useState<number>(0);
+  const [formData, setFormData] = useState<FormData>(initialFormData);
   const [customFields, setCustomFields] = useState<Record<string, any>>({});
-  const [orderStatuses, setOrderStatuses] = useState<PicklistValue[]>([]);
+  
+  // Search states
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [vendorSearch, setVendorSearch] = useState('');
+  const [productSearch, setProductSearch] = useState('');
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
+  const [filteredVendors, setFilteredVendors] = useState<Vendor[]>([]);
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+  const [showVendorDropdown, setShowVendorDropdown] = useState(false);
+  const [showProductDropdown, setShowProductDropdown] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
+  const [selectedProductIndex, setSelectedProductIndex] = useState<number | null>(null);
+  
+  const customerSearchRef = useRef<HTMLDivElement>(null);
+  const vendorSearchRef = useRef<HTMLDivElement>(null);
+  const productSearchRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetchPicklists();
     if (id) {
       fetchOrder();
+    } else if (selectedOrganization) {
+      setFormData(prev => ({
+        ...prev,
+        organization_id: selectedOrganization.id
+      }));
     }
-  }, [id]);
+  }, [id, selectedOrganization]);
 
   useEffect(() => {
-    if (order) {
-      setPaymentAmount(order.payment_amount);
-      setPaymentPercent((order.payment_amount / order.total_amount) * 100);
+    if (customerSearch) {
+      const filtered = customers.filter(customer => 
+        customer.first_name.toLowerCase().includes(customerSearch.toLowerCase()) ||
+        customer.last_name.toLowerCase().includes(customerSearch.toLowerCase()) ||
+        customer.email.toLowerCase().includes(customerSearch.toLowerCase()) ||
+        customer.company?.toLowerCase().includes(customerSearch.toLowerCase())
+      );
+      setFilteredCustomers(filtered);
+    } else {
+      setFilteredCustomers([]);
     }
-  }, [order]);
+  }, [customerSearch, customers]);
 
-  const fetchPicklists = async () => {
-    try {
-      // Fetch order statuses
-      const { data: statusData, error: statusError } = await supabase
-        .from('picklist_values')
-        .select('id, value, label, is_default, is_active, color, text_color')
-        .eq('type', 'order_status')
-        .eq('is_active', true)
-        .eq('organization_id', selectedOrganization?.id)
-        .order('display_order', { ascending: true });
+  useEffect(() => {
+    if (vendorSearch) {
+      const filtered = vendors.filter(vendor => 
+        vendor.name.toLowerCase().includes(vendorSearch.toLowerCase()) ||
+        vendor.email?.toLowerCase().includes(vendorSearch.toLowerCase()) ||
+        vendor.contact_person?.toLowerCase().includes(vendorSearch.toLowerCase())
+      );
+      setFilteredVendors(filtered);
+    } else {
+      setFilteredVendors([]);
+    }
+  }, [vendorSearch, vendors]);
 
-      if (statusError) throw statusError;
-      setOrderStatuses(statusData || []);
+  useEffect(() => {
+    if (productSearch) {
+      const filtered = products.filter(product =>
+        product.name.toLowerCase().includes(productSearch.toLowerCase()) ||
+        product.description?.toLowerCase().includes(productSearch.toLowerCase())
+      );
+      setFilteredProducts(filtered);
+    } else {
+      setFilteredProducts([]);
+    }
+  }, [productSearch, products]);
 
-      // If no order is being edited, set default status
-      if (!id && statusData) {
-        const defaultStatus = statusData.find(s => s.is_default)?.value || statusData[0]?.value;
-        if (defaultStatus) {
-          setOrder(prev => prev ? { ...prev, status: defaultStatus } : null);
-        }
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (customerSearchRef.current && !customerSearchRef.current.contains(event.target as Node)) {
+        setShowCustomerDropdown(false);
       }
-    } catch (err) {
-      console.error('Error fetching picklists:', err);
-      setError('Failed to load picklist values');
-    }
-  };
+      if (vendorSearchRef.current && !vendorSearchRef.current.contains(event.target as Node)) {
+        setShowVendorDropdown(false);
+      }
+      if (productSearchRef.current && !productSearchRef.current.contains(event.target as Node)) {
+        setShowProductDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const fetchOrder = async () => {
     try {
-      const { data: orderData, error } = await supabase
+      const { data: order, error } = await supabase
         .from('order_hdr')
-        .select('*')
+        .select(`
+          *,
+          customer:customers(*),
+          vendor:vendors(*),
+          items:order_dtl(*)
+        `)
         .eq('order_id', id)
         .single();
 
       if (error) throw error;
-      setOrder(orderData);
+      if (order) {
+        setFormData({
+          customer_id: order.customer_id,
+          vendor_id: order.vendor_id,
+          status: order.status,
+          payment_status: order.payment_status,
+          payment_amount: order.payment_amount,
+          total_amount: order.total_amount,
+          notes: order.notes || '',
+          items: order.items.map((item: any) => ({
+            product_id: item.product_id,
+            product_name: item.item_name,
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            subtotal: item.subtotal,
+            notes: item.notes
+          })),
+          organization_id: order.organization_id
+        });
 
-      // Get order details
-      const { data: itemsData, error: itemsError } = await supabase
-        .from('order_dtl')
-        .select('*')
-        .eq('order_id', id);
-
-      if (itemsError) throw itemsError;
-      setItems(itemsData || []);
+        if (order.customer) {
+          setSelectedCustomer(order.customer);
+        }
+        if (order.vendor) {
+          setSelectedVendor(order.vendor);
+        }
+      }
     } catch (err) {
       console.error('Error fetching order:', err);
       setError('Failed to load order');
@@ -128,142 +211,260 @@ export function OrderForm() {
     }
   };
 
-  const handlePaymentAmountChange = (amount: number) => {
-    if (!order) return;
-    
-    // Validate amount is between 0 and total
-    const validAmount = Math.max(0, Math.min(order.total_amount, amount));
-    setPaymentAmount(validAmount);
-    
-    // Calculate and update percentage
-    const newPercent = (validAmount / order.total_amount) * 100;
-    setPaymentPercent(newPercent);
+  const fetchCustomers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('organization_id', selectedOrganization?.id)
+        .order('first_name');
+
+      if (error) throw error;
+      setCustomers(data || []);
+    } catch (err) {
+      console.error('Error fetching customers:', err);
+      setError('Failed to load customers');
+    }
   };
 
-  const handlePaymentPercentChange = (percent: number) => {
-    if (!order) return;
-    
-    // Validate percent is between 0 and 100
-    const validPercent = Math.max(0, Math.min(100, percent));
-    setPaymentPercent(validPercent);
+  const fetchVendors = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('vendors')
+        .select('*')
+        .eq('organization_id', selectedOrganization?.id)
+        .order('name');
 
-    // Calculate new payment amount based on percentage
-    const newAmount = (validPercent / 100) * order.total_amount;
-    setPaymentAmount(newAmount);
+      if (error) throw error;
+      setVendors(data || []);
+    } catch (err) {
+      console.error('Error fetching vendors:', err);
+      setError('Failed to load vendors');
+    }
   };
 
-  const handleInputChange = (field: keyof Order, value: any) => {
-    setOrder(prev => prev ? { ...prev, [field]: value } : null);
+  const fetchProducts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('organization_id', selectedOrganization?.id)
+        .eq('status', 'active')
+        .order('name');
+
+      if (error) throw error;
+      setProducts(data || []);
+    } catch (err) {
+      console.error('Error fetching products:', err);
+      setError('Failed to load products');
+    }
   };
 
-  // Auto calculate tax amount when tax percent is changed
-  const handleTaxPercentChange = (percent: number | null) => {
-    if (!order) return;
-
-    const taxAmount = percent !== null ? (order.subtotal * percent) / 100 : null;
-    setOrder(prev => prev ? { ...prev, tax_percent: percent, tax_amount: taxAmount } : null);
+  const handleCustomerSelect = (customer: Customer) => {
+    setSelectedCustomer(customer);
+    setFormData(prev => ({ ...prev, customer_id: customer.customer_id }));
+    setCustomerSearch('');
+    setShowCustomerDropdown(false);
   };
 
-  // Auto calculate tax percent when tax amount is changed
-  const handleTaxAmountChange = (amount: number | null) => {
-    if (!order) return;
+  const handleVendorSelect = (vendor: Vendor) => {
+    setSelectedVendor(vendor);
+    setFormData(prev => ({ ...prev, vendor_id: vendor.id }));
+    setVendorSearch('');
+    setShowVendorDropdown(false);
+  };
 
-    const taxPercent = amount !== null && order.subtotal > 0 ? (amount / order.subtotal) * 100 : null;
-    setOrder(prev => prev ? { ...prev, tax_amount: amount, tax_percent: taxPercent } : null);
+  const handleProductSelect = (product: Product) => {
+    if (selectedProductIndex !== null) {
+      // Update existing item
+      setFormData(prev => ({
+        ...prev,
+        items: prev.items.map((item, index) => 
+          index === selectedProductIndex
+            ? {
+                product_id: product.id,
+                product_name: product.name,
+                quantity: 1,
+                unit_price: product.price,
+                subtotal: product.price
+              }
+            : item
+        )
+      }));
+    } else {
+      // Add new item
+      setFormData(prev => ({
+        ...prev,
+        items: [
+          ...prev.items,
+          {
+            product_id: product.id,
+            product_name: product.name,
+            quantity: 1,
+            unit_price: product.price,
+            subtotal: product.price
+          }
+        ]
+      }));
+    }
+    setProductSearch('');
+    setShowProductDropdown(false);
+    setSelectedProductIndex(null);
+  };
+
+  const updateItem = (index: number, field: keyof OrderItem, value: any) => {
+    setFormData(prev => ({
+      ...prev,
+      items: prev.items.map((item, i) => {
+        if (i === index) {
+          const updatedItem = { ...item, [field]: value };
+          // Recalculate subtotal if quantity or unit_price changes
+          if (field === 'quantity' || field === 'unit_price') {
+            updatedItem.subtotal = updatedItem.quantity * updatedItem.unit_price;
+          }
+          return updatedItem;
+        }
+        return item;
+      })
+    }));
+  };
+
+  const removeItem = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      items: prev.items.filter((_, i) => i !== index)
+    }));
+  };
+
+  const calculateTotal = () => {
+    return formData.items.reduce((sum, item) => sum + item.subtotal, 0);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!order) return;
+    if (!formData.customer_id) {
+      setError('Please select a customer');
+      return;
+    }
 
     setLoading(true);
     setError(null);
 
     try {
-      // Update order header
-      const { error: updateError } = await supabase
-        .from('order_hdr')
-        .update({
-          status: order.status,
-          payment_amount: order.payment_amount,
-          tax_percent: order.tax_percent,
-          tax_amount: order.tax_amount,
-          discount_amount: order.discount_amount,
-          subtotal: order.subtotal,
-          total_amount: order.subtotal + (order.tax_amount ?? 0) - (order.discount_amount ?? 0),
-          notes: order.notes,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('order_id', id);
+      const total = calculateTotal();
+      const organizationId = selectedOrganization?.id;
+      const { data: orderNumberData, error: orderNumberError } = await supabase
+        .rpc('generate_order_number', { org_id: organizationId });
 
-      if (updateError) throw updateError;
+      if (orderNumberError) throw orderNumberError;
 
-      // Update items
-      for (const item of items) {
-        const { error: itemError } = await supabase
-          .from('order_dtl')
+      const generatedOrderNumber = orderNumberData;
+
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error('Not authenticated');
+      
+      const orderData = {
+        ...formData,
+        total_amount: total,
+        organization_id: selectedOrganization?.id
+      };
+
+      if (id) {
+        // Update existing order
+        const { error: updateError } = await supabase
+          .from('order_hdr')
           .update({
-            item_name: item.item_name,
-            description: item.description,
-            quantity: item.quantity,
-            unit_price: item.unit_price,
-            subtotal: item.quantity * item.unit_price,
-            notes: item.notes
+            customer_id: orderData.customer_id,
+            vendor_id: orderData.vendor_id,
+            status: orderData.status,
+            payment_status: orderData.payment_status,
+            payment_amount: orderData.payment_amount,
+            total_amount: orderData.total_amount,
+            notes: orderData.notes,
+            updated_at: new Date().toISOString()
           })
-          .eq('order_dtl_id', item.order_dtl_id);
+          .eq('order_id', id);
 
-        if (itemError) throw itemError;
+        if (updateError) throw updateError;
+
+        // Delete existing items
+        const { error: deleteError } = await supabase
+          .from('order_dtl')
+          .delete()
+          .eq('order_id', id);
+
+        if (deleteError) throw deleteError;
+
+        // Insert new items
+        const { error: itemsError } = await supabase
+          .from('order_dtl')
+          .insert(
+            orderData.items.map(item => ({
+              order_id: id,
+              product_id: item.product_id,
+              item_name: item.product_name,
+              quantity: item.quantity,
+              unit_price: item.unit_price,
+              subtotal: item.subtotal,
+              notes: item.notes,
+              organization_id: orderData.organization_id
+            }))
+          );
+
+        if (itemsError) throw itemsError;
+      } else {
+        // Create new order
+        const { data: newOrder, error: insertError } = await supabase
+          .from('order_hdr')
+          .insert([{
+            order_number: generatedOrderNumber,  // 🔹 Use generated order number
+            customer_id: formData.customer_id,
+            vendor_id: formData.vendor_id,
+            status: formData.status,
+            payment_status: formData.payment_status,
+            payment_amount: formData.payment_amount,
+            total_amount: total,
+            notes: formData.notes,
+            created_at: new Date().toISOString(),
+            created_by: userData.user.id,
+            updated_at: new Date().toISOString(),
+            updated_by: userData.user.id,
+            organization_id: organizationId
+          }])
+          .select()
+          .single();
+
+        if (insertError) throw insertError;
+
+        // Insert items
+        const { error: itemsError } = await supabase
+          .from('order_dtl')
+          .insert(
+            orderData.items.map(item => ({
+              order_id: newOrder.order_id,
+              product_id: item.product_id,
+              item_name: item.product_name,
+              quantity: item.quantity,
+              unit_price: item.unit_price,
+              subtotal: item.subtotal,
+              notes: item.notes,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              organization_id: orderData.organization_id
+            }))
+          );
+
+        if (itemsError) throw itemsError;
       }
 
-      // Save custom field values
-      if (user) {
-        for (const [fieldId, value] of Object.entries(customFields)) {
-          const { error: valueError } = await supabase
-            .from('custom_field_values')
-            .upsert({
-              organization_id: selectedOrganization?.id,
-              entity_id: id,
-              field_id: fieldId,
-              value,
-              created_by: user.id,
-              updated_by: user.id,
-              updated_at: new Date().toISOString()
-            }, {
-              onConflict: 'organization_id,field_id,entity_id'
-            });
-
-          if (valueError) {
-            console.error('Error saving custom field value:', valueError);
-          }
-        }
-      }
-
-      navigate(`/admin/orders/${id}`);
+      navigate('/admin/orders');
     } catch (err) {
-      console.error('Error updating order:', err);
-      setError(err instanceof Error ? err.message : 'Failed to update order');
+      console.error('Error saving order:', err);
+      setError(err instanceof Error ? err.message : 'Failed to save order');
     } finally {
       setLoading(false);
     }
   };
-
-  // Get style for status badge
-  const getStatusStyle = (status: string) => {
-    const statusValue = orderStatuses.find(s => s.value === status);
-    if (!statusValue?.color) return {};
-    return {
-      backgroundColor: statusValue.color,
-      color: statusValue.text_color || '#FFFFFF'
-    };
-  };
-
-  if (!order) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
-      </div>
-    );
-  }
 
   return (
     <motion.div
@@ -272,9 +473,11 @@ export function OrderForm() {
       className="bg-white rounded-lg shadow-md p-6"
     >
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Edit Order {order.order_number}</h1>
+        <h1 className="text-2xl font-bold">
+          {id ? 'Edit Order' : 'Create New Order'}
+        </h1>
         <button
-          onClick={() => navigate(`/admin/orders/${id}`)}
+          onClick={() => navigate('/admin/orders')}
           className="p-2 text-gray-500 hover:text-gray-700 rounded-full hover:bg-gray-100"
         >
           <X className="w-6 h-6" />
@@ -289,95 +492,422 @@ export function OrderForm() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Tax, Discount, and Subtotal Fields */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div ref={customerSearchRef} className="relative">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Customer *
+            </label>
+            {selectedCustomer ? (
+              <div className="flex items-center justify-between p-2 border rounded-lg">
+                <div>
+                  <p className="font-medium">
+                    {selectedCustomer.first_name} {selectedCustomer.last_name}
+                  </p>
+                  <p className="text-sm text-gray-500">{selectedCustomer.email}</p>
+                  {selectedCustomer.company && (
+                    <p className="text-sm text-gray-500">{selectedCustomer.company}</p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedCustomer(null);
+                    setFormData(prev => ({ ...prev, customer_id: '' }));
+                  }}
+                  className="p-1 hover:bg-gray-100 rounded-full"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="text"
+                  value={customerSearch}
+                  onChange={(e) => {
+                    setCustomerSearch(e.target.value);
+                    setShowCustomerDropdown(true);
+                    if (!customers.length) {
+                      fetchCustomers();
+                    }
+                  }}
+                  onFocus={() => {
+                    setShowCustomerDropdown(true);
+                    if (!customers.length) {
+                      fetchCustomers();
+                    }
+                  }}
+                  placeholder="Search customers..."
+                  className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                />
+              </div>
+            )}
+
+            <AnimatePresence>
+              {showCustomerDropdown && customerSearch && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="absolute z-10 w-full mt-1 bg-white rounded-lg shadow-lg border border-gray-200"
+                >
+                  {filteredCustomers.length > 0 ? (
+                    <ul className="py-1 max-h-60 overflow-auto">
+                      {filteredCustomers.map(customer => (
+                        <li
+                          key={customer.customer_id}
+                          onClick={() => handleCustomerSelect(customer)}
+                          className="px-4 py-2 hover:bg-gray-50 cursor-pointer"
+                        >
+                          <div className="font-medium">
+                            {customer.first_name} {customer.last_name}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {customer.email}
+                          </div>
+                          {customer.company && (
+                            <div className="text-sm text-gray-500">
+                              {customer.company}
+                            </div>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="p-4 text-gray-500">
+                      No customers found
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          <div ref={vendorSearchRef} className="relative">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Account
+            </label>
+            {selectedVendor ? (
+              <div className="flex items-center justify-between p-2 border rounded-lg">
+                <div>
+                  <p className="font-medium">{selectedVendor.name}</p>
+                  {selectedVendor.contact_person && (
+                    <p className="text-sm text-gray-500">
+                      Contact: {selectedVendor.contact_person}
+                    </p>
+                  )}
+                  {selectedVendor.email && (
+                    <p className="text-sm text-gray-500">{selectedVendor.email}</p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedVendor(null);
+                    setFormData(prev => ({ ...prev, vendor_id: null }));
+                  }}
+                  className="p-1 hover:bg-gray-100 rounded-full"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="text"
+                  value={vendorSearch}
+                  onChange={(e) => {
+                    setVendorSearch(e.target.value);
+                    setShowVendorDropdown(true);
+                    if (!vendors.length) {
+                      fetchVendors();
+                    }
+                  }}
+                  onFocus={() => {
+                    setShowVendorDropdown(true);
+                    if (!vendors.length) {
+                      fetchVendors();
+                    }
+                  }}
+                  placeholder="Search accounts..."
+                  className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                />
+              </div>
+            )}
+
+            <AnimatePresence>
+              {showVendorDropdown && vendorSearch && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="absolute z-10 w-full mt-1 bg-white rounded-lg shadow-lg border border-gray-200"
+                >
+                  {filteredVendors.length > 0 ? (
+                    <ul className="py-1 max-h-60 overflow-auto">
+                      {filteredVendors.map(vendor => (
+                        <li
+                          key={vendor.id}
+                          onClick={() => handleVendorSelect(vendor)}
+                          className="px-4 py-2 hover:bg-gray-50 cursor-pointer"
+                        >
+                          <div className="font-medium">{vendor.name}</div>
+                          {vendor.contact_person && (
+                            <div className="text-sm text-gray-500">
+                              Contact: {vendor.contact_person}
+                            </div>
+                          )}
+                          {vendor.email && (
+                            <div className="text-sm text-gray-500">
+                              {vendor.email}
+                            </div>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="p-4 text-gray-500">
+                      No accounts found
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
           <div>
-            <label className="block text-sm font-medium text-gray-700">Subtotal</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Status
+            </label>
+            <select
+              value={formData.status}
+              onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
+              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+            >
+              <option value="New">New</option>
+              <option value="In Progress">In Progress</option>
+              <option value="In Review">In Review</option>
+              <option value="Completed">Completed</option>
+              <option value="Cancelled">Cancelled</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Payment Status
+            </label>
+            <select
+              value={formData.payment_status}
+              onChange={(e) => setFormData(prev => ({ ...prev, payment_status: e.target.value }))}
+              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+            >
+              <option value="Pending">Pending</option>
+              <option value="Partial Received">Partial Received</option>
+              <option value="Fully Received">Fully Received</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Payment Amount
+            </label>
             <input
               type="number"
-              value={order.subtotal}
-              onChange={(e) => handleInputChange('subtotal', parseFloat(e.target.value))}
-              className="w-full px-4 py-2 rounded-lg border border-gray-300"
+              min="0"
+              step="0.01"
+              value={formData.payment_amount}
+              onChange={(e) => setFormData(prev => ({ ...prev, payment_amount: parseFloat(e.target.value) || 0 }))}
+              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Tax %</label>
-            <input
-              type="number"
-              value={order.tax_percent ?? ''}
-              onChange={(e) => handleTaxPercentChange(parseFloat(e.target.value))}
-              className="w-full px-4 py-2 rounded-lg border border-gray-300"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Tax Amount</label>
-            <input
-              type="number"
-              value={order.tax_amount ?? ''}
-              onChange={(e) => handleTaxAmountChange(parseFloat(e.target.value))}
-              className="w-full px-4 py-2 rounded-lg border border-gray-300"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Discount Amount</label>
-            <input
-              type="number"
-              value={order.discount_amount ?? ''}
-              onChange={(e) => handleInputChange('discount_amount', parseFloat(e.target.value))}
-              className="w-full px-4 py-2 rounded-lg border border-gray-300"
-            />
-          </div>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Status
-          </label>
-          <select
-            value={order.status}
-            onChange={(e) => setOrder(prev => prev ? { ...prev, status: e.target.value } : null)}
-            className="text-sm font-medium rounded-full px-3 py-1"
-            style={getStatusStyle(order.status)}
-          >
-            {orderStatuses.map(status => (
-              <option key={status.id} value={status.value}>
-                {status.label}
-              </option>
-            ))}
-          </select>
         </div>
 
-        <div className="space-y-3">
-          <label className="block text-sm font-medium text-gray-700">
-            Payment Details
-          </label>
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1">
-              <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <input
-                type="number"
-                value={paymentAmount}
-                onChange={(e) => handlePaymentAmountChange(parseFloat(e.target.value))}
-                min="0"
-                max={order.total_amount}
-                step="0.01"
-                className="w-full pl-9 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-              />
+        <div className="border-t border-gray-200 pt-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-semibold">Order Items</h2>
+            <div ref={productSearchRef} className="relative">
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={selectedProductIndex === null ? '' : productSearch}
+                  onChange={(e) => {
+                    setProductSearch(e.target.value);
+                    setShowProductDropdown(true);
+                    if (!products.length) {
+                      fetchProducts();
+                    }
+                  }}
+                  onFocus={() => {
+                    setShowProductDropdown(true);
+                    if (!products.length) {
+                      fetchProducts();
+                    }
+                  }}
+                  placeholder="Search products..."
+                  className="w-64 px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedProductIndex(null);
+                    setProductSearch('');
+                    setShowProductDropdown(true);
+                  }}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Product
+                </button>
+              </div>
+
+              <AnimatePresence>
+                {showProductDropdown && productSearch && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="absolute z-10 w-full mt-1 bg-white rounded-lg shadow-lg border border-gray-200"
+                  >
+                    {filteredProducts.length > 0 ? (
+                      <ul className="py-1 max-h-60 overflow-auto">
+                        {filteredProducts.map(product => (
+                          <li
+                            key={product.id}
+                            onClick={() => handleProductSelect(product)}
+                            className="px-4 py-2 hover:bg-gray-50 cursor-pointer"
+                          >
+                            <div className="flex items-center">
+                              <Package className="w-4 h-4 text-gray-400 mr-2" />
+                              <div>
+                                <div className="font-medium">{product.name}</div>
+                                <div className="text-sm text-gray-500">
+                                  Price: ${product.price.toFixed(2)}
+                                </div>
+                              </div>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className="p-4 text-gray-500">
+                        No products found
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
-            <span className="text-sm text-gray-500 whitespace-nowrap">
-              of {order.total_amount.toFixed(2)}
-            </span>
           </div>
-          <div className="relative">
-            <Percent className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <input
-              type="number"
-              value={paymentPercent}
-              onChange={(e) => handlePaymentPercentChange(parseFloat(e.target.value))}
-              min="0"
-              max="100"
-              step="0.01"
-              className="w-full pl-9 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-            />
+
+          <div className="space-y-4">
+            {formData.items.map((item, index) => (
+              <div key={index} className="bg-gray-50 p-4 rounded-lg">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Item Name *
+                    </label>
+                    <input
+                      type="text"
+                      value={item.product_name || ''}
+                      onChange={(e) => updateItem(index, 'product_name', e.target.value)}
+                      className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Quantity *
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={item.quantity}
+                      onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value))}
+                      className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Unit Price *
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={item.unit_price}
+                      onChange={(e) => updateItem(index, 'unit_price', parseFloat(e.target.value))}
+                      className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Notes
+                    </label>
+                    <input
+                      type="text"
+                      value={item.notes || ''}
+                      onChange={(e) => updateItem(index, 'notes', e.target.value)}
+                      className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-4 flex justify-between items-center">
+                  <button
+                    type="button"
+                    onClick={() => removeItem(index)}
+                    className="text-red-600 hover:text-red-700"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                  <div className="text-right">
+                    <span className="text-sm text-gray-500">Subtotal:</span>
+                    <span className="ml-2 font-medium">
+                      ${item.subtotal.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            <button
+              type="button"
+              onClick={() => {
+                setFormData(prev => ({
+                  ...prev,
+                  items: [
+                    ...prev.items,
+                    {
+                      product_id: null,
+                      product_name: '',
+                      quantity: 1,
+                      unit_price: 0,
+                      subtotal: 0
+                    }
+                  ]
+                }));
+              }}
+              className="w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-primary-500 hover:text-primary-500 transition-colors flex items-center justify-center"
+            >
+              <Plus className="w-5 h-5 mr-2" />
+              Add Item
+            </button>
+
+            <div className="flex justify-end">
+              <div className="text-right">
+                <div className="text-sm text-gray-500">Total: ${calculateTotal().toFixed(2)}</div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -386,104 +916,11 @@ export function OrderForm() {
             Notes
           </label>
           <textarea
-            value={order.notes || ''}
-            onChange={(e) => setOrder(prev => prev ? { ...prev, notes: e.target.value } : null)}
+            value={formData.notes}
+            onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
             rows={4}
             className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
           />
-        </div>
-
-        <div>
-          <h2 className="text-lg font-semibold mb-4">Order Items</h2>
-          <div className="space-y-4">
-            {items.map((item, index) => (
-              <div key={item.order_dtl_id} className="bg-gray-50 p-4 rounded-lg">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Item Name
-                    </label>
-                    <input
-                      type="text"
-                      value={item.item_name}
-                      onChange={(e) => {
-                        const newItems = [...items];
-                        newItems[index] = { ...item, item_name: e.target.value };
-                        setItems(newItems);
-                      }}
-                      className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Quantity
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={item.quantity}
-                      onChange={(e) => {
-                        const newItems = [...items];
-                        newItems[index] = { 
-                          ...item, 
-                          quantity: parseInt(e.target.value),
-                          subtotal: parseInt(e.target.value) * item.unit_price
-                        };
-                        setItems(newItems);
-                      }}
-                      className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div className="mt-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Description
-                  </label>
-                  <textarea
-                    value={item.description || ''}
-                    onChange={(e) => {
-                      const newItems = [...items];
-                      newItems[index] = { ...item, description: e.target.value };
-                      setItems(newItems);
-                    }}
-                    rows={2}
-                    className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-                  />
-                </div>
-
-                <div className="mt-4 flex justify-between items-center">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Unit Price
-                    </label>
-                    <input
-                      type="number"
-                      value={item.unit_price}
-                      onChange={(e) => {
-                        const newItems = [...items];
-                        newItems[index] = { 
-                          ...item, 
-                          unit_price: parseFloat(e.target.value),
-                          subtotal: item.quantity * parseFloat(e.target.value)
-                        };
-                        setItems(newItems);
-                      }}
-                      min="0"
-                      step="0.01"
-                      className="w-32 px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-                    />
-                  </div>
-                  <div className="text-right">
-                    <span className="text-sm text-gray-500">Subtotal:</span>
-                    <span className="ml-2 font-medium">
-                      {(item.subtotal).toFixed(2)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
 
         <CustomFieldsForm
@@ -497,7 +934,7 @@ export function OrderForm() {
         <div className="flex justify-end space-x-4">
           <button
             type="button"
-            onClick={() => navigate(`/admin/orders/${id}`)}
+            onClick={() => navigate('/admin/orders')}
             className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
           >
             Cancel
@@ -508,7 +945,7 @@ export function OrderForm() {
             className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center"
           >
             <Save className="w-4 h-4 mr-2" />
-            {loading ? 'Saving...' : 'Save Changes'}
+            {loading ? 'Saving...' : 'Save Order'}
           </button>
         </div>
       </form>
