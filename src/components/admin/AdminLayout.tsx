@@ -5,7 +5,7 @@ import {
   FileText, Image, LogOut, Users, Package, Tag, Quote, MessageSquare, 
   LayoutDashboard, Settings, ShoppingBag, Building2, Truck, ClipboardList, 
   BoxSelect as BoxSeam, UserCog, Home, UserPlus, UserCheck, Target,
-  Search, MoreHorizontal, ChevronRight
+  Search, MoreHorizontal, ChevronRight, BarChart2
 } from 'lucide-react';
 import { getCurrentUser, signOut } from '../../lib/auth';
 import { cn } from '../../lib/utils';
@@ -73,6 +73,8 @@ export function AdminLayout() {
   );
 
   const menuItems = [
+    { path: '/admin', icon: LayoutDashboard, label: 'Dashboard' },
+    { path: '/admin/reports', icon: BarChart2, label: 'Reports' },
     { path: '/admin/vendors', icon: Building2, label: 'Accounts' },
     { path: '/admin/customers', icon: Users, label: 'Customers' },
     { path: '/admin/leads', icon: UserCheck, label: 'Leads' },
@@ -130,10 +132,10 @@ export function AdminLayout() {
               <AnimatePresence>
                 {showSearch && (
                   <motion.div
-                    initial={{ opacity: 0, y: 10 }}
+                    initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 10 }}
-                    className="absolute top-full mt-2 left-0 w-80 bg-white rounded-lg shadow-lg border border-gray-200 p-4"
+                    exit={{ opacity: 0, y: -10 }}
+                    className="absolute z-10 w-full mt-1 bg-white rounded-lg shadow-lg border border-gray-200"
                   >
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -142,7 +144,7 @@ export function AdminLayout() {
                         placeholder="Search modules..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
                         autoFocus
                       />
                     </div>
@@ -191,9 +193,7 @@ export function AdminLayout() {
                   onClick={() => setShowMoreMenu(!showMoreMenu)}
                   className={cn(
                     "p-3 text-sm font-medium rounded-full transition-colors flex items-center",
-                    showMoreMenu
-                      ? "bg-primary-100 text-primary-900"
-                      : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                    showMoreMenu ? "bg-primary-100 text-primary-900" : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                   )}
                 >
                   <MoreHorizontal className="w-5 h-5 mr-2" />
@@ -203,9 +203,9 @@ export function AdminLayout() {
                 <AnimatePresence>
                   {showMoreMenu && (
                     <motion.div
-                      initial={{ opacity: 0, y: 10 }}
+                      initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 10 }}
+                      exit={{ opacity: 0, y: -10 }}
                       className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1"
                     >
                       {moreMenuItems.map((item) => (
@@ -251,9 +251,9 @@ export function AdminLayout() {
               <AnimatePresence>
                 {showSettingsMenu && (
                   <motion.div
-                    initial={{ opacity: 0, y: 10 }}
+                    initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 10 }}
+                    exit={{ opacity: 0, y: -10 }}
                     className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1"
                   >
                     <Link
