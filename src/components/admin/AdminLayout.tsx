@@ -83,6 +83,8 @@ export function AdminLayout() {
     { path: '/admin/purchase-orders', icon: Truck, label: 'Purchase Orders' },
     { path: '/admin/work-orders', icon: ClipboardList, label: 'Work Orders' },
     { path: '/admin/inventory', icon: BoxSeam, label: 'Inventory' },
+    { path: '/admin/posts', icon: FileText, label: 'Blog Posts' },
+    { path: '/admin/portfolio', icon: Image, label: 'Portfolio' },
     // Show Products menu for admin/owner roles
     ...(hasAdminAccess ? [
       { path: '/admin/products', icon: Package, label: 'Products' }
@@ -204,7 +206,7 @@ export function AdminLayout() {
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: 10 }}
-                      className="absolute top-full mt-2 right-0 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1"
+                      className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1"
                     >
                       {moreMenuItems.map((item) => (
                         <Link
@@ -252,7 +254,7 @@ export function AdminLayout() {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 10 }}
-                    className="absolute top-full right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1"
+                    className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1"
                   >
                     <Link
                       to="/admin/settings"
