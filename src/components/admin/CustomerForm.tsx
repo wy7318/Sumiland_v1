@@ -271,13 +271,15 @@ export function CustomerForm() {
           const { error: leadUpdateError } = await supabase
             .from('leads')
             .update({
-              // status: 'Converted',
+              status: 'Converted',
               is_converted: true,
+              conversion_type: 'contact',
+              converted_to_id: customerId,
               converted_at: new Date().toISOString(),
               converted_by: user?.id
             })
             .eq('id', leadData.lead_id);
-
+  
           if (leadUpdateError) throw leadUpdateError;
         }
       }
