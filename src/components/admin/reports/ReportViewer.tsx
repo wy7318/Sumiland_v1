@@ -10,11 +10,10 @@ import { supabase } from '../../../lib/supabase';
 import { cn } from '../../../lib/utils';
 import { useOrganization } from '../../../contexts/OrganizationContext';
 
-
 type Props = {
   report: Report;
   onClose: () => void;
-  onEdit: () => void;
+  onEdit: (report: Report) => void;
 };
 
 type Report = {
@@ -36,6 +35,7 @@ type Report = {
     x_field: string;
     y_field: string;
     group_by?: string;
+    aggregation?: 'count' | 'sum' | 'avg';
   }[];
   is_favorite: boolean;
   is_shared: boolean;
@@ -43,6 +43,7 @@ type Report = {
   created_at: string;
   created_by: string;
   organization_id: string;
+  selected_fields: string[];
 };
 
 const COLORS = [
@@ -54,13 +55,57 @@ export function ReportViewer({ report, onClose, onEdit }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<any[]>([]);
+  const [chartData, setChartData] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const { selectedOrganization } = useOrganization();
-
 
   useEffect(() => {
     fetchReportData();
   }, [report]);
+
+  const processChartData = (rawData: any[]) => {
+    const processedData = report.charts.map(chart => {
+      // Group data by x-axis field
+      const groupedData = rawData.reduce((acc: any, item: any) => {
+        const xValue = item[chart.x_field] || 'Unknown';
+        
+        if (!acc[xValue]) {
+          acc[xValue] = {
+            [chart.x_field]: xValue,
+            count: 0,
+            sum: 0,
+            total: 0,
+            records: []
+          };
+        }
+        
+        acc[xValue].count++;
+        if (chart.y_field) {
+          const value = parseFloat(item[chart.y_field]) || 0;
+          acc[xValue].sum += value;
+          acc[xValue].total += value;
+          acc[xValue].records.push(item);
+        }
+        
+        return acc;
+      }, {});
+
+      // Convert grouped data to array format
+      const chartData = Object.values(groupedData).map((group: any) => ({
+        name: group[chart.x_field],
+        value: chart.aggregation === 'count' ? group.count :
+               chart.aggregation === 'sum' ? group.sum :
+               chart.aggregation === 'avg' ? (group.total / group.count) : 0
+      }));
+
+      return {
+        ...chart,
+        data: chartData
+      };
+    });
+
+    return processedData;
+  };
 
   const fetchReportData = async () => {
     try {
@@ -107,44 +152,13 @@ export function ReportViewer({ report, onClose, onEdit }: Props) {
         query = query.order(sort.field, { ascending: sort.direction === 'asc' });
       });
 
-      const { data, error } = await query;
+      const { data: rawData, error } = await query;
       if (error) throw error;
 
-      // Process data for grouping
-      let processedData = data;
-      if (report.grouping.length > 0) {
-        processedData = data.reduce((acc: any[], item: any) => {
-          const groupKey = report.grouping
-            .map(field => item[field])
-            .join(' - ');
-
-          const existingGroup = acc.find(g => g.group === groupKey);
-          if (existingGroup) {
-            existingGroup.count += 1;
-            report.charts.forEach(chart => {
-              if (chart.y_field.endsWith('_sum')) {
-                const field = chart.y_field.replace('_sum', '');
-                existingGroup[chart.y_field] += item[field] || 0;
-              }
-            });
-          } else {
-            const newGroup = {
-              group: groupKey,
-              count: 1
-            };
-            report.charts.forEach(chart => {
-              if (chart.y_field.endsWith('_sum')) {
-                const field = chart.y_field.replace('_sum', '');
-                newGroup[chart.y_field] = item[field] || 0;
-              }
-            });
-            acc.push(newGroup);
-          }
-          return acc;
-        }, []);
-      }
-
-      setData(processedData);
+      // Process data for charts
+      const processedChartData = processChartData(rawData || []);
+      setChartData(processedChartData);
+      setData(rawData || []);
     } catch (err) {
       console.error('Error fetching report data:', err);
       setError(err instanceof Error ? err.message : 'Failed to load report data');
@@ -158,11 +172,6 @@ export function ReportViewer({ report, onClose, onEdit }: Props) {
     await fetchReportData();
     setRefreshing(false);
   };
-
-  const handleEdit = () => {
-    onEdit(report); // Ensure the report is passed when editing
-  };
-
 
   const handleExport = () => {
     // Export data as CSV
@@ -225,7 +234,7 @@ export function ReportViewer({ report, onClose, onEdit }: Props) {
               <Download className="w-5 h-5" />
             </button>
             <button
-              onClick={handleEdit}
+              onClick={() => onEdit(report)}
               className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-full"
             >
               <Edit className="w-5 h-5" />
@@ -252,41 +261,64 @@ export function ReportViewer({ report, onClose, onEdit }: Props) {
             {/* Charts */}
             {report.charts.length > 0 && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {report.charts.map((chart, index) => (
+                {chartData.map((chart, index) => (
                   <div key={index} className="bg-white p-4 rounded-lg shadow">
                     <h3 className="text-lg font-medium mb-4">{chart.title}</h3>
                     <div className="h-80">
                       <ResponsiveContainer width="100%" height="100%">
                         {chart.type === 'bar' ? (
-                          <BarChart data={data}>
+                          <BarChart data={chart.data}>
                             <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey={chart.x_field} />
+                            <XAxis 
+                              dataKey="name" 
+                              angle={-45}
+                              textAnchor="end"
+                              height={80}
+                            />
                             <YAxis />
                             <Tooltip />
                             <Legend />
-                            <Bar dataKey={chart.y_field} fill="#8884d8" />
+                            <Bar 
+                              dataKey="value"
+                              fill="#8884d8"
+                              name={chart.aggregation === 'count' ? 'Count' :
+                                   chart.aggregation === 'sum' ? 'Sum' :
+                                   'Average'}
+                            />
                           </BarChart>
                         ) : chart.type === 'line' ? (
-                          <LineChart data={data}>
+                          <LineChart data={chart.data}>
                             <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey={chart.x_field} />
+                            <XAxis 
+                              dataKey="name"
+                              angle={-45}
+                              textAnchor="end"
+                              height={80}
+                            />
                             <YAxis />
                             <Tooltip />
                             <Legend />
-                            <Line type="monotone" dataKey={chart.y_field} stroke="#8884d8" />
+                            <Line 
+                              type="monotone" 
+                              dataKey="value"
+                              stroke="#8884d8"
+                              name={chart.aggregation === 'count' ? 'Count' :
+                                   chart.aggregation === 'sum' ? 'Sum' :
+                                   'Average'}
+                            />
                           </LineChart>
                         ) : (
                           <PieChart>
                             <Pie
-                              data={data}
-                              dataKey={chart.y_field}
-                              nameKey={chart.x_field}
+                              data={chart.data}
+                              dataKey="value"
+                              nameKey="name"
                               cx="50%"
                               cy="50%"
                               outerRadius={80}
                               label
                             >
-                              {data.map((entry, index) => (
+                              {chart.data.map((entry: any, index: number) => (
                                 <Cell 
                                   key={`cell-${index}`} 
                                   fill={COLORS[index % COLORS.length]} 

@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Plus, Search, Filter, ChevronDown, ChevronUp, Edit, Trash2, 
   Settings, AlertCircle, Database, Save, X, Check, List, Palette,
-  BarChart2, LineChart, PieChart
+  BarChart2, LineChart, PieChart, HelpCircle
 } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { cn } from '../../../lib/utils';
@@ -110,12 +110,49 @@ const OBJECT_TYPES = [
   { value: 'product', label: 'Products', table: 'products' }
 ];
 
+const CHART_HELP = {
+  'bar': {
+    title: 'Bar Chart',
+    description: 'Best for comparing values across categories',
+    examples: [
+      'Count of Leads by Status',
+      'Sum of Order Amount by Month',
+      'Average Deal Size by Sales Rep'
+    ]
+  },
+  'line': {
+    title: 'Line Chart',
+    description: 'Best for showing trends over time',
+    examples: [
+      'Orders per Month',
+      'Cumulative Sales by Quarter',
+      'Lead Conversion Rate Over Time'
+    ]
+  },
+  'pie': {
+    title: 'Pie Chart',
+    description: 'Best for showing parts of a whole',
+    examples: [
+      'Opportunities by Stage',
+      'Revenue by Product Category',
+      'Customers by Region'
+    ]
+  }
+};
+
+const AGGREGATION_HELP = {
+  'count': 'Counts the number of records',
+  'sum': 'Adds up numeric values',
+  'avg': 'Calculates the average of numeric values'
+};
+
 export function ReportBuilder({ onClose, onSave, editingReport }: Props) {
   const { user } = useAuth();
   const { selectedOrganization } = useOrganization();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fields, setFields] = useState<ObjectField[]>([]);
+  const [showChartHelp, setShowChartHelp] = useState(false);
   const [formData, setFormData] = useState<Partial<Report>>(
     editingReport || {
       name: '',
@@ -132,12 +169,7 @@ export function ReportBuilder({ onClose, onSave, editingReport }: Props) {
     }
   );
 
-  useEffect(() => {
-    if (formData.object_type) {
-      fetchObjectFields(formData.object_type);
-    }
-  }, [formData.object_type]);
-
+  // Initialize form data from editing report
   useEffect(() => {
     if (editingReport) {
       setFormData({
@@ -155,8 +187,7 @@ export function ReportBuilder({ onClose, onSave, editingReport }: Props) {
         folder_id: editingReport.folder_id || null,
       });
     }
-  }, [editingReport]); // Only update when editingReport changes
-
+  }, [editingReport]);
 
   // Fetch fields when object_type changes
   useEffect(() => {
@@ -164,7 +195,6 @@ export function ReportBuilder({ onClose, onSave, editingReport }: Props) {
       fetchObjectFields(formData.object_type);
     }
   }, [formData.object_type]);
-
 
   const fetchObjectFields = async (objectType: string) => {
     try {
@@ -201,13 +231,10 @@ export function ReportBuilder({ onClose, onSave, editingReport }: Props) {
 
       if (standardError) throw standardError;
 
-      // Combine standard and custom fields
+      // Combine and transform fields
       const allFields = [
         ...standardFields.map((field: any) => ({
-          column_name: field.column_name,
-          data_type: field.data_type,
-          is_nullable: field.is_nullable,
-          column_default: field.column_default,
+          ...field,
           display_name: field.column_name.split('_').map((w: string) => 
             w.charAt(0).toUpperCase() + w.slice(1)
           ).join(' '),
@@ -226,7 +253,7 @@ export function ReportBuilder({ onClose, onSave, editingReport }: Props) {
       setFields(allFields);
     } catch (err) {
       console.error('Error fetching fields:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load fields');
+      setError('Failed to load fields');
     }
   };
 
@@ -244,28 +271,28 @@ export function ReportBuilder({ onClose, onSave, editingReport }: Props) {
       // Get the correct table name
       const relation = OBJECT_RELATIONS[formData.object_type as keyof typeof OBJECT_RELATIONS];
       const tableName = relation?.main || OBJECT_TYPES.find(t => t.value === formData.object_type)?.table || `${formData.object_type}s`;
-
       const reportData = {
         ...formData,
-        object_type: tableName,
         organization_id: selectedOrganization?.id,
         created_by: user?.id,
-        created_at: new Date().toISOString()
+        object_type: tableName,
+        created_at: new Date().toISOString(),
+        selected_fields: fields.filter(f => f.is_selected).map(f => f.column_name)
       };
 
       if (editingReport?.id) {
-        const { error } = await supabase
+        const { error: updateError } = await supabase
           .from('reports')
           .update(reportData)
           .eq('id', editingReport.id);
 
-        if (error) throw error;
+        if (updateError) throw updateError;
       } else {
-        const { error } = await supabase
+        const { error: insertError } = await supabase
           .from('reports')
           .insert([reportData]);
 
-        if (error) throw error;
+        if (insertError) throw insertError;
       }
 
       onSave();
@@ -276,6 +303,51 @@ export function ReportBuilder({ onClose, onSave, editingReport }: Props) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const addChart = () => {
+    setFormData(prev => ({
+      ...prev,
+      charts: [
+        ...(prev.charts || []),
+        {
+          type: 'bar',
+          title: '',
+          x_field: '',
+          y_field: '',
+          aggregation: 'count'
+        }
+      ]
+    }));
+  };
+
+  const updateChart = (index: number, updates: Partial<Report['charts'][0]>) => {
+    setFormData(prev => ({
+      ...prev,
+      charts: prev.charts?.map((chart, i) => 
+        i === index ? { ...chart, ...updates } : chart
+      )
+    }));
+  };
+
+  const removeChart = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      charts: prev.charts?.filter((_, i) => i !== index)
+    }));
+  };
+
+  const getFieldOptions = (fieldType?: 'date' | 'number' | 'all') => {
+    return fields.filter(field => {
+      if (!fieldType) return true;
+      if (fieldType === 'date') {
+        return field.data_type.includes('timestamp') || field.data_type.includes('date');
+      }
+      if (fieldType === 'number') {
+        return field.data_type.includes('int') || field.data_type.includes('decimal') || field.data_type.includes('numeric');
+      }
+      return true;
+    });
   };
 
   return (
@@ -385,296 +457,193 @@ export function ReportBuilder({ onClose, onSave, editingReport }: Props) {
                         className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                       />
                       <span className="text-sm text-gray-700">{field.display_name || field.column_name}</span>
+                      {field.data_type && (
+                        <span className="text-xs text-gray-500">({field.data_type})</span>
+                      )}
                     </label>
                   ))}
                 </div>
               </div>
 
-              {/* Filters Section */}
-              <div className="border-t border-gray-200 pt-6">
-                <h3 className="text-lg font-medium mb-4">Filters</h3>
-                <div className="space-y-4">
-                  {formData.filters?.map((filter, index) => (
-                    <div key={index} className="flex items-center gap-4">
-                      <select
-                        value={filter.field}
-                        onChange={e => {
-                          const newFilters = [...(formData.filters || [])];
-                          newFilters[index] = { ...filter, field: e.target.value };
-                          setFormData(prev => ({ ...prev, filters: newFilters }));
-                        }}
-                        className="flex-1 px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-                      >
-                        <option value="">Select Field</option>
-                        {fields.map(field => (
-                          <option key={field.column_name} value={field.column_name}>
-                            {field.display_name || field.column_name}
-                          </option>
-                        ))}
-                      </select>
-
-                      <select
-                        value={filter.operator}
-                        onChange={e => {
-                          const newFilters = [...(formData.filters || [])];
-                          newFilters[index] = { ...filter, operator: e.target.value };
-                          setFormData(prev => ({ ...prev, filters: newFilters }));
-                        }}
-                        className="w-40 px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-                      >
-                        <option value="equals">Equals</option>
-                        <option value="not_equals">Not Equals</option>
-                        <option value="contains">Contains</option>
-                        <option value="greater_than">Greater Than</option>
-                        <option value="less_than">Less Than</option>
-                      </select>
-
-                      <input
-                        type="text"
-                        value={filter.value}
-                        onChange={e => {
-                          const newFilters = [...(formData.filters || [])];
-                          newFilters[index] = { ...filter, value: e.target.value };
-                          setFormData(prev => ({ ...prev, filters: newFilters }));
-                        }}
-                        className="flex-1 px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-                        placeholder="Value"
-                      />
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const newFilters = [...(formData.filters || [])];
-                          newFilters.splice(index, 1);
-                          setFormData(prev => ({ ...prev, filters: newFilters }));
-                        }}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded-full"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
-                    </div>
-                  ))}
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFormData(prev => ({
-                        ...prev,
-                        filters: [
-                          ...(prev.filters || []),
-                          { field: '', operator: 'equals', value: '' }
-                        ]
-                      }));
-                    }}
-                    className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Filter
-                  </button>
-                </div>
-              </div>
-
-              {/* Grouping Section */}
-              <div className="border-t border-gray-200 pt-6">
-                <h3 className="text-lg font-medium mb-4">Group By</h3>
-                <div className="space-y-4">
-                  {formData.grouping?.map((field, index) => (
-                    <div key={index} className="flex items-center gap-4">
-                      <select
-                        value={field}
-                        onChange={e => {
-                          const newGrouping = [...(formData.grouping || [])];
-                          newGrouping[index] = e.target.value;
-                          setFormData(prev => ({ ...prev, grouping: newGrouping }));
-                        }}
-                        className="flex-1 px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-                      >
-                        <option value="">Select Field</option>
-                        {fields.map(field => (
-                          <option key={field.column_name} value={field.column_name}>
-                            {field.display_name || field.column_name}
-                          </option>
-                        ))}
-                      </select>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const newGrouping = [...(formData.grouping || [])];
-                          newGrouping.splice(index, 1);
-                          setFormData(prev => ({ ...prev, grouping: newGrouping }));
-                        }}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded-full"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
-                    </div>
-                  ))}
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFormData(prev => ({
-                        ...prev,
-                        grouping: [...(prev.grouping || []), '']
-                      }));
-                    }}
-                    className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Group By
-                  </button>
-                </div>
-              </div>
-
               {/* Charts Section */}
               <div className="border-t border-gray-200 pt-6">
-                <h3 className="text-lg font-medium mb-4">Charts</h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-medium">Charts</h3>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowChartHelp(!showChartHelp)}
+                      className="p-2 text-gray-600 hover:bg-gray-100 rounded-full"
+                      title="Chart Help"
+                    >
+                      <HelpCircle className="w-5 h-5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={addChart}
+                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Chart
+                    </button>
+                  </div>
+                </div>
+
+                <AnimatePresence>
+                  {showChartHelp && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="mb-6 bg-blue-50 p-4 rounded-lg"
+                    >
+                      <h4 className="font-medium text-blue-900 mb-2">Chart Creation Guide</h4>
+                      <div className="space-y-4">
+                        {Object.entries(CHART_HELP).map(([type, help]) => (
+                          <div key={type} className="bg-white p-4 rounded-md shadow-sm">
+                            <h5 className="font-medium text-gray-900 mb-2">{help.title}</h5>
+                            <p className="text-gray-600 mb-2">{help.description}</p>
+                            <div className="text-sm text-gray-500">
+                              <strong>Examples:</strong>
+                              <ul className="list-disc list-inside ml-2">
+                                {help.examples.map((example, i) => (
+                                  <li key={i}>{example}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          </div>
+                        ))}
+                        <div className="bg-white p-4 rounded-md shadow-sm">
+                          <h5 className="font-medium text-gray-900 mb-2">Aggregation Types</h5>
+                          <dl className="space-y-2">
+                            {Object.entries(AGGREGATION_HELP).map(([type, description]) => (
+                              <div key={type}>
+                                <dt className="font-medium text-gray-700">{type}</dt>
+                                <dd className="text-gray-600">{description}</dd>
+                              </div>
+                            ))}
+                          </dl>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
                 <div className="space-y-4">
                   {formData.charts?.map((chart, index) => (
-                    <div key={index} className="bg-gray-50 p-4 rounded-lg space-y-4">
-                      <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-2">
-                          {chart.type === 'bar' && <BarChart2 className="w-5 h-5 text-primary-500" />}
-                          {chart.type === 'line' && <LineChart className="w-5 h-5 text-green-500" />}
-                          {chart.type === 'pie' && <PieChart className="w-5 h-5 text-purple-500" />}
+                    <div key={index} className="bg-gray-50 p-4 rounded-lg">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Chart Title
+                          </label>
                           <input
                             type="text"
                             value={chart.title}
-                            onChange={e => {
-                              const newCharts = [...(formData.charts || [])];
-                              newCharts[index] = { ...chart, title: e.target.value };
-                              setFormData(prev => ({ ...prev, charts: newCharts }));
-                            }}
-                            className="px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-                            placeholder="Chart Title"
+                            onChange={e => updateChart(index, { title: e.target.value })}
+                            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                            placeholder="e.g., Orders by Month"
                           />
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Chart Type
+                          </label>
                           <select
                             value={chart.type}
-                            onChange={e => {
-                              const newCharts = [...(formData.charts || [])];
-                              newCharts[index] = { 
-                                ...chart, 
-                                type: e.target.value as 'bar' | 'line' | 'pie' 
-                              };
-                              setFormData(prev => ({ ...prev, charts: newCharts }));
-                            }}
-                            className="px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                            onChange={e => updateChart(index, { type: e.target.value as 'bar' | 'line' | 'pie' })}
+                            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
                           >
                             <option value="bar">Bar Chart</option>
                             <option value="line">Line Chart</option>
                             <option value="pie">Pie Chart</option>
                           </select>
+                        </div>
 
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const newCharts = [...(formData.charts || [])];
-                              newCharts.splice(index, 1);
-                              setFormData(prev => ({ ...prev, charts: newCharts }));
-                            }}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-full"
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            X-Axis Field (Categories)
+                          </label>
+                          <select
+                            value={chart.x_field}
+                            onChange={e => updateChart(index, { x_field: e.target.value })}
+                            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
                           >
-                            <Trash2 className="w-5 h-5" />
-                          </button>
+                            <option value="">Select Field</option>
+                            {getFieldOptions().map(field => (
+                              <option key={field.column_name} value={field.column_name}>
+                                {field.display_name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Y-Axis Aggregation
+                          </label>
+                          <select
+                            value={chart.aggregation || 'count'}
+                            onChange={e => updateChart(index, { aggregation: e.target.value as 'count' | 'sum' | 'avg' })}
+                            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                          >
+                            <option value="count">Count Records</option>
+                            <option value="sum">Sum Field</option>
+                            <option value="avg">Average Field</option>
+                          </select>
+                        </div>
+
+                        {chart.aggregation && chart.aggregation !== 'count' && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Y-Axis Field (Value to {chart.aggregation === 'sum' ? 'Sum' : 'Average'})
+                            </label>
+                            <select
+                              value={chart.y_field}
+                              onChange={e => updateChart(index, { y_field: e.target.value })}
+                              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                            >
+                              <option value="">Select Field</option>
+                              {getFieldOptions('number').map(field => (
+                                <option key={field.column_name} value={field.column_name}>
+                                  {field.display_name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Group By (Optional)
+                          </label>
+                          <select
+                            value={chart.group_by || ''}
+                            onChange={e => updateChart(index, { group_by: e.target.value || undefined })}
+                            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                          >
+                            <option value="">None</option>
+                            {getFieldOptions().map(field => (
+                              <option key={field.column_name} value={field.column_name}>
+                                {field.display_name}
+                              </option>
+                            ))}
+                          </select>
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <select
-                          value={chart.x_field}
-                          onChange={e => {
-                            const newCharts = [...(formData.charts || [])];
-                            newCharts[index] = { ...chart, x_field: e.target.value };
-                            setFormData(prev => ({ ...prev, charts: newCharts }));
-                          }}
-                          className="px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                      <div className="mt-4 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => removeChart(index)}
+                          className="text-red-600 hover:text-red-700"
                         >
-                          <option value="">X-Axis Field</option>
-                          {fields.map(field => (
-                            <option key={field.column_name} value={field.column_name}>
-                              {field.display_name || field.column_name}
-                            </option>
-                          ))}
-                        </select>
-
-                        <select
-                          value={chart.y_field}
-                          onChange={e => {
-                            const newCharts = [...(formData.charts || [])];
-                            newCharts[index] = { ...chart, y_field: e.target.value };
-                            setFormData(prev => ({ ...prev, charts: newCharts }));
-                          }}
-                          className="px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-                        >
-                          <option value="">Y-Axis Field</option>
-                          {fields.map(field => (
-                            <option key={field.column_name} value={field.column_name}>
-                              {field.display_name || field.column_name}
-                            </option>
-                          ))}
-                        </select>
-
-                        <select
-                          value={chart.aggregation}
-                          onChange={e => {
-                            const newCharts = [...(formData.charts || [])];
-                            newCharts[index] = { ...chart, aggregation: e.target.value as 'count' | 'sum' | 'avg' };
-                            setFormData(prev => ({ ...prev, charts: newCharts }));
-                          }}
-                          className="px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-                        >
-                          <option value="">Select Aggregation</option>
-                          <option value="count">Count</option>
-                          <option value="sum">Sum</option>
-                          <option value="avg">Average</option>
-                        </select>
-
-                        <select
-                          value={chart.group_by}
-                          onChange={e => {
-                            const newCharts = [...(formData.charts || [])];
-                            newCharts[index] = { ...chart, group_by: e.target.value };
-                            setFormData(prev => ({ ...prev, charts: newCharts }));
-                          }}
-                          className="px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-                        >
-                          <option value="">Group By (Optional)</option>
-                          {fields.map(field => (
-                            <option key={field.column_name} value={field.column_name}>
-                              {field.display_name || field.column_name}
-                            </option>
-                          ))}
-                        </select>
+                          <Trash2 className="w-5 h-5" />
+                        </button>
                       </div>
                     </div>
                   ))}
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFormData(prev => ({
-                        ...prev,
-                        charts: [
-                          ...(prev.charts || []),
-                          {
-                            type: 'bar',
-                            title: '',
-                            x_field: '',
-                            y_field: '',
-                            aggregation: 'count'
-                          }
-                        ]
-                      }));
-                    }}
-                    className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Chart
-                  </button>
                 </div>
               </div>
             </>
