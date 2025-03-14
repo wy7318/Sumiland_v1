@@ -490,6 +490,7 @@ export function OpportunityForm() {
     return formData.products.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
   };
 
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -541,6 +542,24 @@ export function OpportunityForm() {
         if (insertError) throw insertError;
         opportunityId = newOpportunity.id;
       }
+
+      // If converting from lead, update lead status and conversion details
+      if (leadData?.lead_id) {
+        const { error: leadUpdateError } = await supabase
+          .from('leads')
+          .update({
+            status: 'Converted',
+            is_converted: true,
+            conversion_type: 'opportunity',
+            converted_to_id: opportunityId,
+            converted_at: new Date().toISOString(),
+            converted_by: user?.id
+          })
+          .eq('id', leadData.lead_id);
+
+        if (leadUpdateError) throw leadUpdateError;
+      }
+    
   
       // Insert products
       if (formData.products.length > 0) {
@@ -1177,3 +1196,4 @@ export function OpportunityForm() {
     </motion.div>
   );
 }
+
