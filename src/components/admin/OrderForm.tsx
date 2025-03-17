@@ -924,7 +924,7 @@ export function OrderForm() {
         </div>
 
         <CustomFieldsForm
-          entityType="order"
+          entityType="orders"
           entityId={id}
           organizationId={selectedOrganization?.id}
           onChange={(values) => setCustomFields(values)}

@@ -748,7 +748,7 @@ export function VendorForm() {
 
         {/* Custom Fields */}
         <CustomFieldsForm
-          entityType="vendor"
+          entityType="vendors"
           entityId={id}
           organizationId={selectedOrganization?.id}
           onChange={(customFieldValues) => {

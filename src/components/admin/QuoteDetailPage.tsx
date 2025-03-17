@@ -408,7 +408,7 @@ export function QuoteDetailPage() {
             {/* Add Custom Fields section */}
             <div className="md:col-span-2">
               <CustomFieldsSection
-                entityType="quote"
+                entityType="quotes"
                 entityId={id || ''}
                 organizationId={selectedOrganization?.id}
                 className="bg-gray-50 rounded-lg p-4"

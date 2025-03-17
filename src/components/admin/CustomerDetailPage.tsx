@@ -583,7 +583,7 @@ export function CustomerDetailPage() {
             {/* Add Custom Fields section */}
             <div className="md:col-span-2">
               <CustomFieldsSection
-                entityType="customer"
+                entityType="customers"
                 entityId={id}
                 organizationId={customer.organization_id}
                 className="bg-gray-50 rounded-lg p-4"

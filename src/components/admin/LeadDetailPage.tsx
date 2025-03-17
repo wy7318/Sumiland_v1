@@ -621,7 +621,7 @@ export function LeadDetailPage() {
             {/* Add Custom Fields section */}
             <div className="md:col-span-2">
               <CustomFieldsSection
-                entityType="lead"
+                entityType="leads"
                 entityId={id}
                 organizationId={lead.organization_id}
                 className="bg-gray-50 rounded-lg p-4"

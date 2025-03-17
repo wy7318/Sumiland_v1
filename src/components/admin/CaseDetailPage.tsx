@@ -615,7 +615,7 @@ export function CaseDetailPage() {
             {/* Add Custom Fields section */}
             <div className="md:col-span-2">
               <CustomFieldsSection
-                entityType="case"
+                entityType="cases"
                 entityId={id}
                 organizationId={selectedOrganization?.id}
                 className="bg-gray-50 rounded-lg p-4"
