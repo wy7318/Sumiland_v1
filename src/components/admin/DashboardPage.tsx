@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { 
   Plus, Search, Filter, ChevronDown, ChevronUp, Edit, Trash2, 
   Eye, BarChart2, LineChart, PieChart, Star, StarOff, FolderPlus,
-  AlertCircle, Settings, Share2
+  AlertCircle, Settings, Share2, RefreshCw
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
@@ -46,6 +46,16 @@ type Report = {
   template_id: string | null;
 };
 
+const MODULES = [
+  { name: 'Cases', table: 'cases', icon: '📋', color: 'bg-blue-100 text-blue-800', idField: 'id', nameField: 'title', route: 'cases' },
+  { name: 'Leads', table: 'leads', icon: '📋', color: 'bg-blue-100 text-blue-800', idField: 'id', nameField: 'company', route: 'leads' },
+  { name: 'Accounts', table: 'vendors', icon: '🏢', color: 'bg-yellow-100 text-yellow-800', idField: 'id', nameField: 'name', route: 'vendors' },
+  { name: 'Customers', table: 'customers', icon: '👤', color: 'bg-green-100 text-green-800', idField: 'customer_id', nameField: 'company', route: 'customers' },
+  { name: 'Opportunities', table: 'opportunities', icon: '💼', color: 'bg-purple-100 text-purple-800', idField: 'id', nameField: 'name', route: 'opportunities' },
+  { name: 'Quotes', table: 'quote_hdr', icon: '📝', color: 'bg-pink-100 text-pink-800', idField: 'quote_id', nameField: 'quote_number', route: 'quotes' },
+  { name: 'Orders', table: 'order_hdr', icon: '📦', color: 'bg-red-100 text-red-800', idField: 'order_id', nameField: 'order_number', route: 'orders' }
+];
+
 export function DashboardPage() {
   const { user } = useAuth();
   const { selectedOrganization } = useOrganization();
@@ -56,10 +66,49 @@ export function DashboardPage() {
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const [editingReport, setEditingReport] = useState<Report | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [data, setData] = useState<any>({});
 
   useEffect(() => {
     fetchReports();
   }, [selectedOrganization]);
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    setLoading(true);
+    const today = new Date().toISOString().split('T')[0];
+    const results: any = {};
+
+    for (const module of MODULES) {
+      const { data: records, error } = await supabase
+        .from(module.table)
+        .select(`${module.idField}, ${module.nameField}, created_at`)
+        .eq('organization_id', selectedOrganization?.id)
+        .gte('created_at', `${today}T00:00:00Z`)
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      const { count, error: countError } = await supabase
+        .from(module.table)
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', selectedOrganization?.id)
+        .gte('created_at', `${today}T00:00:00Z`);
+
+      if (error || countError) {
+        console.error(`Error loading ${module.name}:`, error || countError);
+      }
+
+      results[module.table] = {
+        records: records || [],
+        count: count || 0
+      };
+    }
+
+    setData(results);
+    setLoading(false);
+  };
 
   const fetchReports = async () => {
     try {
@@ -154,6 +203,77 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold">Key Metrics</h1>
+        <button
+          onClick={fetchData}
+          disabled={loading}
+          className="p-2 bg-gray-100 rounded-full hover:bg-gray-200"
+          aria-label="Refresh Metrics"
+        >
+          <RefreshCw className={loading ? 'animate-spin' : ''} />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {loading ? (
+          // Show skeleton loaders while loading
+          Array.from({ length: MODULES.length }).map((_, index) => (
+            <SkeletonLoader key={index} />
+          ))
+        ) : (
+          // Show actual content when data is loaded
+          MODULES.map(module => {
+            const moduleData = data[module.table] || { records: [], count: 0 };
+            return (
+              <motion.div
+                key={module.table}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-white rounded-2xl shadow p-4 hover:shadow-lg transition-shadow"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <div className={`text-2xl ${module.color} px-3 py-1 rounded-full`}>
+                    {module.icon}
+                  </div>
+                  <Link
+                    to={`/admin/${module.route}`}
+                    className="text-sm text-primary-600 hover:underline"
+                  >
+                    View All
+                  </Link>
+                </div>
+                <h2 className="text-lg font-semibold mb-1">{module.name}</h2>
+                <p className="text-3xl font-bold text-gray-800 mb-4">
+                  {moduleData.count}
+                </p>
+                <div className="space-y-2">
+                  {moduleData.records.length > 0 ? (
+                    moduleData.records.map((rec: any) => (
+                      <Link
+                        to={`/admin/${module.route}/${rec[module.idField]}`}
+                        key={rec[module.idField]}
+                        className="block p-2 rounded-lg hover:bg-gray-50 transition"
+                      >
+                        <p className="text-sm font-medium text-gray-900">
+                          {rec[module.nameField] || 'No Title'}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {new Date(rec.created_at).toLocaleString()}
+                        </p>
+                      </Link>
+                    ))
+                  ) : (
+                    <p className="text-sm text-gray-400">No new records today</p>
+                  )}
+                </div>
+              </motion.div>
+            );
+          })
+        )}
+      </div>
+
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Dashboard</h1>
         <button
@@ -166,6 +286,7 @@ export function DashboardPage() {
           <Plus className="w-4 h-4 mr-2" />
           Create Report
         </button>
+
       </div>
 
       {error && (
@@ -266,6 +387,32 @@ type ReportCardProps = {
   onSelect: (report: Report) => void;
   onEdit: (report: Report) => void;
 };
+
+function SkeletonLoader() {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.5 }}
+      className="bg-white rounded-2xl shadow p-4"
+    >
+      <div className="flex items-center justify-between mb-2">
+        <div className="w-10 h-10 bg-gray-200 rounded-full animate-pulse"></div>
+        <div className="w-16 h-4 bg-gray-200 rounded animate-pulse"></div>
+      </div>
+      <div className="h-6 w-24 bg-gray-200 rounded mb-4 animate-pulse"></div>
+      <div className="h-8 w-16 bg-gray-200 rounded mb-4 animate-pulse"></div>
+      <div className="space-y-2">
+        {[1, 2, 3].map((_, index) => (
+          <div key={index} className="p-2 rounded-lg">
+            <div className="h-4 w-32 bg-gray-200 rounded animate-pulse"></div>
+            <div className="h-3 w-24 bg-gray-200 rounded mt-1 animate-pulse"></div>
+          </div>
+        ))}
+      </div>
+    </motion.div>
+  );
+}
 
 function ReportCard({ report, onFavorite, onShare, onDelete, onSelect, onEdit }: ReportCardProps) {
   return (
