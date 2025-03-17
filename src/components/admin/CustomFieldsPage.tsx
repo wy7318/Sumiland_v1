@@ -329,7 +329,7 @@ export function CustomFieldsPage() {
                     onChange={(e) => setFormData(prev => ({ 
                       ...prev, 
                       field_label: e.target.value,
-                      field_name: e.target.value.toLowerCase().replace(/\s+/g, '_')
+                      field_name: e.target.value.toLowerCase().replace(/\s+/g, '_') + '__c'
                     }))}
                     className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
                     required
