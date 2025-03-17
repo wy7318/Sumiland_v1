@@ -44,6 +44,8 @@ type Report = {
   created_by: string;
   organization_id: string;
   selected_fields: string[];
+  is_template: boolean;
+  template_id: string | null;
 };
 
 const COLORS = [
@@ -58,6 +60,7 @@ export function ReportViewer({ report, onClose, onEdit }: Props) {
   const [chartData, setChartData] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const { selectedOrganization } = useOrganization();
+  const [customFieldLabels, setCustomFieldLabels] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetchReportData();
@@ -111,13 +114,20 @@ export function ReportViewer({ report, onClose, onEdit }: Props) {
     try {
       setLoading(true);
       setError(null);
-
-      // Build the query
+  
+      // Separate standard fields and custom fields (ending with '__c')
+      const standardFields = report.selected_fields.filter(field => !field.endsWith('__c'));
+      const customFields = report.selected_fields.filter(field => field.endsWith('__c'));
+  
+      console.log('Standard Fields:', standardFields);
+      console.log('Custom Fields:', customFields);
+  
+      // Build the query for standard fields
       let query = supabase
         .from(report.object_type)
-        .select(report.selected_fields.join(','))
+        .select(standardFields.join(','))
         .eq('organization_id', selectedOrganization?.id);
-
+  
       // Apply filters
       report.filters.forEach(filter => {
         switch (filter.operator) {
@@ -138,7 +148,7 @@ export function ReportViewer({ report, onClose, onEdit }: Props) {
             break;
         }
       });
-
+  
       // Apply date range if specified
       if (report.date_range?.field && report.date_range.start) {
         query = query.gte(report.date_range.field, report.date_range.start);
@@ -146,19 +156,86 @@ export function ReportViewer({ report, onClose, onEdit }: Props) {
           query = query.lte(report.date_range.field, report.date_range.end);
         }
       }
-
+  
       // Apply sorting
       report.sorting.forEach(sort => {
         query = query.order(sort.field, { ascending: sort.direction === 'asc' });
       });
-
-      const { data: rawData, error } = await query;
-      if (error) throw error;
-
+  
+      // Get standard field data
+      const { data: standardData, error: standardError } = await query;
+      if (standardError) throw standardError;
+  
+      console.log('Standard Data:', standardData);
+  
+      // If there are custom fields, fetch their values
+      let customData: Record<string, any>[] = [];
+      let customFieldLabels: Record<string, string> = {}; // Map custom field names to their labels
+      if (customFields.length > 0) {
+        // Extract custom field names (remove '__c' suffix)
+        const customFieldNames = customFields.map(field => field);
+  
+        console.log('Custom Field Names (without __c):', customFieldNames);
+  
+        // Get custom field definitions (including field_label)
+        const { data: fieldDefs, error: fieldDefsError } = await supabase
+          .from('custom_fields')
+          .select('id, field_name, field_label')
+          .in('field_name', customFieldNames)
+          .eq('organization_id', selectedOrganization?.id);
+  
+        if (fieldDefsError) throw fieldDefsError;
+  
+        console.log('Custom Field Definitions:', fieldDefs);
+  
+        // Create a mapping of custom field names to their labels
+        fieldDefs.forEach(def => {
+          customFieldLabels[`${def.field_name}`] = def.field_label;
+        });
+  
+        console.log('Custom Field Labels:', customFieldLabels);
+  
+        // Get custom field values for each record
+        const { data: fieldValues, error: fieldValuesError } = await supabase
+          .from('custom_field_values')
+          .select('entity_id, field_id, value')
+          .in('entity_id', standardData.map(record => record.id))
+          .in('field_id', fieldDefs.map(def => def.id))
+          .eq('organization_id', selectedOrganization?.id);
+  
+        if (fieldValuesError) throw fieldValuesError;
+  
+        console.log('Custom Field Values:', fieldValues);
+  
+        // Merge custom field values into standard data
+        customData = standardData.map(record => {
+          const customValues = fieldValues
+            .filter(value => value.entity_id === record.id)
+            .reduce((acc, value) => {
+              const fieldDef = fieldDefs.find(def => def.id === value.field_id);
+              if (fieldDef) {
+                acc[`${fieldDef.field_name}`] = value.value;
+              }
+              return acc;
+            }, {} as Record<string, any>);
+          return { ...record, ...customValues };
+        });
+  
+        console.log('Merged Data with Custom Fields:', customData);
+      }
+  
+      // Use merged data or standard data
+      const finalData = customData.length > 0 ? customData : standardData;
+  
+      console.log('Final Data:', finalData);
+  
       // Process data for charts
-      const processedChartData = processChartData(rawData || []);
+      const processedChartData = processChartData(finalData);
       setChartData(processedChartData);
-      setData(rawData || []);
+      setData(finalData || []);
+  
+      // Store custom field labels for rendering
+      setCustomFieldLabels(customFieldLabels);
     } catch (err) {
       console.error('Error fetching report data:', err);
       setError(err instanceof Error ? err.message : 'Failed to load report data');
@@ -199,7 +276,7 @@ export function ReportViewer({ report, onClose, onEdit }: Props) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
       onClick={onClose}
     >
       <motion.div
@@ -341,12 +418,12 @@ export function ReportViewer({ report, onClose, onEdit }: Props) {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    {data[0] && Object.keys(data[0]).map(key => (
+                    {report.selected_fields.map(key => (
                       <th
                         key={key}
                         className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                       >
-                        {key}
+                        {customFieldLabels[key] || key}
                       </th>
                     ))}
                   </tr>
@@ -354,12 +431,12 @@ export function ReportViewer({ report, onClose, onEdit }: Props) {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {data.map((row, i) => (
                     <tr key={i}>
-                      {Object.values(row).map((value: any, j) => (
+                      {report.selected_fields.map((field: any, j) => (
                         <td
                           key={j}
                           className="px-6 py-4 whitespace-nowrap text-sm text-gray-900"
                         >
-                          {typeof value === 'object' ? JSON.stringify(value) : value}
+                          {typeof row[field] === 'object' ? JSON.stringify(row[field]) : row[field] ?? ''}
                         </td>
                       ))}
                     </tr>
