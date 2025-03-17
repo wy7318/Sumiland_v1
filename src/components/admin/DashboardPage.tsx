@@ -33,6 +33,7 @@ type Report = {
     x_field: string;
     y_field: string;
     group_by?: string;
+    aggregation?: 'count' | 'sum' | 'avg';
   }[];
   is_favorite: boolean;
   is_shared: boolean;
@@ -40,6 +41,9 @@ type Report = {
   created_at: string;
   created_by: string;
   organization_id: string;
+  selected_fields: string[];
+  is_template: boolean;
+  template_id: string | null;
 };
 
 export function DashboardPage() {
@@ -50,6 +54,7 @@ export function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [showReportBuilder, setShowReportBuilder] = useState(false);
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
+  const [editingReport, setEditingReport] = useState<Report | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
@@ -126,6 +131,11 @@ export function DashboardPage() {
     }
   };
 
+  const handleEdit = (report: Report) => {
+    setEditingReport(report);
+    setShowReportBuilder(true);
+  };
+
   const filteredReports = reports.filter(report =>
     report.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     report.description?.toLowerCase().includes(searchQuery.toLowerCase())
@@ -147,7 +157,10 @@ export function DashboardPage() {
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Dashboard</h1>
         <button
-          onClick={() => setShowReportBuilder(true)}
+          onClick={() => {
+            setEditingReport(null);
+            setShowReportBuilder(true);
+          }}
           className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
         >
           <Plus className="w-4 h-4 mr-2" />
@@ -193,6 +206,7 @@ export function DashboardPage() {
                 onShare={handleShareToggle}
                 onDelete={handleDelete}
                 onSelect={setSelectedReport}
+                onEdit={handleEdit}
               />
             ))}
           </div>
@@ -211,6 +225,7 @@ export function DashboardPage() {
               onShare={handleShareToggle}
               onDelete={handleDelete}
               onSelect={setSelectedReport}
+              onEdit={handleEdit}
             />
           ))}
         </div>
@@ -219,8 +234,12 @@ export function DashboardPage() {
       {/* Report Builder Modal */}
       {showReportBuilder && (
         <ReportBuilder
-          onClose={() => setShowReportBuilder(false)}
+          onClose={() => {
+            setShowReportBuilder(false);
+            setEditingReport(null);
+          }}
           onSave={fetchReports}
+          editingReport={editingReport}
         />
       )}
 
@@ -231,7 +250,7 @@ export function DashboardPage() {
           onClose={() => setSelectedReport(null)}
           onEdit={() => {
             setSelectedReport(null);
-            setShowReportBuilder(true);
+            handleEdit(selectedReport);
           }}
         />
       )}
@@ -245,9 +264,10 @@ type ReportCardProps = {
   onShare: (id: string) => void;
   onDelete: (id: string) => void;
   onSelect: (report: Report) => void;
+  onEdit: (report: Report) => void;
 };
 
-function ReportCard({ report, onFavorite, onShare, onDelete, onSelect }: ReportCardProps) {
+function ReportCard({ report, onFavorite, onShare, onDelete, onSelect, onEdit }: ReportCardProps) {
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -321,6 +341,12 @@ function ReportCard({ report, onFavorite, onShare, onDelete, onSelect }: ReportC
             View Report
           </button>
           <div className="flex space-x-2">
+            <button
+              onClick={() => onEdit(report)}
+              className="p-1 text-blue-600 hover:bg-blue-50 rounded-full"
+            >
+              <Edit className="w-4 h-4" />
+            </button>
             <button
               onClick={() => onDelete(report.id)}
               className="p-1 text-red-600 hover:bg-red-50 rounded-full"

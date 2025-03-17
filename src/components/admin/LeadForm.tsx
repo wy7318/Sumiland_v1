@@ -491,7 +491,7 @@ export function LeadForm() {
         </div>
 
         <CustomFieldsForm
-          entityType="lead"
+          entityType="leads"
           entityId={id}
           organizationId={formData.organization_id}
           onChange={(values) => setCustomFields(values)}

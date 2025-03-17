@@ -1168,7 +1168,7 @@ export function OpportunityForm() {
         </div>
 
         <CustomFieldsForm
-          entityType="opportunity"
+          entityType="opportunities"
           entityId={id}
           organizationId={selectedOrganization?.id}
           onChange={(values) => setCustomFields(values)}

@@ -1207,7 +1207,7 @@ export function QuoteForm() {
         
 
         <CustomFieldsForm
-          entityType="quote"
+          entityType="quotes"
           entityId={id}
           organizationId={selectedOrganization?.id}
           onChange={(values) => setCustomFields(values)}

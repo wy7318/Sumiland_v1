@@ -635,7 +635,7 @@ export function OpportunityDetailPage() {
             {/* Custom Fields */}
             <div className="md:col-span-2">
               <CustomFieldsSection
-                entityType="opportunity"
+                entityType="opportunities"
                 entityId={id}
                 organizationId={selectedOrganization?.id}
                 className="bg-gray-50 rounded-lg p-4"

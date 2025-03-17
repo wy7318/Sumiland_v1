@@ -19,7 +19,7 @@ type CustomField = {
 };
 
 interface Props {
-  entityType: 'case' | 'vendor' | 'customer' | 'product' | 'order' | 'quote' | 'lead' | 'opportunity';
+  entityType: 'cases' | 'vendors' | 'customers' | 'products' | 'orders' | 'quotes' | 'leads' | 'opportunities';
   entityId?: string;
   organizationId: string;
   initialValues?: Record<string, any>;

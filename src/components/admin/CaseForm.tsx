@@ -414,7 +414,7 @@ export function CaseForm() {
         </div>
 
         <CustomFieldsForm
-          entityType="case"
+          entityType="cases"
           entityId={id}
           organizationId={selectedOrganization?.id}
           onChange={(customFieldValues) => setCustomFields(customFieldValues)}

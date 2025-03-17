@@ -100,14 +100,14 @@ const OBJECT_RELATIONS = {
 };
 
 const OBJECT_TYPES = [
-  { value: 'vendor', label: 'Accounts', table: 'vendors' },
-  { value: 'customer', label: 'Customers', table: 'customers' },
-  { value: 'lead', label: 'Leads', table: 'leads' },
-  { value: 'opportunity', label: 'Opportunities', table: 'opportunities' },
-  { value: 'case', label: 'Cases', table: 'cases' },
-  { value: 'quote', label: 'Quotes', table: 'quotes' },
-  { value: 'order', label: 'Orders', table: 'orders' },
-  { value: 'product', label: 'Products', table: 'products' }
+  { value: 'vendors', label: 'Accounts', table: 'vendors' },
+  { value: 'customers', label: 'Customers', table: 'customers' },
+  { value: 'leads', label: 'Leads', table: 'leads' },
+  { value: 'opportunities', label: 'Opportunities', table: 'opportunities' },
+  { value: 'cases', label: 'Cases', table: 'cases' },
+  { value: 'quotes', label: 'Quotes', table: 'quotes' },
+  { value: 'orders', label: 'Orders', table: 'orders' },
+  { value: 'products', label: 'Products', table: 'products' }
 ];
 
 const CHART_HELP = {

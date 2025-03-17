@@ -470,7 +470,7 @@ export function ProductForm() {
 
         {/* Custom Fields Section */}
         <CustomFieldsForm
-          entityType="product"
+          entityType="products"
           entityId={id}
           organizationId={selectedOrganization?.id}
           onChange={(customFieldValues) => {

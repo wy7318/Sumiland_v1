@@ -11,7 +11,7 @@ import { useOrganization } from '../../contexts/OrganizationContext';
 
 type CustomField = {
   id: string;
-  entity_type: 'case' | 'vendor' | 'customer' | 'product' | 'order' | 'quote' | 'lead' |'opportunity';
+  entity_type: 'cases' | 'vendors' | 'customers' | 'products' | 'orders' | 'quotes' | 'leads' |'opportunities';
   field_name: string;
   field_type: 'text' | 'number' | 'date' | 'boolean' | 'select' | 'multi_select' | 'url' | 'email' | 'phone' | 'currency';
   field_label: string;
@@ -28,14 +28,14 @@ type CustomField = {
 };
 
 const ENTITY_TYPES = [
-  { value: 'opportunity', label: 'Opportunities' },
-  { value: 'lead', label: 'Leads' },
-  { value: 'case', label: 'Cases' },
-  { value: 'vendor', label: 'Accounts' },
-  { value: 'customer', label: 'Customers' },
-  { value: 'product', label: 'Products' },
-  { value: 'order', label: 'Orders' },
-  { value: 'quote', label: 'Quotes' }
+  { value: 'opportunities', label: 'Opportunities' },
+  { value: 'leads', label: 'Leads' },
+  { value: 'cases', label: 'Cases' },
+  { value: 'vendors', label: 'Accounts' },
+  { value: 'customes', label: 'Customers' },
+  { value: 'products', label: 'Products' },
+  { value: 'orders', label: 'Orders' },
+  { value: 'quotes', label: 'Quotes' }
 ];
 
 const FIELD_TYPES = [
@@ -52,7 +52,7 @@ const FIELD_TYPES = [
 ];
 
 const initialFormData = {
-  entity_type: 'lead' as const,
+  entity_type: 'leads' as const,
   field_name: '',
   field_type: 'text' as const,
   field_label: '',
