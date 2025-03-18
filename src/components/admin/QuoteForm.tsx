@@ -471,6 +471,8 @@ export function QuoteForm() {
   };
 
 
+ // handleSubmit 
+
   // const handleSubmit = async (e: React.FormEvent) => {
   //   e.preventDefault();
   //   if (!formData.customer_id) {
@@ -605,6 +607,7 @@ export function QuoteForm() {
   //     setLoading(false);
   //   }
   // };
+  // handleSubmit -- end
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -658,6 +661,35 @@ export function QuoteForm() {
           .eq('quote_id', id);
   
         if (updateError) throw updateError;
+
+        // Delete existing items
+        const { error: deleteError } = await supabase
+          .from('quote_dtl')
+          .delete()
+          .eq('quote_id', id);
+
+        if (deleteError) throw deleteError;
+
+        // Insert new items
+        const itemsToInsert = [];
+        for (const item of formData.items) {
+          itemsToInsert.push({
+            quote_id: id,
+            item_name: item.item_name,
+            item_desc: item.item_desc,
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            organization_id: formData.organization_id
+          });
+        }
+        console.log('itemsToInsert:', itemsToInsert);
+
+        const { error: itemsError } = await supabase
+          .from('quote_dtl')
+          .insert(itemsToInsert);
+
+        if (itemsError) throw itemsError;
+        
       } else {
         console.log("🟢 Debug - Creating New Quote");
         const { data: newQuote, error: insertError } = await supabase
@@ -683,6 +715,49 @@ export function QuoteForm() {
   
         if (insertError) throw insertError;
         quoteId = newQuote.quote_id;
+
+        // Insert new items for the new quote
+        const itemsToInsert = [];
+        for (const item of formData.items) {
+          itemsToInsert.push({
+            quote_id: quoteId,
+            item_name: item.item_name,
+            item_desc: item.item_desc,
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            organization_id: formData.organization_id
+          });
+        }
+        console.log('itemsToInsert:', itemsToInsert);
+
+        const { error: itemsError } = await supabase
+          .from('quote_dtl')
+          .insert(itemsToInsert);
+
+        if (itemsError) throw itemsError;
+      }
+
+      // Save custom field values
+      if (userData.user) {
+        for (const [fieldId, value] of Object.entries(customFields)) {
+          const { error: valueError } = await supabase
+            .from('custom_field_values')
+            .upsert({
+              organization_id: formData.organization_id,
+              entity_id: quoteId,
+              field_id: fieldId,
+              value,
+              created_by: userData.user.id,
+              updated_by: userData.user.id,
+              updated_at: new Date().toISOString()
+            }, {
+              onConflict: 'organization_id,field_id,entity_id'
+            });
+
+          if (valueError) {
+            console.error('Error saving custom field value:', valueError);
+          }
+        }
       }
   
       navigate('/admin/quotes');
