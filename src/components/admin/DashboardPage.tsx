@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { 
-  Plus, Search, Filter, ChevronDown, ChevronUp, Edit, Trash2, 
+import {
+  Plus, Search, Filter, ChevronDown, ChevronUp, Edit, Trash2,
   Eye, BarChart2, LineChart, PieChart, Star, StarOff, FolderPlus,
   AlertCircle, Settings, Share2, RefreshCw
 } from 'lucide-react';
@@ -47,13 +47,13 @@ type Report = {
 };
 
 const MODULES = [
+  { name: 'Opportunities', table: 'opportunities', icon: '💼', color: 'bg-purple-100 text-purple-800', idField: 'id', nameField: 'name', route: 'opportunities' },
+  { name: 'Quotes', table: 'quote_hdr', icon: '📝', color: 'bg-pink-100 text-pink-800', idField: 'quote_id', nameField: 'quote_number', route: 'quotes' },
+  { name: 'Orders', table: 'order_hdr', icon: '📦', color: 'bg-red-100 text-red-800', idField: 'order_id', nameField: 'order_number', route: 'orders' },
   { name: 'Cases', table: 'cases', icon: '📋', color: 'bg-blue-100 text-blue-800', idField: 'id', nameField: 'title', route: 'cases' },
   { name: 'Leads', table: 'leads', icon: '📋', color: 'bg-blue-100 text-blue-800', idField: 'id', nameField: 'company', route: 'leads' },
   { name: 'Accounts', table: 'vendors', icon: '🏢', color: 'bg-yellow-100 text-yellow-800', idField: 'id', nameField: 'name', route: 'vendors' },
-  { name: 'Customers', table: 'customers', icon: '👤', color: 'bg-green-100 text-green-800', idField: 'customer_id', nameField: 'company', route: 'customers' },
-  { name: 'Opportunities', table: 'opportunities', icon: '💼', color: 'bg-purple-100 text-purple-800', idField: 'id', nameField: 'name', route: 'opportunities' },
-  { name: 'Quotes', table: 'quote_hdr', icon: '📝', color: 'bg-pink-100 text-pink-800', idField: 'quote_id', nameField: 'quote_number', route: 'quotes' },
-  { name: 'Orders', table: 'order_hdr', icon: '📦', color: 'bg-red-100 text-red-800', idField: 'order_id', nameField: 'order_number', route: 'orders' }
+  { name: 'Customers', table: 'customers', icon: '👤', color: 'bg-green-100 text-green-800', idField: 'customer_id', nameField: 'company', route: 'customers' }
 ];
 
 export function DashboardPage() {
@@ -67,6 +67,11 @@ export function DashboardPage() {
   const [editingReport, setEditingReport] = useState<Report | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [data, setData] = useState<any>({});
+  const [totalsByDay, setTotalsByDay] = useState({
+    opportunities: 0,
+    quotes: 0,
+    orders: 0
+  });
 
   useEffect(() => {
     fetchReports();
@@ -96,15 +101,37 @@ export function DashboardPage() {
         .eq('organization_id', selectedOrganization?.id)
         .gte('created_at', `${today}T00:00:00Z`);
 
-      if (error || countError) {
-        console.error(`Error loading ${module.name}:`, error || countError);
-      }
-
       results[module.table] = {
         records: records || [],
         count: count || 0
       };
     }
+
+    // Fetch totals for amount fields
+    const [oppTotalRes, quoteTotalRes, orderTotalRes] = await Promise.all([
+      supabase.from('opportunities')
+        .select('amount')
+        .eq('organization_id', selectedOrganization?.id)
+        .gte('created_at', `${today}T00:00:00Z`),
+      supabase.from('quote_hdr')
+        .select('subtotal')
+        .eq('organization_id', selectedOrganization?.id)
+        .gte('created_at', `${today}T00:00:00Z`),
+      supabase.from('order_hdr')
+        .select('subtotal')
+        .eq('organization_id', selectedOrganization?.id)
+        .gte('created_at', `${today}T00:00:00Z`)
+    ]);
+
+    const oppTotal = oppTotalRes.data?.reduce((sum, r) => sum + (r.amount || 0), 0) || 0;
+    const quoteTotal = quoteTotalRes.data?.reduce((sum, r) => sum + (r.subtotal || 0), 0) || 0;
+    const orderTotal = orderTotalRes.data?.reduce((sum, r) => sum + (r.subtotal || 0), 0) || 0;
+
+    setTotalsByDay({
+      opportunities: oppTotal,
+      quotes: quoteTotal,
+      orders: orderTotal
+    });
 
     setData(results);
     setLoading(false);
@@ -203,7 +230,7 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      
+
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Key Metrics</h1>
         <button
@@ -216,6 +243,7 @@ export function DashboardPage() {
         </button>
       </div>
 
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {loading ? (
           // Show skeleton loaders while loading
@@ -226,12 +254,17 @@ export function DashboardPage() {
           // Show actual content when data is loaded
           MODULES.map(module => {
             const moduleData = data[module.table] || { records: [], count: 0 };
+            const isTopCard = ['Opportunities', 'Quotes', 'Orders'].includes(module.name);
+
             return (
               <motion.div
                 key={module.table}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-white rounded-2xl shadow p-4 hover:shadow-lg transition-shadow"
+                className={cn(
+                  "rounded-2xl shadow p-4 hover:shadow-lg transition-shadow",
+                  isTopCard ? "bg-white border border-gray-200" : "bg-gray-50"
+                )}
               >
                 <div className="flex items-center justify-between mb-2">
                   <div className={`text-2xl ${module.color} px-3 py-1 rounded-full`}>
@@ -245,9 +278,28 @@ export function DashboardPage() {
                   </Link>
                 </div>
                 <h2 className="text-lg font-semibold mb-1">{module.name}</h2>
-                <p className="text-3xl font-bold text-gray-800 mb-4">
-                  {moduleData.count}
-                </p>
+                <div className="mb-4">
+                  <p className="text-3xl font-bold text-gray-800">
+                    {moduleData.count}
+                  </p>
+                  {/* Show daily total amount for Opportunities, Quotes, Orders */}
+                  {module.name === 'Opportunities' && (
+                    <p className="text-sm text-purple-600 font-medium mt-1">
+                      Total: ${totalsByDay.opportunities.toLocaleString()}
+                    </p>
+                  )}
+                  {module.name === 'Quotes' && (
+                    <p className="text-sm text-pink-600 font-medium mt-1">
+                      Total: ${totalsByDay.quotes.toLocaleString()}
+                    </p>
+                  )}
+                  {module.name === 'Orders' && (
+                    <p className="text-sm text-red-600 font-medium mt-1">
+                      Total: ${totalsByDay.orders.toLocaleString()}
+                    </p>
+                  )}
+                </div>
+
                 <div className="space-y-2">
                   {moduleData.records.length > 0 ? (
                     moduleData.records.map((rec: any) => (
