@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { 
-  Plus, Search, Filter, ChevronDown, ChevronUp, Edit, Trash2, 
+import {
+  Plus, Search, Filter, ChevronDown, ChevronUp, Edit, Trash2,
   Eye, BarChart2, LineChart, PieChart, Star, StarOff, FolderPlus,
   AlertCircle, Settings, Share2, RefreshCw
 } from 'lucide-react';
+import { useSpring, animated } from '@react-spring/web';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { cn } from '../../lib/utils';
@@ -47,14 +48,25 @@ type Report = {
 };
 
 const MODULES = [
+  { name: 'Opportunities', table: 'opportunities', icon: '💼', color: 'bg-purple-100 text-purple-800', idField: 'id', nameField: 'name', route: 'opportunities' },
+  { name: 'Quotes', table: 'quote_hdr', icon: '📝', color: 'bg-pink-100 text-pink-800', idField: 'quote_id', nameField: 'quote_number', route: 'quotes' },
+  { name: 'Orders', table: 'order_hdr', icon: '📦', color: 'bg-red-100 text-red-800', idField: 'order_id', nameField: 'order_number', route: 'orders' },
   { name: 'Cases', table: 'cases', icon: '📋', color: 'bg-blue-100 text-blue-800', idField: 'id', nameField: 'title', route: 'cases' },
   { name: 'Leads', table: 'leads', icon: '📋', color: 'bg-blue-100 text-blue-800', idField: 'id', nameField: 'company', route: 'leads' },
   { name: 'Accounts', table: 'vendors', icon: '🏢', color: 'bg-yellow-100 text-yellow-800', idField: 'id', nameField: 'name', route: 'vendors' },
-  { name: 'Customers', table: 'customers', icon: '👤', color: 'bg-green-100 text-green-800', idField: 'customer_id', nameField: 'company', route: 'customers' },
-  { name: 'Opportunities', table: 'opportunities', icon: '💼', color: 'bg-purple-100 text-purple-800', idField: 'id', nameField: 'name', route: 'opportunities' },
-  { name: 'Quotes', table: 'quote_hdr', icon: '📝', color: 'bg-pink-100 text-pink-800', idField: 'quote_id', nameField: 'quote_number', route: 'quotes' },
-  { name: 'Orders', table: 'order_hdr', icon: '📦', color: 'bg-red-100 text-red-800', idField: 'order_id', nameField: 'order_number', route: 'orders' }
+  { name: 'Customers', table: 'customers', icon: '👤', color: 'bg-green-100 text-green-800', idField: 'customer_id', nameField: 'company', route: 'customers' }
 ];
+
+function AnimatedCount({ value }: { value: number }) {
+  const spring = useSpring({ val: value, from: { val: 0 }, config: { tension: 170, friction: 26 } });
+
+  return (
+    <animated.p className="text-3xl font-bold text-gray-800">
+      {spring.val.to((val) => Math.floor(val))}
+    </animated.p>
+  );
+}
+
 
 export function DashboardPage() {
   const { user } = useAuth();
@@ -67,6 +79,15 @@ export function DashboardPage() {
   const [editingReport, setEditingReport] = useState<Report | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [data, setData] = useState<any>({});
+  const [rangeType, setRangeType] = useState<'daily' | 'monthly' | 'yearly' | 'custom'>('daily');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
+
+  const [totalsByDay, setTotalsByDay] = useState({
+    opportunities: 0,
+    quotes: 0,
+    orders: 0
+  });
 
   useEffect(() => {
     fetchReports();
@@ -76,9 +97,35 @@ export function DashboardPage() {
     fetchData();
   }, []);
 
-  const fetchData = async () => {
+  const fetchData = async (range: 'daily' | 'monthly' | 'yearly' | 'custom' = 'daily') => {
     setLoading(true);
-    const today = new Date().toISOString().split('T')[0];
+
+    let startDate: string;
+    const today = new Date();
+
+    switch (range) {
+      case 'monthly':
+        startDate = new Date(today.getFullYear(), today.getMonth(), 1).toISOString();
+        break;
+      case 'yearly':
+        startDate = new Date(today.getFullYear(), 0, 1).toISOString();
+        break;
+      case 'custom':
+        if (!customStartDate || !customEndDate) {
+          alert('Please select both start and end dates.');
+          setLoading(false);
+          return;
+        }
+        startDate = new Date(customStartDate).toISOString();
+        break;
+      case 'daily':
+      default:
+        startDate = new Date(today.toISOString().split('T')[0] + 'T00:00:00Z').toISOString();
+        break;
+    }
+
+    const endDate = range === 'custom' ? new Date(customEndDate).toISOString() : today.toISOString();
+
     const results: any = {};
 
     for (const module of MODULES) {
@@ -86,7 +133,8 @@ export function DashboardPage() {
         .from(module.table)
         .select(`${module.idField}, ${module.nameField}, created_at`)
         .eq('organization_id', selectedOrganization?.id)
-        .gte('created_at', `${today}T00:00:00Z`)
+        .gte('created_at', startDate)
+        .lte('created_at', endDate)
         .order('created_at', { ascending: false })
         .limit(5);
 
@@ -94,7 +142,8 @@ export function DashboardPage() {
         .from(module.table)
         .select('*', { count: 'exact', head: true })
         .eq('organization_id', selectedOrganization?.id)
-        .gte('created_at', `${today}T00:00:00Z`);
+        .gte('created_at', startDate)
+        .lte('created_at', endDate);
 
       if (error || countError) {
         console.error(`Error loading ${module.name}:`, error || countError);
@@ -106,9 +155,39 @@ export function DashboardPage() {
       };
     }
 
+    // Fetch total amounts in range
+    const [oppTotalRes, quoteTotalRes, orderTotalRes] = await Promise.all([
+      supabase.from('opportunities')
+        .select('amount')
+        .eq('organization_id', selectedOrganization?.id)
+        .gte('created_at', startDate)
+        .lte('created_at', endDate),
+      supabase.from('quote_hdr')
+        .select('subtotal')
+        .eq('organization_id', selectedOrganization?.id)
+        .gte('created_at', startDate)
+        .lte('created_at', endDate),
+      supabase.from('order_hdr')
+        .select('subtotal')
+        .eq('organization_id', selectedOrganization?.id)
+        .gte('created_at', startDate)
+        .lte('created_at', endDate)
+    ]);
+
+    const oppTotal = oppTotalRes.data?.reduce((sum, r) => sum + (r.amount || 0), 0) || 0;
+    const quoteTotal = quoteTotalRes.data?.reduce((sum, r) => sum + (r.subtotal || 0), 0) || 0;
+    const orderTotal = orderTotalRes.data?.reduce((sum, r) => sum + (r.subtotal || 0), 0) || 0;
+
+    setTotalsByDay({
+      opportunities: oppTotal,
+      quotes: quoteTotal,
+      orders: orderTotal
+    });
+
     setData(results);
     setLoading(false);
   };
+
 
   const fetchReports = async () => {
     try {
@@ -203,9 +282,68 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      
+      <h1 className="text-2xl font-bold">Key Metrics</h1>
+      <div className="flex flex-wrap items-center gap-4 mb-6">
+        <div className="flex gap-2">
+          {['daily', 'monthly', 'yearly'].map(type => (
+            <button
+              key={type}
+              onClick={() => {
+                setRangeType(type as any);
+                fetchData(type as any);
+              }}
+              className={cn(
+                "px-4 py-2 rounded-lg text-sm font-medium border shadow-sm transition",
+                rangeType === type
+                  ? "bg-primary-600 text-white border-primary-600"
+                  : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+              )}
+            >
+              {type.charAt(0).toUpperCase() + type.slice(1)}
+            </button>
+          ))}
+          <button
+            onClick={() => setRangeType('custom')}
+            className={cn(
+              "px-4 py-2 rounded-lg text-sm font-medium border shadow-sm transition",
+              rangeType === 'custom'
+                ? "bg-primary-600 text-white border-primary-600"
+                : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+            )}
+          >
+            Custom Range
+          </button>
+        </div>
+
+        {rangeType === 'custom' && (
+          <div className="flex items-center gap-2">
+            <input
+              type="date"
+              value={customStartDate}
+              onChange={e => setCustomStartDate(e.target.value)}
+              className="border border-gray-300 rounded-md px-3 py-2 text-sm shadow-sm"
+            />
+            <span className="text-sm text-gray-500">to</span>
+            <input
+              type="date"
+              value={customEndDate}
+              onChange={e => setCustomEndDate(e.target.value)}
+              className="border border-gray-300 rounded-md px-3 py-2 text-sm shadow-sm"
+            />
+            <button
+              onClick={() => fetchData('custom')}
+              className="bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700 shadow"
+            >
+              Apply
+            </button>
+          </div>
+        )}
+      </div>
+
+
+
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Key Metrics</h1>
+
         <button
           onClick={fetchData}
           disabled={loading}
@@ -215,6 +353,7 @@ export function DashboardPage() {
           <RefreshCw className={loading ? 'animate-spin' : ''} />
         </button>
       </div>
+
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {loading ? (
@@ -226,49 +365,78 @@ export function DashboardPage() {
           // Show actual content when data is loaded
           MODULES.map(module => {
             const moduleData = data[module.table] || { records: [], count: 0 };
+            const isTopCard = ['Opportunities', 'Quotes', 'Orders'].includes(module.name);
+
             return (
               <motion.div
                 key={module.table}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-white rounded-2xl shadow p-4 hover:shadow-lg transition-shadow"
+                className="bg-white/80 backdrop-blur-sm border border-gray-200 shadow-lg rounded-2xl p-5 hover:scale-[1.02] transition-transform"
+
               >
-                <div className="flex items-center justify-between mb-2">
-                  <div className={`text-2xl ${module.color} px-3 py-1 rounded-full`}>
+                <div className="flex items-center justify-between mb-3">
+                  <div className={`text-3xl ${module.color} px-3 py-1 rounded-xl shadow-inner`}>
                     {module.icon}
                   </div>
                   <Link
                     to={`/admin/${module.route}`}
-                    className="text-sm text-primary-600 hover:underline"
+                    className="text-sm text-primary-600 hover:underline font-medium"
                   >
                     View All
                   </Link>
                 </div>
-                <h2 className="text-lg font-semibold mb-1">{module.name}</h2>
-                <p className="text-3xl font-bold text-gray-800 mb-4">
-                  {moduleData.count}
-                </p>
-                <div className="space-y-2">
+
+                <h2 className="text-lg font-semibold mb-2 text-gray-800">{module.name}</h2>
+
+                <div className="mb-3">
+                  <AnimatedCount value={moduleData.count} />
+
+
+                  {/* Total amount styling */}
+                  {module.name === 'Opportunities' && (
+                    <p className="text-sm text-purple-600 font-medium mt-1">
+                      Total: <span title="Sum of opportunity amounts">
+                        ${totalsByDay.opportunities.toLocaleString()}
+                      </span>
+                    </p>
+                  )}
+                  {module.name === 'Quotes' && (
+                    <p className="text-sm text-pink-600 font-medium mt-1">
+                      Total: <span title="Sum of quote subtotals">
+                        ${totalsByDay.quotes.toLocaleString()}
+                      </span>
+                    </p>
+                  )}
+                  {module.name === 'Orders' && (
+                    <p className="text-sm text-red-600 font-medium mt-1">
+                      Total: <span title="Sum of order subtotals">
+                        ${totalsByDay.orders.toLocaleString()}
+                      </span>
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2 text-sm text-gray-600">
                   {moduleData.records.length > 0 ? (
                     moduleData.records.map((rec: any) => (
                       <Link
                         to={`/admin/${module.route}/${rec[module.idField]}`}
                         key={rec[module.idField]}
-                        className="block p-2 rounded-lg hover:bg-gray-50 transition"
+                        className="block p-2 rounded-lg hover:bg-gray-100 transition"
                       >
-                        <p className="text-sm font-medium text-gray-900">
-                          {rec[module.nameField] || 'No Title'}
-                        </p>
+                        <p className="font-medium text-gray-800">{rec[module.nameField] || 'No Title'}</p>
                         <p className="text-xs text-gray-500">
                           {new Date(rec.created_at).toLocaleString()}
                         </p>
                       </Link>
                     ))
                   ) : (
-                    <p className="text-sm text-gray-400">No new records today</p>
+                    <p className="text-gray-400">No new records</p>
                   )}
                 </div>
               </motion.div>
+
             );
           })
         )}

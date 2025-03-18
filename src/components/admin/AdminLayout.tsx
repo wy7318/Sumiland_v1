@@ -11,6 +11,7 @@ import { getCurrentUser, signOut } from '../../lib/auth';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
 import { OrganizationSwitcher } from '../OrganizationSwitcher';
+import { NotificationPanel } from './NotificationPanel';
 
 export function AdminLayout() {
   const navigate = useNavigate();
@@ -89,7 +90,8 @@ export function AdminLayout() {
     { path: '/admin/portfolio', icon: Image, label: 'Portfolio' },
     // Show Products menu for admin/owner roles
     ...(hasAdminAccess ? [
-      { path: '/admin/products', icon: Package, label: 'Products' }
+      { path: '/admin/products', icon: Package, label: 'Products' },
+      { path: '/admin/customflows', icon: Package, label: 'Custom Flows' }
     ] : []),
     // Show additional menus for super admin
     ...(isSuperAdmin ? [
@@ -232,6 +234,9 @@ export function AdminLayout() {
           <div className="flex items-center space-x-4">
             {/* Organization Switcher */}
             <OrganizationSwitcher />
+
+            {/* Notification Panel */}
+            <NotificationPanel />
 
             {/* Settings Menu */}
             <div ref={settingsMenuRef} className="relative">
