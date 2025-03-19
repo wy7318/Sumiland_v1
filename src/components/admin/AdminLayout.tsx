@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { Outlet, useNavigate, Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  FileText, Image, LogOut, Users, Package, Tag, Quote, MessageSquare, 
-  LayoutDashboard, Settings, ShoppingBag, Building2, Truck, ClipboardList, 
+import {
+  FileText, Image, LogOut, Users, Package, Quote, MessageSquare,
+  LayoutDashboard, Settings, ShoppingBag, Building2, Truck, ClipboardList,
   BoxSelect as BoxSeam, UserCog, Home, UserPlus, UserCheck, Target,
-  Search, MoreHorizontal, ChevronRight, BarChart2
+  Search, MoreHorizontal, BarChart2
 } from 'lucide-react';
 import { getCurrentUser, signOut } from '../../lib/auth';
 import { cn } from '../../lib/utils';
@@ -23,30 +23,43 @@ export function AdminLayout() {
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
   const { organizations } = useAuth();
-  
+
   const searchRef = useRef<HTMLDivElement>(null);
   const moreMenuRef = useRef<HTMLDivElement>(null);
   const settingsMenuRef = useRef<HTMLDivElement>(null);
+  const [screenWidth, setScreenWidth] = useState(window.innerWidth);
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => setScreenWidth(window.innerWidth);
+    const handleScroll = () => setScrolled(window.scrollY > 10);
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('scroll', handleScroll);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
 
   useEffect(() => {
     checkAuth();
-
-    // Click outside handlers
     const handleClickOutside = (event: MouseEvent) => {
-      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
-        setShowSearch(false);
-      }
-      if (moreMenuRef.current && !moreMenuRef.current.contains(event.target as Node)) {
-        setShowMoreMenu(false);
-      }
-      if (settingsMenuRef.current && !settingsMenuRef.current.contains(event.target as Node)) {
-        setShowSettingsMenu(false);
-      }
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) setShowSearch(false);
+      if (moreMenuRef.current && !moreMenuRef.current.contains(event.target as Node)) setShowMoreMenu(false);
+      if (settingsMenuRef.current && !settingsMenuRef.current.contains(event.target as Node)) setShowSettingsMenu(false);
     };
-
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  const getVisibleMenuCount = () => {
+    if (screenWidth > 1400) return 12;
+    if (screenWidth > 1024) return 7;
+    if (screenWidth > 768) return 5;
+    return 3;
+  };
+
+  const visibleCount = getVisibleMenuCount();
 
   const checkAuth = async () => {
     const userData = await getCurrentUser();
@@ -54,7 +67,6 @@ export function AdminLayout() {
       navigate('/login');
       return;
     }
-
     setIsSuperAdmin(!!userData.profile?.is_super_admin);
     setLoading(false);
   };
@@ -64,14 +76,9 @@ export function AdminLayout() {
     navigate('/');
   };
 
-  const isActive = (path: string) => {
-    return location.pathname.startsWith(path);
-  };
+  const isActive = (path: string) => location.pathname.startsWith(path);
 
-  // Check if user has admin or owner role in any organization
-  const hasAdminAccess = organizations.some(org => 
-    org.role === 'admin' || org.role === 'owner'
-  );
+  const hasAdminAccess = organizations.some(org => org.role === 'admin' || org.role === 'owner');
 
   const menuItems = [
     { path: '/admin', icon: LayoutDashboard, label: 'Dashboard' },
@@ -88,24 +95,19 @@ export function AdminLayout() {
     { path: '/admin/inventory', icon: BoxSeam, label: 'Inventory' },
     { path: '/admin/posts', icon: FileText, label: 'Blog Posts' },
     { path: '/admin/portfolio', icon: Image, label: 'Portfolio' },
-    // Show Products menu for admin/owner roles
     ...(hasAdminAccess ? [
       { path: '/admin/products', icon: Package, label: 'Products' },
       { path: '/admin/customflows', icon: Package, label: 'Custom Flows' }
     ] : []),
-    // Show additional menus for super admin
     ...(isSuperAdmin ? [
       { path: '/admin/user-organizations', icon: UserCog, label: 'User & Org Management' },
       { path: '/admin/users', icon: UserPlus, label: 'User Management' }
     ] : [])
   ];
 
-  const visibleMenuItems = menuItems.slice(0, 7); // Show first 7 items
-  const moreMenuItems = menuItems.slice(7); // Remaining items go to More menu
-
-  const filteredMenuItems = menuItems.filter(item =>
-    item.label.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const visibleMenuItems = menuItems.slice(0, visibleCount);
+  const moreMenuItems = menuItems.slice(visibleCount);
+  const filteredMenuItems = menuItems.filter(item => item.label.toLowerCase().includes(searchQuery.toLowerCase()));
 
   if (loading) {
     return (
@@ -117,149 +119,129 @@ export function AdminLayout() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Floating Top Navigation */}
-      <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-7xl">
-        <div className="bg-white rounded-full shadow-lg p-2 flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            {/* Go Button & Search */}
-            <div ref={searchRef} className="relative">
-              <button
-                onClick={() => setShowSearch(!showSearch)}
-                className="p-3 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-full flex items-center"
-              >
-                <Search className="w-5 h-5 mr-2" />
-                <span className="text-sm font-medium">Go</span>
-              </button>
+      {/* NAVIGATION WRAPPER WITH SCROLL EFFECT */}
+      {/* NAVIGATION WRAPPER WITH SCROLL EFFECT */}
+      <div className={cn(
+        "fixed top-0 left-0 w-full z-50 transition-colors duration-300",
+        scrolled ? "bg-white shadow border-b border-gray-200" : ""
+      )}>
+        <div className="flex flex-wrap items-center justify-between gap-y-2 px-4 py-2">
 
-              <AnimatePresence>
-                {showSearch && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    className="absolute z-10 w-full mt-1 bg-white rounded-lg shadow-lg border border-gray-200"
-                  >
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                      <input
-                        type="text"
-                        placeholder="Search modules..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-                        autoFocus
-                      />
-                    </div>
-                    {searchQuery && (
-                      <ul className="mt-2 max-h-64 overflow-auto">
-                        {filteredMenuItems.map((item) => (
-                          <li key={item.path}>
-                            <Link
-                              to={item.path}
-                              className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg"
-                              onClick={() => setShowSearch(false)}
-                            >
-                              <item.icon className="w-5 h-5 mr-3 text-gray-400" />
-                              {item.label}
-                            </Link>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+          {/* LEFT: Organization Switcher */}
+          <div className="flex-shrink-0">
+            <OrganizationSwitcher />
+          </div>
 
-            {/* Main Navigation */}
-            {visibleMenuItems.map((item) => (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={cn(
-                  "p-3 text-sm font-medium rounded-full transition-colors flex items-center",
-                  isActive(item.path)
-                    ? "bg-primary-100 text-primary-900"
-                    : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-                )}
-              >
-                <item.icon className="w-5 h-5 mr-2" />
-                {item.label}
-              </Link>
-            ))}
-
-            {/* More Menu */}
-            {moreMenuItems.length > 0 && (
-              <div ref={moreMenuRef} className="relative">
+          {/* CENTER: Module Nav (Blue Box) */}
+          <div className="relative flex-grow min-w-[250px] max-w-full">
+            {/* Blue Nav Box with horizontal scroll */}
+            <div className="bg-blue-50 border border-blue-200 rounded-xl shadow px-2 py-2 flex items-center overflow-x-auto space-x-2 scrollbar-hide">
+              {/* Go/Search Button */}
+              <div ref={searchRef} className="relative flex-shrink-0">
                 <button
-                  onClick={() => setShowMoreMenu(!showMoreMenu)}
-                  className={cn(
-                    "p-3 text-sm font-medium rounded-full transition-colors flex items-center",
-                    showMoreMenu ? "bg-primary-100 text-primary-900" : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-                  )}
+                  onClick={() => setShowSearch(!showSearch)}
+                  className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-full flex items-center whitespace-nowrap"
                 >
-                  <MoreHorizontal className="w-5 h-5 mr-2" />
-                  More
+                  <Search className="w-5 h-5 mr-1" />
+                  <span className="text-sm font-medium">Go</span>
                 </button>
-
+                {/* Search Dropdown */}
                 <AnimatePresence>
-                  {showMoreMenu && (
+                  {showSearch && (
                     <motion.div
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -10 }}
-                      className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1"
+                      className="absolute z-50 w-64 mt-1 bg-white rounded-lg shadow-lg border border-gray-200"
                     >
-                      {moreMenuItems.map((item) => (
-                        <Link
-                          key={item.path}
-                          to={item.path}
-                          className={cn(
-                            "flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100",
-                            isActive(item.path) && "bg-gray-50"
-                          )}
-                          onClick={() => setShowMoreMenu(false)}
-                        >
-                          <item.icon className="w-5 h-5 mr-3 text-gray-400" />
-                          {item.label}
-                        </Link>
-                      ))}
+                      {/* Add search input/results here */}
                     </motion.div>
                   )}
                 </AnimatePresence>
               </div>
+
+              {/* Visible Menu Items */}
+              {visibleMenuItems.map((item) => (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className={cn(
+                    "p-2 text-sm font-medium rounded-full transition-colors flex items-center whitespace-nowrap",
+                    isActive(item.path)
+                      ? "bg-primary-100 text-primary-900"
+                      : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                  )}
+                >
+                  <item.icon className="w-5 h-5 mr-1" />
+                  {item.label}
+                </Link>
+              ))}
+
+              {/* More Button */}
+              <div className="relative flex-shrink-0">
+                <button
+                  onClick={() => setShowMoreMenu(!showMoreMenu)}
+                  className={cn(
+                    "p-2 text-sm font-medium rounded-full transition-colors flex items-center",
+                    showMoreMenu ? "bg-primary-100 text-primary-900" : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                  )}
+                >
+                  <MoreHorizontal className="w-5 h-5 mr-1" />
+                  More
+                </button>
+              </div>
+            </div>
+
+            {/* More Menu Dropdown (OUTSIDE Blue Box) */}
+            {showMoreMenu && (
+              <motion.div
+                ref={moreMenuRef}
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50"
+              >
+                {moreMenuItems.map((item) => (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    className={cn(
+                      "flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100",
+                      isActive(item.path) && "bg-gray-50"
+                    )}
+                    onClick={() => setShowMoreMenu(false)}
+                  >
+                    <item.icon className="w-5 h-5 mr-3 text-gray-400" />
+                    {item.label}
+                  </Link>
+                ))}
+              </motion.div>
             )}
           </div>
 
-          <div className="flex items-center space-x-4">
-            {/* Organization Switcher */}
-            <OrganizationSwitcher />
-
-            {/* Notification Panel */}
+          {/* RIGHT: Notification + Settings */}
+          <div className="flex-shrink-0 flex items-center space-x-2">
             <NotificationPanel />
-
-            {/* Settings Menu */}
             <div ref={settingsMenuRef} className="relative">
               <button
                 onClick={() => setShowSettingsMenu(!showSettingsMenu)}
                 className={cn(
-                  "p-3 text-sm font-medium rounded-full transition-colors flex items-center",
+                  "p-2 text-sm font-medium rounded-full transition-colors flex items-center",
                   showSettingsMenu
                     ? "bg-gray-100 text-gray-900"
                     : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                 )}
               >
-                <Settings className="w-5 h-5 mr-2" />
+                <Settings className="w-5 h-5 mr-1" />
                 Menu
               </button>
-
               <AnimatePresence>
                 {showSettingsMenu && (
                   <motion.div
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
-                    className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1"
+                    className="absolute right-0 mt-2 w-48 max-w-xs bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50"
                   >
                     <Link
                       to="/admin/settings"
@@ -292,8 +274,9 @@ export function AdminLayout() {
         </div>
       </div>
 
-      {/* Main Content */}
-      <main className="pt-24 pb-8 px-4 max-w-7xl mx-auto">
+
+      {/* MAIN CONTENT */}
+      <main className="pt-28 pb-8 px-6 w-full">
         <Outlet />
       </main>
     </div>
