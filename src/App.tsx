@@ -54,6 +54,7 @@ import { OrganizationSelector } from './components/OrganizationSelector';
 import { OpportunitiesPage } from './components/admin/OpportunitiesPage';
 import { OpportunityForm } from './components/admin/OpportunityForm';
 import { OpportunityDetailPage } from './components/admin/OpportunityDetailPage';
+import { ReportFolderList } from './components/admin/reports/ReportFolderList';
 
 function App() {
     const { scrollYProgress } = useScroll();
@@ -127,6 +128,8 @@ function App() {
                                 <Route path="opportunities/new" element={<OpportunityForm />} />
                                 <Route path="opportunities/:id" element={<OpportunityDetailPage />} />
                                 <Route path="opportunities/:id/edit" element={<OpportunityForm />} />
+                                <Route path="ReportFolderList" element={<ReportFolderList />} />
+                                    
                                 <Route path="products" element={<ProductsPage />} />
                                 <Route path="products/new" element={<ProductForm />} />
                                 <Route path="products/:id/edit" element={<ProductForm />} />

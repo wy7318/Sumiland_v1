@@ -82,7 +82,7 @@ export function AdminLayout() {
 
   const menuItems = [
     { path: '/admin', icon: LayoutDashboard, label: 'Dashboard' },
-    { path: '/admin/reports', icon: BarChart2, label: 'Reports' },
+    { path: '/admin/ReportFolderList', icon: BarChart2, label: 'Reports' },
     { path: '/admin/vendors', icon: Building2, label: 'Accounts' },
     { path: '/admin/customers', icon: Users, label: 'Customers' },
     { path: '/admin/leads', icon: UserCheck, label: 'Leads' },
