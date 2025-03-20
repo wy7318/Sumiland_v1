@@ -1,0 +1,39 @@
+.custom-calendar {
+    border: none;
+    font-family: inherit;
+    background-color: white;
+    border-radius: 0.5rem;
+    padding: 1rem;
+}
+
+.custom-calendar .react-calendar__tile {
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.375rem;
+    transition: all 0.2s ease-in-out;
+}
+
+.custom-calendar .react-calendar__tile--now {
+    background: #f0f0f0;
+    border-radius: 0.375rem;
+    font-weight: bold;
+}
+
+.custom-calendar .react-calendar__tile--active {
+    background-color: #4f46e5;
+    /* Primary */
+    color: white;
+}
+
+.custom-calendar .react-calendar__tile:hover {
+    background-color: #e0e7ff;
+    /* Light primary */
+}
+
+.task-dot {
+    width: 6px;
+    height: 6px;
+    background-color: #4f46e5;
+    /* Primary */
+    border-radius: 9999px;
+    margin: 0 auto;
+}

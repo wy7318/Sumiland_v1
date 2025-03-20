@@ -1,0 +1,62 @@
+/* Grid Styling */
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    background-color: #f1f5f9;
+    /* Light background */
+}
+
+/* Each Day Cell */
+.calendar-day {
+    background-color: #fff;
+    min-height: 110px;
+    padding: 8px;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+    /* Light border */
+    position: relative;
+    overflow-y: auto;
+    transition: background 0.2s ease;
+}
+
+.calendar-day:hover {
+    background-color: #f9fafb;
+    cursor: pointer;
+}
+
+/* Today Border Highlight */
+.today-border {
+    border: 2px solid #3b82f6;
+}
+
+/* Date Number */
+.date-label {
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: #4b5563;
+    position: absolute;
+    top: 8px;
+    right: 8px;
+}
+
+/* Task Pill */
+.task-pill {
+    font-size: 0.75rem;
+    padding: 2px 6px;
+    border-radius: 9999px;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    background-color: #e0f2fe;
+    /* light blue */
+    color: #0369a1;
+    /* darker blue */
+    transition: background 0.2s ease;
+}
+
+.task-pill:hover {
+    background-color: #bae6fd;
+}
