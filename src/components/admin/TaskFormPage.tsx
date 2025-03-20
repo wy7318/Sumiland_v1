@@ -5,6 +5,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useOrganization } from '../../contexts/OrganizationContext';
 import { X, Save, AlertCircle, Calendar, Search } from 'lucide-react';
 import { UserSearch } from './UserSearch';
+import { useSearchParams } from 'react-router-dom';
+
 
 const moduleOptions = [
     { name: 'Opportunities', table: 'opportunities', idField: 'id', nameField: 'name' },
@@ -21,6 +23,7 @@ export function TaskFormPage() {
     const { selectedOrganization } = useOrganization();
     const navigate = useNavigate();
     const { id } = useParams();
+    const [searchParams] = useSearchParams();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -30,13 +33,38 @@ export function TaskFormPage() {
     const [assignedTo, setAssignedTo] = useState<string>('');
     const [isPersonal, setIsPersonal] = useState(true);
     const [selectedModule, setSelectedModule] = useState<any | null>(null);
+    // const [moduleName, setModuleName] = useState('');
     const [recordId, setRecordId] = useState('');
+
     const [moduleRecords, setModuleRecords] = useState<any[]>([]);
     const [recordSearch, setRecordSearch] = useState('');
+    
 
     useEffect(() => {
-        if (id) fetchTask();
+        if (!id) {
+            const moduleParam = searchParams.get('module');
+            const recordParam = searchParams.get('recordId');
+
+            if (moduleParam) {
+                const mod = moduleOptions.find(m => m.table === moduleParam);
+                if (mod) {
+                    setSelectedModule(mod);
+                }
+            }
+            if (recordParam) {
+                setRecordId(recordParam);
+            }
+        }
+    }, [id, searchParams]);
+
+    useEffect(() => {
+        if (id) {
+            fetchTask();
+        }
     }, [id]);
+
+
+
 
     useEffect(() => {
         if (selectedModule) fetchModuleRecords();
