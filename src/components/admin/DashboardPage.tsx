@@ -17,6 +17,8 @@ import { ReportFolderList } from './reports/ReportFolderList';
 import { ResponsiveLine } from '@nivo/line'; // Install: npm i @nivo/line @nivo/core
 import { ResponsiveBar } from '@nivo/bar'; // Install: npm i @nivo/bar @nivo/core
 import { ResponsivePie } from '@nivo/pie'; // Import npm i @nivo/pie @nivo/core
+import { MiniTaskCalendar } from './MiniTaskCalendar';
+
 
 
 
@@ -626,10 +628,7 @@ export function DashboardPage() {
         )}
       </div>
 
-
-
       <div className="flex justify-between items-center">
-
         <button
           onClick={fetchData}
           disabled={loading}
@@ -640,109 +639,115 @@ export function DashboardPage() {
         </button>
       </div>
 
+      {/* Main Grid Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        {/* Key Metrics Section */}
+        <div className="lg:col-span-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {loading ? (
+              // Show skeleton loaders while loading
+              Array.from({ length: MODULES.length }).map((_, index) => (
+                <SkeletonLoader key={index} />
+              ))
+            ) : (
+              // Show actual content when data is loaded
+              MODULES.map(module => {
+                const moduleData = data[module.table] || { records: [], count: 0 };
+                const isTopCard = ['Opportunities', 'Quotes', 'Orders'].includes(module.name);
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {loading ? (
-          // Show skeleton loaders while loading
-          Array.from({ length: MODULES.length }).map((_, index) => (
-            <SkeletonLoader key={index} />
-          ))
-        ) : (
-          // Show actual content when data is loaded
-          MODULES.map(module => {
-            const moduleData = data[module.table] || { records: [], count: 0 };
-            const isTopCard = ['Opportunities', 'Quotes', 'Orders'].includes(module.name);
-
-
-            return (
-              <motion.div
-                key={module.table}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-white/80 backdrop-blur-sm border border-gray-200 shadow-lg rounded-2xl p-5 hover:scale-[1.02] transition-transform"
-
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <div className={`text-3xl ${module.color} px-3 py-1 rounded-xl shadow-inner`}>
-                    {module.icon}
-                  </div>
-                  <Link
-                    to={`/admin/${module.route}`}
-                    className="text-sm text-primary-600 hover:underline font-medium"
+                return (
+                  <motion.div
+                    key={module.table}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-white/80 backdrop-blur-sm border border-gray-200 shadow-lg rounded-2xl p-5 hover:scale-[1.02] transition-transform"
                   >
-                    View All
-                  </Link>
-                </div>
-
-                <h2 className="text-lg font-semibold mb-2 text-gray-800">{module.name}</h2>
-
-                <div className="mb-3 space-y-2">
-                  <AnimatedCount value={moduleData.count} />
-                  <p className={cn("text-sm font-medium",
-                    module.name === 'Opportunities' && "text-purple-600",
-                    module.name === 'Quotes' && "text-pink-600",
-                    module.name === 'Orders' && "text-red-600"
-                  )}>
-                    Total: $
-                    {(module.name === 'Opportunities'
-                      ? totalsByDay.opportunities
-                      : module.name === 'Quotes'
-                        ? totalsByDay.quotes
-                        : module.name === 'Orders'
-                          ? totalsByDay.orders
-                          : 0
-                    ).toLocaleString()}
-                  </p>
-
-                  {/* Line Chart */}
-                  {module.name === 'Opportunities' || module.name === 'Quotes' || module.name === 'Orders' ? (
-                    <ChartWithToggle
-                      records={moduleData.records}
-                      rangeType={rangeType}
-                      moduleName={module.name}
-                    />
-                  ) : (
-                    <PieChartCard
-                      records={moduleData.records}
-                      moduleName={module.name}
-                      groupByField={
-                        module.name === 'Leads' ? 'lead_source' :
-                          module.name === 'Cases' ? 'type' :
-                            module.name === 'Accounts' ? 'type' :
-                              module.name === 'Customers' ? 'type' :
-                                'status'
-                      }
-                    />
-                  )}
-
-                </div>
-
-
-                <div className="space-y-2 text-sm text-gray-600">
-                  {moduleData.records.length > 0 ? (
-                    moduleData.records.slice(0, 3).map((rec: any) => (
+                    <div className="flex items-center justify-between mb-3">
+                      <div className={`text-3xl ${module.color} px-3 py-1 rounded-xl shadow-inner`}>
+                        {module.icon}
+                      </div>
                       <Link
-                        to={`/admin/${module.route}/${rec[module.idField]}`}
-                        key={rec[module.idField]}
-                        className="block p-2 rounded-lg hover:bg-gray-100 transition"
+                        to={`/admin/${module.route}`}
+                        className="text-sm text-primary-600 hover:underline font-medium"
                       >
-                        <p className="font-medium text-gray-800">{rec[module.nameField] || 'No Title'}</p>
-                        <p className="text-xs text-gray-500">
-                          {new Date(rec.created_at).toLocaleString()}
-                        </p>
+                        View All
                       </Link>
-                    ))
-                  ) : (
-                    <p className="text-gray-400">No new records</p>
-                  )}
-                </div>
-              </motion.div>
+                    </div>
 
-            );
-          })
-        )}
+                    <h2 className="text-lg font-semibold mb-2 text-gray-800">{module.name}</h2>
+
+                    <div className="mb-3 space-y-2">
+                      <AnimatedCount value={moduleData.count} />
+                      <p className={cn("text-sm font-medium",
+                        module.name === 'Opportunities' && "text-purple-600",
+                        module.name === 'Quotes' && "text-pink-600",
+                        module.name === 'Orders' && "text-red-600"
+                      )}>
+                        Total: $
+                        {(module.name === 'Opportunities'
+                          ? totalsByDay.opportunities
+                          : module.name === 'Quotes'
+                            ? totalsByDay.quotes
+                            : module.name === 'Orders'
+                              ? totalsByDay.orders
+                              : 0
+                        ).toLocaleString()}
+                      </p>
+
+                      {/* Line Chart */}
+                      {module.name === 'Opportunities' || module.name === 'Quotes' || module.name === 'Orders' ? (
+                        <ChartWithToggle
+                          records={moduleData.records}
+                          rangeType={rangeType}
+                          moduleName={module.name}
+                        />
+                      ) : (
+                        <PieChartCard
+                          records={moduleData.records}
+                          moduleName={module.name}
+                          groupByField={
+                            module.name === 'Leads' ? 'lead_source' :
+                              module.name === 'Cases' ? 'type' :
+                                module.name === 'Accounts' ? 'type' :
+                                  module.name === 'Customers' ? 'type' :
+                                    'status'
+                          }
+                        />
+                      )}
+                    </div>
+
+                    <div className="space-y-2 text-sm text-gray-600">
+                      {moduleData.records.length > 0 ? (
+                        moduleData.records.slice(0, 3).map((rec: any) => (
+                          <Link
+                            to={`/admin/${module.route}/${rec[module.idField]}`}
+                            key={rec[module.idField]}
+                            className="block p-2 rounded-lg hover:bg-gray-100 transition"
+                          >
+                            <p className="font-medium text-gray-800">{rec[module.nameField] || 'No Title'}</p>
+                            <p className="text-xs text-gray-500">
+                              {new Date(rec.created_at).toLocaleString()}
+                            </p>
+                          </Link>
+                        ))
+                      ) : (
+                        <p className="text-gray-400">No new records</p>
+                      )}
+                    </div>
+                  </motion.div>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* Task Calendar Section */}
+        <div className="lg:col-span-1">
+          <MiniTaskCalendar />
+        </div>
       </div>
 
+      {/* Rest of the Dashboard Content */}
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Dashboard</h1>
         <button
@@ -755,7 +760,6 @@ export function DashboardPage() {
           <Plus className="w-4 h-4 mr-2" />
           Create Report
         </button>
-
       </div>
 
       {error && (
