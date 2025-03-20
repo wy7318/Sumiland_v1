@@ -55,6 +55,11 @@ import { OpportunitiesPage } from './components/admin/OpportunitiesPage';
 import { OpportunityForm } from './components/admin/OpportunityForm';
 import { OpportunityDetailPage } from './components/admin/OpportunityDetailPage';
 import { ReportFolderList } from './components/admin/reports/ReportFolderList';
+import { TasksPage } from './components/admin/TasksPage';
+import { TaskFormPage } from './components/admin/TaskFormPage';
+import { FullTaskCalendar } from './components/admin/FullTaskCalendar';
+
+
 
 function App() {
     const { scrollYProgress } = useScroll();
@@ -158,6 +163,11 @@ function App() {
                                 <Route path="inventory/alerts" element={<InventoryAlertsPage />} />
                                 <Route path="user-organizations" element={<UserOrganizationsPage />} />
                                 <Route path="users" element={<UsersPage />} />
+                                <Route path="tasks" element={<TasksPage />} />
+                                <Route path="tasks/new" element={<TaskFormPage />} />
+                                <Route path="tasks/:id/edit" element={<TaskFormPage />} />
+                                <Route path="tasks/calendar" element={<FullTaskCalendar />} />
+                                    
                                 <Route path="settings" element={<SettingsPage />} />
                             </Route>
                         </Routes>
