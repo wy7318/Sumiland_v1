@@ -55,13 +55,13 @@ type Report = {
 };
 
 const MODULES = [
-  { name: 'Opportunities', table: 'opportunities', icon: '💼', color: 'bg-purple-100 text-purple-800', idField: 'id', nameField: 'name', route: 'opportunities' },
-  { name: 'Quotes', table: 'quote_hdr', icon: '📝', color: 'bg-pink-100 text-pink-800', idField: 'quote_id', nameField: 'quote_number', route: 'quotes' },
-  { name: 'Orders', table: 'order_hdr', icon: '📦', color: 'bg-red-100 text-red-800', idField: 'order_id', nameField: 'order_number', route: 'orders' },
   { name: 'Cases', table: 'cases', icon: '📋', color: 'bg-blue-100 text-blue-800', idField: 'id', nameField: 'title', route: 'cases' },
   { name: 'Leads', table: 'leads', icon: '📋', color: 'bg-blue-100 text-blue-800', idField: 'id', nameField: 'company', route: 'leads' },
   { name: 'Accounts', table: 'vendors', icon: '🏢', color: 'bg-yellow-100 text-yellow-800', idField: 'id', nameField: 'name', route: 'vendors' },
-  { name: 'Customers', table: 'customers', icon: '👤', color: 'bg-green-100 text-green-800', idField: 'customer_id', nameField: 'company', route: 'customers' }
+  { name: 'Customers', table: 'customers', icon: '👤', color: 'bg-green-100 text-green-800', idField: 'customer_id', nameField: 'company', route: 'customers' },
+  { name: 'Opportunities', table: 'opportunities', icon: '💼', color: 'bg-purple-100 text-purple-800', idField: 'id', nameField: 'name', route: 'opportunities' },
+  { name: 'Quotes', table: 'quote_hdr', icon: '📝', color: 'bg-pink-100 text-pink-800', idField: 'quote_id', nameField: 'quote_number', route: 'quotes' },
+  { name: 'Orders', table: 'order_hdr', icon: '📦', color: 'bg-red-100 text-red-800', idField: 'order_id', nameField: 'order_number', route: 'orders' }
 ];
 
 function AnimatedCount({ value }: { value: number }) {
@@ -570,7 +570,7 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Key Metrics</h1>
+      <h1 className="text-2xl font-bold">Your Highlights!</h1>
       <div className="flex flex-wrap items-center gap-4 mb-6">
         <div className="flex gap-2">
           {['daily', 'monthly', 'yearly'].map(type => (
@@ -643,17 +643,91 @@ export function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         {/* Key Metrics Section */}
         <div className="lg:col-span-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* First row: Cases, Leads, Accounts, Customers */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             {loading ? (
               // Show skeleton loaders while loading
-              Array.from({ length: MODULES.length }).map((_, index) => (
-                <SkeletonLoader key={index} />
+              Array.from({ length: 4 }).map((_, index) => (
+                <SkeletonLoader key={`row1-${index}`} />
               ))
             ) : (
               // Show actual content when data is loaded
-              MODULES.map(module => {
+              MODULES.filter(module => ['Cases', 'Leads', 'Accounts', 'Customers'].includes(module.name)).map(module => {
                 const moduleData = data[module.table] || { records: [], count: 0 };
-                const isTopCard = ['Opportunities', 'Quotes', 'Orders'].includes(module.name);
+
+                return (
+                  <motion.div
+                    key={module.table}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-white/80 backdrop-blur-sm border border-gray-200 shadow-lg rounded-2xl p-4 hover:scale-[1.02] transition-transform"
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <div className={`text-2xl ${module.color} px-2 py-1 rounded-xl shadow-inner`}>
+                        {module.icon}
+                      </div>
+                      <Link
+                        to={`/admin/${module.route}`}
+                        className="text-xs text-primary-600 hover:underline font-medium"
+                      >
+                        View All
+                      </Link>
+                    </div>
+
+                    <h2 className="text-base font-semibold mb-2 text-gray-800">{module.name}</h2>
+
+                    <div className="mb-3 space-y-2">
+                      <AnimatedCount value={moduleData.count} />
+
+                      {/* Pie Chart */}
+                      <PieChartCard
+                        records={moduleData.records}
+                        moduleName={module.name}
+                        groupByField={
+                          module.name === 'Leads' ? 'lead_source' :
+                            module.name === 'Cases' ? 'type' :
+                              module.name === 'Accounts' ? 'type' :
+                                module.name === 'Customers' ? 'type' :
+                                  'status'
+                        }
+                      />
+                    </div>
+
+                    <div className="space-y-1 text-xs text-gray-600">
+                      {moduleData.records.length > 0 ? (
+                        moduleData.records.slice(0, 2).map((rec: any) => (
+                          <Link
+                            to={`/admin/${module.route}/${rec[module.idField]}`}
+                            key={rec[module.idField]}
+                            className="block p-2 rounded-lg hover:bg-gray-100 transition"
+                          >
+                            <p className="font-medium text-gray-800">{rec[module.nameField] || 'No Title'}</p>
+                            <p className="text-xs text-gray-500">
+                              {new Date(rec.created_at).toLocaleString()}
+                            </p>
+                          </Link>
+                        ))
+                      ) : (
+                        <p className="text-gray-400">No new records</p>
+                      )}
+                    </div>
+                  </motion.div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Second row: Opportunities, Quotes, Orders (larger) */}
+          <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-3 gap-6">
+            {loading ? (
+              // Show skeleton loaders while loading
+              Array.from({ length: 3 }).map((_, index) => (
+                <SkeletonLoader key={`row2-${index}`} />
+              ))
+            ) : (
+              // Show actual content when data is loaded
+              MODULES.filter(module => ['Opportunities', 'Quotes', 'Orders'].includes(module.name)).map(module => {
+                const moduleData = data[module.table] || { records: [], count: 0 };
 
                 return (
                   <motion.div
@@ -695,25 +769,11 @@ export function DashboardPage() {
                       </p>
 
                       {/* Line Chart */}
-                      {module.name === 'Opportunities' || module.name === 'Quotes' || module.name === 'Orders' ? (
-                        <ChartWithToggle
-                          records={moduleData.records}
-                          rangeType={rangeType}
-                          moduleName={module.name}
-                        />
-                      ) : (
-                        <PieChartCard
-                          records={moduleData.records}
-                          moduleName={module.name}
-                          groupByField={
-                            module.name === 'Leads' ? 'lead_source' :
-                              module.name === 'Cases' ? 'type' :
-                                module.name === 'Accounts' ? 'type' :
-                                  module.name === 'Customers' ? 'type' :
-                                    'status'
-                          }
-                        />
-                      )}
+                      <ChartWithToggle
+                        records={moduleData.records}
+                        rangeType={rangeType}
+                        moduleName={module.name}
+                      />
                     </div>
 
                     <div className="space-y-2 text-sm text-gray-600">
@@ -749,7 +809,7 @@ export function DashboardPage() {
 
       {/* Rest of the Dashboard Content */}
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Dashboard</h1>
+        <h1 className="text-2xl font-bold">Reports</h1>
         <button
           onClick={() => {
             setEditingReport(null);
