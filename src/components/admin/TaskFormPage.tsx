@@ -38,6 +38,8 @@ export function TaskFormPage() {
 
     const [moduleRecords, setModuleRecords] = useState<any[]>([]);
     const [recordSearch, setRecordSearch] = useState('');
+    const [isDone, setIsDone] = useState(false);  // New state
+
     
 
     useEffect(() => {
@@ -81,6 +83,7 @@ export function TaskFormPage() {
                 setDueDate(data.due_date);
                 setAssignedTo(data.assigned_to || '');
                 setIsPersonal(data.is_personal);
+                setIsDone(data.is_done); // Load is_done
                 const moduleInfo = moduleOptions.find(mod => mod.table === data.module_name);
                 setSelectedModule(moduleInfo || null);
                 setRecordId(data.record_id || '');
@@ -127,6 +130,7 @@ export function TaskFormPage() {
                 due_date: dueDate,
                 assigned_to: assignedTo || null,
                 is_personal: isPersonal,
+                is_done: isDone, // Add this
                 organization_id: selectedOrganization?.id || null,
                 created_by: user?.id,
                 module_name: selectedModule?.table || null,
@@ -166,6 +170,26 @@ export function TaskFormPage() {
             )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Mark as Completed</label>
+                    <label className="inline-flex items-center cursor-pointer">
+                        <input
+                            type="checkbox"
+                            className="sr-only"
+                            checked={isDone}
+                            onChange={(e) => setIsDone(e.target.checked)}
+                        />
+                        <div className="relative">
+                            <div className="block bg-gray-300 w-10 h-6 rounded-full"></div>
+                            <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition ${isDone ? 'transform translate-x-4 bg-green-500' : ''
+                                }`}></div>
+                        </div>
+                        <span className="ml-3 text-sm font-medium text-gray-900">
+                            {isDone ? 'Yes' : 'No'}
+                        </span>
+                    </label>
+                </div>
+
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
                     <input
