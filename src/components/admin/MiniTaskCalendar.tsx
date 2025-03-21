@@ -23,17 +23,30 @@ export function MiniTaskCalendar() {
 
     const fetchTasks = async () => {
         try {
+            if (!user || !selectedOrganization?.id) return;
+
             const { data, error } = await supabase
                 .from('tasks')
                 .select('*')
-                .or(
-                    `created_by.eq.${user?.id},assigned_to.eq.${user?.id}` +
-                    (selectedOrganization?.id ? `,organization_id.eq.${selectedOrganization.id}` : '')
-                )
+                .eq('organization_id', selectedOrganization.id)
                 .order('due_date', { ascending: true });
 
             if (error) throw error;
-            setTasks(data || []);
+
+            // Filter tasks based on is_personal visibility rules
+            const filteredTasks = (data || []).filter(task => {
+                const isCreatedByUser = task.created_by === user.id;
+                const isAssignedToUser = task.assigned_to === user.id;
+
+                if (task.is_personal) {
+                    // Personal task: only visible to creator or assignee
+                    return isCreatedByUser || isAssignedToUser;
+                } else {
+                    // Not personal: visible to all users in org
+                    return true;
+                }
+            });
+            setTasks(filteredTasks || []);
         } catch (err) {
             console.error('Error fetching tasks:', err);
         }
