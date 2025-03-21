@@ -16,9 +16,32 @@ export function EmailConfigModal({ onClose, onSuccess }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  // Configure Google login
+  const handleGoogleSuccess = async (tokenResponse: any) => {
+    try {
+      if (!user) return;
+      if (!tokenResponse?.access_token) {
+        throw new Error('No access token received from Google');
+      }
+
+      const config = await connectGmail(tokenResponse);
+      const { error: saveError } = await saveEmailConfig(user.id, config);
+      if (saveError) throw saveError;
+
+      setSuccess(true);
+      setTimeout(() => {
+        onSuccess();
+      }, 1500);
+    } catch (err) {
+      console.error('Error connecting Gmail:', err);
+      setError(err instanceof Error ? err.message : 'Failed to connect Gmail');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const googleLogin = useGoogleLogin({
     scope: 'https://www.googleapis.com/auth/gmail.send',
+    onSuccess: handleGoogleSuccess,
     onError: (error) => {
       console.error('Google login error:', error);
       setError('Failed to connect to Gmail');
@@ -28,36 +51,29 @@ export function EmailConfigModal({ onClose, onSuccess }: Props) {
 
   const handleConnect = async (provider: 'gmail' | 'outlook') => {
     if (!user) return;
-    
-    try {
-      setLoading(true);
-      setError(null);
 
-      let config;
-      if (provider === 'gmail') {
-        // Get Google access token
-        const response = await googleLogin();
-        if (!response?.access_token) {
-          throw new Error('No access token received from Google');
-        }
-        config = await connectGmail(response);
-      } else {
-        config = await connectOutlook();
+    setLoading(true);
+    setError(null);
+
+    if (provider === 'gmail') {
+      console.log('Triggering Google login...');
+      googleLogin(); // Note: Just call the function, don't await
+    } else {
+      try {
+        const config = await connectOutlook();
+        const { error: saveError } = await saveEmailConfig(user.id, config);
+        if (saveError) throw saveError;
+
+        setSuccess(true);
+        setTimeout(() => {
+          onSuccess();
+        }, 1500);
+      } catch (err) {
+        console.error('Error connecting Outlook:', err);
+        setError(err instanceof Error ? err.message : 'Failed to connect Outlook');
+      } finally {
+        setLoading(false);
       }
-
-      // Save the configuration
-      const { error: saveError } = await saveEmailConfig(user.id, config);
-      if (saveError) throw saveError;
-
-      setSuccess(true);
-      setTimeout(() => {
-        onSuccess();
-      }, 1500);
-    } catch (err) {
-      console.error('Error connecting email:', err);
-      setError(err instanceof Error ? err.message : 'Failed to connect email account');
-    } finally {
-      setLoading(false);
     }
   };
 
