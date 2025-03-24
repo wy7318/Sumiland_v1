@@ -2,6 +2,8 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { formatCurrency } from './utils';
 
+
+
 export const generateQuotePDF = (quote: any) => {
   // Create PDF with slightly larger page size for better margins
   const doc = new jsPDF({
@@ -225,3 +227,5 @@ export const generateQuotePDF = (quote: any) => {
 
   return doc;
 };
+
+

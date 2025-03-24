@@ -352,7 +352,7 @@ export function DashboardPage() {
           {chartType === 'line' ? (
             <ResponsiveLine
               data={groupedData}
-              margin={{ top: 10, right: 10, bottom: 30, left: 40 }}
+              margin={{ top: 10, right: 40, bottom: 30, left: 40 }}
               xScale={{ type: 'point' }}
               yScale={{ type: 'linear', min: 0, max: 'auto', stacked: false }}
               curve={chartCurves[moduleName]}
@@ -389,7 +389,7 @@ export function DashboardPage() {
               data={barData}
               keys={['y']}
               indexBy="x"
-              margin={{ top: 10, right: 10, bottom: 30, left: 40 }}
+              margin={{ top: 10, right: 40, bottom: 30, left: 40 }}
               padding={0.3}
               colors={[chartColors[moduleName]]}
               axisBottom={{
@@ -423,55 +423,72 @@ export function DashboardPage() {
   function prepareLineChartData(records: any[], rangeType: string, moduleName: string) {
     if (!records || records.length === 0) return [];
 
-    // Determine group key function based on rangeType
-    const groupKeyFn = (date: Date) => {
-      if (rangeType === 'daily') return date.getHours(); // 0–23
-      if (rangeType === 'monthly') return date.getDate(); // 1–31
-      if (rangeType === 'yearly') return date.getMonth() + 1; // 1–12
-
-      // Custom Range Grouping
-      const now = new Date();
-      const rangeDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 3600 * 24));
-      if (rangeDays < 30) return date.getDate(); // Day
-      if (rangeDays < 365) return date.getMonth() + 1; // Month
-      return date.getFullYear(); // Year
-    };
-
-    // Grouped amount sum
-    const grouped: { [key: string]: number } = {};
+    const grouped: { [timestamp: string]: { label: string, total: number } } = {};
 
     records.forEach(record => {
       const createdAt = record.created_at ? new Date(record.created_at) : null;
       if (!createdAt || isNaN(createdAt.getTime())) return;
 
-      // Correct field based on module
       let amount = 0;
       if (moduleName === 'Opportunities') amount = record.amount ?? 0;
       else if (moduleName === 'Quotes' || moduleName === 'Orders') amount = record.total_amount ?? 0;
 
-      const key = groupKeyFn(createdAt).toString();
-      grouped[key] = (grouped[key] || 0) + amount;
+      let label = '';
+      let groupKey = ''; // Used as timestamp for sorting
+
+      switch (rangeType) {
+        case 'daily':
+          label = createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); // "14:00"
+          groupKey = createdAt.setMinutes(0, 0, 0).toString(); // Hour precision
+          break;
+        case 'monthly':
+          label = createdAt.toLocaleDateString([], { day: '2-digit', month: 'short' }); // "05 Mar"
+          groupKey = new Date(createdAt.getFullYear(), createdAt.getMonth(), createdAt.getDate()).getTime().toString();
+          break;
+        case 'yearly':
+          label = createdAt.toLocaleDateString([], { month: 'short' }); // "Mar"
+          groupKey = new Date(createdAt.getFullYear(), createdAt.getMonth(), 1).getTime().toString();
+          break;
+        case 'custom':
+          const diffDays = (Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24);
+          if (diffDays < 30) {
+            label = createdAt.toLocaleDateString([], { day: '2-digit', month: 'short' }); // "05 Mar"
+            groupKey = new Date(createdAt.getFullYear(), createdAt.getMonth(), createdAt.getDate()).getTime().toString();
+          } else if (diffDays < 365) {
+            label = createdAt.toLocaleDateString([], { month: 'short', year: 'numeric' }); // "Mar 2025"
+            groupKey = new Date(createdAt.getFullYear(), createdAt.getMonth(), 1).getTime().toString();
+          } else {
+            label = createdAt.getFullYear().toString(); // "2025"
+            groupKey = new Date(createdAt.getFullYear(), 0, 1).getTime().toString();
+          }
+          break;
+        default:
+          label = createdAt.toISOString().split('T')[0]; // "2025-03-24"
+          groupKey = createdAt.getTime().toString();
+      }
+
+      if (!grouped[groupKey]) {
+        grouped[groupKey] = { label, total: 0 };
+      }
+      grouped[groupKey].total += amount;
     });
 
-    // Sort by time key
-    const sortedKeys = Object.keys(grouped).sort((a, b) => Number(a) - Number(b));
-    const dataPoints = sortedKeys.map(key => ({
-      x: key,
-      y: parseFloat(grouped[key].toFixed(2)) // format to 2 decimal places
-    }));
-    console.log(`[${moduleName}] Chart Data:`, dataPoints);
-
+    // Sort by timestamp ascending
+    const sortedDataPoints = Object.entries(grouped)
+      .sort(([a], [b]) => Number(a) - Number(b))
+      .map(([_, value]) => ({
+        x: value.label,
+        y: parseFloat(value.total.toFixed(2))
+      }));
 
     return [
       {
         id: `${moduleName} Amount`,
         color: 'hsl(220, 70%, 50%)',
-        data: dataPoints
+        data: sortedDataPoints
       }
     ];
   }
-
-
 
 
 

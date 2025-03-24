@@ -4,6 +4,9 @@ import { Save, AlertCircle, CheckCircle, Building2, Globe, MapPin } from 'lucide
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Loader } from '@googlemaps/js-api-loader';
+import { useOrganization } from '../../contexts/OrganizationContext';
+
+
 
 type Organization = {
   id: string;
@@ -26,12 +29,13 @@ type Organization = {
 };
 
 export function OrganizationSettings() {
-  const { organizations, user } = useAuth();
+  const { user } = useAuth(); // You still need user
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [useShippingForBilling, setUseShippingForBilling] = useState(false);
+  const { selectedOrganization } = useOrganization();
   
   const shippingAutocompleteRef = useRef<google.maps.places.Autocomplete>();
   const billingAutocompleteRef = useRef<google.maps.places.Autocomplete>();
@@ -128,17 +132,26 @@ export function OrganizationSettings() {
   };
 
   useEffect(() => {
-    // Get the first organization where user is admin or owner
-    const adminOrg = organizations.find(org => 
-      org.role === 'admin' || org.role === 'owner'
-    );
-    
-    if (adminOrg) {
-      fetchOrganization(adminOrg.id);
+    if (selectedOrganization?.id) {
+      fetchOrganization(selectedOrganization.id);
     }
-  }, [organizations]);
+  }, [selectedOrganization]);
+
+
+  // useEffect(() => {
+  //   // Get the first organization where user is admin or owner
+  //   const adminOrg = organizations.find(org => 
+  //     org.role === 'admin' || org.role === 'owner'
+  //   );
+    
+  //   if (adminOrg) {
+  //     fetchOrganization(selectedOrganization?.id);
+  //   }
+  // }, [organizations]);
 
   const fetchOrganization = async (orgId: string) => {
+    console.log('orgId:', orgId);
+    console.log('selectedOrganization?.id:', selectedOrganization?.id);
     try {
       const { data, error } = await supabase
         .from('organizations')
@@ -167,46 +180,125 @@ export function OrganizationSettings() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!organization || !user) return;
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedOrganization) return;
+
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${selectedOrganization.id}-${Date.now()}.${fileExt}`;
+    const filePath = `logos/${fileName}`;
+
 
     setLoading(true);
     setError(null);
     setSuccess(null);
 
-    try {
-      // If using shipping for billing, copy shipping address to billing
-      const updateData = {
-        ...organization,
-        ...(useShippingForBilling ? {
-          billing_address_line1: organization.shipping_address_line1,
-          billing_address_line2: organization.shipping_address_line2,
-          billing_city: organization.shipping_city,
-          billing_state: organization.shipping_state,
-          billing_zip_code: organization.shipping_zip_code,
-          billing_country: organization.shipping_country
-        } : {}),
-        updated_at: new Date().toISOString(),
-        updated_by: user.id
-      };
+    // Upload to Supabase Storage
+    const { error: uploadError } = await supabase
+      .storage
+      .from('organization-logos')
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: true, // only if overwrite is intended and allowed
+        contentType: file.type
+      });
 
-      const { error } = await supabase
-        .from('organizations')
-        .update(updateData)
-        .eq('id', organization.id);
 
-      if (error) throw error;
-      setSuccess('Organization settings updated successfully');
-    } catch (err) {
-      console.error('Error updating organization:', err);
-      setError(err instanceof Error ? err.message : 'Failed to update organization');
-    } finally {
+    if (uploadError) {
+      console.error('Logo upload error:', uploadError);
+      setError('Failed to upload logo');
       setLoading(false);
+      return;
     }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Logo file size should be less than 5MB');
+      return;
+    }
+
+
+    // Get public URL
+    const { data: publicUrlData } = supabase
+      .storage
+      .from('organization-logos')
+      .getPublicUrl(filePath);
+
+    const logoUrl = publicUrlData.publicUrl;
+
+    // Save logo_url to DB
+    const { error: dbError } = await supabase
+      .from('organizations')
+      .update({ logo_url: logoUrl, updated_at: new Date().toISOString(), updated_by: user.id })
+      .eq('id', selectedOrganization.id);
+
+    if (dbError) {
+      console.error('Error saving logo_url:', dbError);
+      setError('Failed to update logo URL');
+    } else {
+      setOrganization(prev => prev ? { ...prev, logo_url: logoUrl } : prev);
+      setSuccess('Logo uploaded successfully');
+    }
+
+    setLoading(false);
   };
 
-  if (!organization) {
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedOrganization?.id) return;
+
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+
+    const updatePayload = {
+      name: organization.name,
+      website_url: organization.website_url,
+      shipping_address_line1: organization.shipping_address_line1,
+      shipping_address_line2: organization.shipping_address_line2,
+      shipping_city: organization.shipping_city,
+      shipping_state: organization.shipping_state,
+      shipping_zip_code: organization.shipping_zip_code,
+      shipping_country: organization.shipping_country,
+      billing_address_line1: useShippingForBilling
+        ? organization.shipping_address_line1
+        : organization.billing_address_line1,
+      billing_address_line2: useShippingForBilling
+        ? organization.shipping_address_line2
+        : organization.billing_address_line2,
+      billing_city: useShippingForBilling
+        ? organization.shipping_city
+        : organization.billing_city,
+      billing_state: useShippingForBilling
+        ? organization.shipping_state
+        : organization.billing_state,
+      billing_zip_code: useShippingForBilling
+        ? organization.shipping_zip_code
+        : organization.billing_zip_code,
+      billing_country: useShippingForBilling
+        ? organization.shipping_country
+        : organization.billing_country,
+      updated_at: new Date().toISOString(),
+      updated_by: user.id,
+    };
+
+    const { error } = await supabase
+      .from('organizations')
+      .update(updatePayload)
+      .eq('id', selectedOrganization.id);
+
+    console.log('updatePayload:', updatePayload);
+    if (error) {
+      console.error('Update Error:', error);
+      setError('Failed to update organization');
+    } else {
+      setSuccess('Organization settings updated successfully');
+    }
+
+    setLoading(false);
+  };
+
+  if (!selectedOrganization || !organization) {
     return (
       <div className="text-center text-gray-500">
         You need admin or owner access to manage organization settings.
@@ -257,6 +349,33 @@ export function OrganizationSettings() {
                 required
               />
             </div>
+
+            <div className="bg-white rounded-lg shadow p-6 mb-6">
+              <h3 className="text-lg font-semibold mb-4 flex items-center">
+                <Building2 className="w-5 h-5 mr-2" />
+                Organization Logo
+              </h3>
+              <div className="flex items-center space-x-4">
+                {organization.logo_url ? (
+                  <img
+                    src={organization.logo_url}
+                    alt="Organization Logo"
+                    className="w-24 h-24 object-cover rounded-lg border"
+                  />
+                ) : (
+                  <div className="w-24 h-24 bg-gray-100 flex items-center justify-center rounded-lg border text-gray-400">
+                    No Logo
+                  </div>
+                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLogoUpload}
+                  className="text-sm"
+                />
+              </div>
+            </div>
+
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
