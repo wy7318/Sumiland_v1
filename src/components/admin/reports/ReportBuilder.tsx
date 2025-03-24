@@ -465,6 +465,174 @@ export function ReportBuilder({ onClose, onSave, editingReport }: Props) {
                 </div>
               </div>
 
+              {/* Filters Section */}
+              <div className="border-t border-gray-200 pt-6">
+                <h3 className="text-lg font-medium mb-4 flex items-center">
+                  <Filter className="w-5 h-5 mr-2" /> Filters
+                </h3>
+                <div className="space-y-4">
+                  {formData.filters?.map((filter, index) => {
+                    const field = fields.find(f => f.column_name === filter.field);
+                    const isDateField = field?.data_type.includes('date') || field?.data_type.includes('timestamp');
+
+                    return (
+                      <div key={index} className="grid grid-cols-4 gap-4 items-end">
+                        {/* Field Selector */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Field
+                          </label>
+                          <select
+                            value={filter.field}
+                            onChange={e => {
+                              const newFilters = [...formData.filters!];
+                              newFilters[index].field = e.target.value;
+                              setFormData(prev => ({ ...prev, filters: newFilters }));
+                            }}
+                            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                          >
+                            <option value="">Select Field</option>
+                            {fields.map(f => (
+                              <option key={f.column_name} value={f.column_name}>
+                                {f.display_name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Operator */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Operator
+                          </label>
+                          <select
+                            value={filter.operator}
+                            onChange={e => {
+                              const newFilters = [...formData.filters!];
+                              newFilters[index].operator = e.target.value;
+                              setFormData(prev => ({ ...prev, filters: newFilters }));
+                            }}
+                            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                          >
+                            {isDateField ? (
+                              <>
+                                <option value="=">Equals</option>
+                                <option value=">">After</option>
+                                <option value="<">Before</option>
+                                <option value="between">Between</option>
+                              </>
+                            ) : (
+                              <>
+                                <option value="=">Equals</option>
+                                <option value="!=">Not Equal</option>
+                                <option value="like">Contains</option>
+                                <option value="in">In</option>
+                              </>
+                            )}
+                          </select>
+                        </div>
+
+                        {/* Value Input */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Value
+                          </label>
+                          {isDateField && filter.operator === 'between' ? (
+                            <div className="flex gap-2">
+                              <input
+                                type="date"
+                                value={filter.value?.start || ''}
+                                onChange={e => {
+                                  const newFilters = [...formData.filters!];
+                                  newFilters[index].value = {
+                                    ...newFilters[index].value,
+                                    start: e.target.value
+                                  };
+                                  setFormData(prev => ({ ...prev, filters: newFilters }));
+                                }}
+                                className="px-2 py-2 rounded-lg border border-gray-300 w-full"
+                              />
+                              <input
+                                type="date"
+                                value={filter.value?.end || ''}
+                                onChange={e => {
+                                  const newFilters = [...formData.filters!];
+                                  newFilters[index].value = {
+                                    ...newFilters[index].value,
+                                    end: e.target.value
+                                  };
+                                  setFormData(prev => ({ ...prev, filters: newFilters }));
+                                }}
+                                className="px-2 py-2 rounded-lg border border-gray-300 w-full"
+                              />
+                            </div>
+                          ) : isDateField ? (
+                            <input
+                              type="date"
+                              value={filter.value || ''}
+                              onChange={e => {
+                                const newFilters = [...formData.filters!];
+                                newFilters[index].value = e.target.value;
+                                setFormData(prev => ({ ...prev, filters: newFilters }));
+                              }}
+                              className="w-full px-2 py-2 rounded-lg border border-gray-300"
+                            />
+                          ) : (
+                            <input
+                              type="text"
+                              value={filter.value || ''}
+                              onChange={e => {
+                                const newFilters = [...formData.filters!];
+                                newFilters[index].value = e.target.value;
+                                setFormData(prev => ({ ...prev, filters: newFilters }));
+                              }}
+                              className="w-full px-2 py-2 rounded-lg border border-gray-300"
+                            />
+                          )}
+                        </div>
+
+                        {/* Remove Button */}
+                        <div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newFilters = formData.filters!.filter((_, i) => i !== index);
+                              setFormData(prev => ({ ...prev, filters: newFilters }));
+                            }}
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            <Trash2 className="w-5 h-5" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Add Filter Button */}
+                  <div className="pt-4">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newFilter = {
+                          field: '',
+                          operator: '=',
+                          value: ''
+                        };
+                        setFormData(prev => ({
+                          ...prev,
+                          filters: [...(prev.filters || []), newFilter]
+                        }));
+                      }}
+                      className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Filter
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+
               {/* Charts Section */}
               <div className="border-t border-gray-200 pt-6">
                 <div className="flex items-center justify-between mb-4">

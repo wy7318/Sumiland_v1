@@ -130,24 +130,31 @@ export function ReportViewer({ report, onClose, onEdit }: Props) {
   
       // Apply filters
       report.filters.forEach(filter => {
-        switch (filter.operator) {
-          case 'equals':
-            query = query.eq(filter.field, filter.value);
-            break;
-          case 'not_equals':
-            query = query.neq(filter.field, filter.value);
-            break;
-          case 'contains':
-            query = query.ilike(filter.field, `%${filter.value}%`);
-            break;
-          case 'greater_than':
-            query = query.gt(filter.field, filter.value);
-            break;
-          case 'less_than':
-            query = query.lt(filter.field, filter.value);
-            break;
+        const { field, operator, value } = filter;
+
+        if (operator === 'between' && value?.start && value?.end) {
+          query = query.gte(field, value.start).lte(field, value.end);
+        } else {
+          switch (operator) {
+            case '=':
+              query = query.eq(field, value);
+              break;
+            case '!=':
+              query = query.neq(field, value);
+              break;
+            case 'like':
+              query = query.ilike(field, `%${value}%`);
+              break;
+            case '>':
+              query = query.gt(field, value);
+              break;
+            case '<':
+              query = query.lt(field, value);
+              break;
+          }
         }
       });
+
   
       // Apply date range if specified
       if (report.date_range?.field && report.date_range.start) {
