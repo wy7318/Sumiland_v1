@@ -719,18 +719,54 @@ export function CaseDetailPage() {
           )}
         </div>
       </div>
-      <div className="lg:w-1/4 space-y-6">
-        <div className="bg-white rounded-lg shadow p-4">
-          <h2 className="text-lg font-semibold mb-4">Related</h2>
-            <div className="md:col-span-1 space-y-6">
+
+      {/* Related Tabs */}
+      <div className="lg:w-1/4">
+        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          {/* Tab Header */}
+          <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+            <h2 className="text-base font-semibold text-gray-800 flex items-center">
+              <svg
+                className="w-4 h-4 text-gray-500 mr-2"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+                />
+              </svg>
+              Related Records
+            </h2>
+          </div>
+
+          {/* Tab Content */}
+          <div className="divide-y divide-gray-200">
+            <div className="p-4">
               <RelatedEmails
                 recordId={caseData.id}
                 organizationId={caseData.organization_id}
                 refreshKey={refreshEmailList}
+                title="Email Communications"
               />
-
             </div>
 
+            {/* You can add more related components here with the same styling */}
+            {/* Example placeholder for another related component */}
+            <div className="p-4">
+              <div className="text-sm text-gray-500 italic">More related records would appear here</div>
+            </div>
+          </div>
+
+          {/* Optional footer */}
+          <div className="bg-gray-50 px-4 py-2 border-t border-gray-200 text-right">
+            <button className="text-xs text-blue-600 hover:text-blue-800 font-medium">
+              View All Related Records
+            </button>
+          </div>
         </div>
       </div>
     </div>
