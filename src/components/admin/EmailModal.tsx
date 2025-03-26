@@ -15,6 +15,7 @@ type Props = {
   onClose: () => void;
   onSuccess: () => void;
   caseTitle?: string; // <-- add this
+  caseId?: string; // <-- Add this
 };
 
 
@@ -38,7 +39,7 @@ const formats = [
 ];
 
 
-export function EmailModal({ to, onClose, onSuccess, caseTitle }: Props) {
+export function EmailModal({ to, onClose, onSuccess, caseTitle, caseId }: Props) {
   // const [subject, setSubject] = useState(caseTitle ? `[${caseTitle}]` : '');
 
   const { user } = useAuth();
@@ -73,8 +74,10 @@ export function EmailModal({ to, onClose, onSuccess, caseTitle }: Props) {
       //   setError('Failed to re-authenticate Gmail');
       // } else {
         // Try sending email again
+        console.log('caseId : ' + caseId);
         try {
-          await sendEmail(user.id, toAddress, subject, body, cc, bcc);
+          await sendEmail(user.id, toAddress, subject, body, cc, bcc, caseId); // ← pass case ID if available
+
 
           onSuccess();
         } catch (retryErr) {
@@ -110,7 +113,8 @@ export function EmailModal({ to, onClose, onSuccess, caseTitle }: Props) {
       }
 
       // Token is good — send email
-      await sendEmail(user.id, to, subject, body, cc, bcc);
+      await sendEmail(user.id, toAddress, subject, body, cc, bcc, caseId);
+
 
       onSuccess();
     } catch (err) {

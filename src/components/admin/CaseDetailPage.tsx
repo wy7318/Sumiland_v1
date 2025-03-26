@@ -700,6 +700,7 @@ export function CaseDetailPage() {
         <EmailModal
           to={caseData.contact.email}
           caseTitle={caseData.title}
+          caseId = {id}
           onClose={() => setShowEmailModal(false)}
           onSuccess={() => {
             setShowEmailModal(false);
