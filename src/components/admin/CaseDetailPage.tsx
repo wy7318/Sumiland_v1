@@ -16,6 +16,7 @@ import { getEmailConfig } from '../../lib/email';
 import { useAuth } from '../../contexts/AuthContext';
 import { useOrganization } from '../../contexts/OrganizationContext';
 import { RelatedEmails } from './RelatedEmails';
+import { RelatedTasks } from './RelatedTasks';
 
 type Case = {
   id: string;
@@ -751,6 +752,14 @@ export function CaseDetailPage() {
                 organizationId={caseData.organization_id}
                 refreshKey={refreshEmailList}
                 title="Email Communications"
+              />
+            </div>
+            <div className="p-4">
+              <RelatedTasks
+                recordId={caseData.id}
+                organizationId={caseData.organization_id}
+                refreshKey={refreshEmailList}
+                title="Tasks"
               />
             </div>
 
