@@ -224,6 +224,7 @@ export async function sendEmail(
   body: string,
   cc?: string,
   bcc?: string,
+  orgId?: string, 
   recordId?: string // optional related record ID (e.g. case ID)
 ) {
   const toList = to.split(',').map(e => e.trim());
@@ -264,6 +265,7 @@ export async function sendEmail(
     // ✅ Log the successful send to Supabase
     await supabase.from('email_messages').insert({
       record_id: recordId || null,
+      organization_id: orgId,
       user_id: userId,
       from_address: fromAddress,
       to_addresses: toList,
@@ -283,6 +285,7 @@ export async function sendEmail(
     // ❗ Log the failure as well
     await supabase.from('email_messages').insert({
       record_id: recordId || null,
+      organization_id: orgId,
       user_id: userId,
       from_address: fromAddress || 'unknown',
       to_addresses: toList,
