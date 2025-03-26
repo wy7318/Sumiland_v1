@@ -58,6 +58,8 @@ import { ReportFolderList } from './components/admin/reports/ReportFolderList';
 import { TasksPage } from './components/admin/TasksPage';
 import { TaskFormPage } from './components/admin/TaskFormPage';
 import { FullTaskCalendar } from './components/admin/FullTaskCalendar';
+import { FormTemplateList } from './components/admin/FormTemplateList';
+import { FormTemplateEditor } from './components/admin/FormTemplateEditor';
 
 
 
@@ -166,6 +168,9 @@ function App() {
                                 <Route path="tasks" element={<TasksPage />} />
                                 <Route path="tasks/new" element={<TaskFormPage />} />
                                 <Route path="tasks/:id/edit" element={<TaskFormPage />} />
+                                <Route path="forms" element={<FormTemplateList />} />
+                                <Route path="form-templates/create" element={<FormTemplateEditor />} />
+                                <Route path="form-templates/:id" element={<FormTemplateEditor />} />
                                 <Route path="tasks/calendar" element={<FullTaskCalendar />} />
                                     
                                 <Route path="settings" element={<SettingsPage />} />

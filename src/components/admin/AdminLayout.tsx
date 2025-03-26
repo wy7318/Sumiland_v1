@@ -91,6 +91,9 @@ export function AdminLayout() {
     { path: '/admin/quotes', icon: Quote, label: 'Quotes' },
     { path: '/admin/orders', icon: ShoppingBag, label: 'Orders' },
     { path: '/admin/tasks', icon: CheckSquare, label: 'Tasks' },
+    { path: '/admin/forms', icon: CheckSquare, label: 'Forms' },
+    // { path: '/admin/form-templates', icon: CheckSquare, label: 'Tasks' },
+    
     { path: '/admin/purchase-orders', icon: Truck, label: 'Purchase Orders' },
     { path: '/admin/work-orders', icon: ClipboardList, label: 'Work Orders' },
     { path: '/admin/inventory', icon: BoxSeam, label: 'Inventory' },
