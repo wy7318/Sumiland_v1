@@ -15,6 +15,7 @@ type Props = {
   onClose: () => void;
   onSuccess: () => void;
   caseTitle?: string; // <-- add this
+  orgId?: string; 
   caseId?: string; // <-- Add this
 };
 
@@ -39,7 +40,7 @@ const formats = [
 ];
 
 
-export function EmailModal({ to, onClose, onSuccess, caseTitle, caseId }: Props) {
+export function EmailModal({ to, onClose, onSuccess, caseTitle, orgId, caseId }: Props) {
   // const [subject, setSubject] = useState(caseTitle ? `[${caseTitle}]` : '');
 
   const { user } = useAuth();
@@ -76,7 +77,7 @@ export function EmailModal({ to, onClose, onSuccess, caseTitle, caseId }: Props)
         // Try sending email again
         console.log('caseId : ' + caseId);
         try {
-          await sendEmail(user.id, toAddress, subject, body, cc, bcc, caseId); // ← pass case ID if available
+          await sendEmail(user.id, toAddress, subject, body, cc, bcc, orgId, caseId); // ← pass case ID if available
 
 
           onSuccess();
@@ -113,7 +114,7 @@ export function EmailModal({ to, onClose, onSuccess, caseTitle, caseId }: Props)
       }
 
       // Token is good — send email
-      await sendEmail(user.id, toAddress, subject, body, cc, bcc, caseId);
+      await sendEmail(user.id, toAddress, subject, body, cc, bcc, orgId, caseId);
 
 
       onSuccess();
