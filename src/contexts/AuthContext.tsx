@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import type { User } from '@supabase/supabase-js';
@@ -20,32 +20,37 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const SESSION_CHECK_TIMEOUT = 500; // 0.5 seconds timeout
+// Key for tracking last auth check to prevent too frequent checks
+const LAST_AUTH_CHECK_KEY = 'last_auth_check_time';
+// Key for tracking sign out state
+const IS_SIGNED_OUT_KEY = 'is_signed_out';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<any>(null);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
+  const isCheckingAuthRef = useRef(false); // Use ref instead of state to prevent re-renders
+  const isSignedOutRef = useRef(localStorage.getItem(IS_SIGNED_OUT_KEY) === 'true');
   const navigate = useNavigate();
 
+  // Clear auth state and set signed out flag
   const clearAuthState = useCallback(() => {
+    console.log('Clearing auth state and setting signed out flag');
     setUser(null);
     setProfile(null);
     setOrganizations([]);
+
+    // Mark as signed out to prevent further checks
+    localStorage.setItem(IS_SIGNED_OUT_KEY, 'true');
+    isSignedOutRef.current = true;
+
+    // Clear any session storage
+    sessionStorage.removeItem('selectedOrganization');
   }, []);
 
-  const handleSignOut = useCallback(async () => {
-    try {
-      await supabase.auth.signOut();
-      clearAuthState();
-      navigate('/', { replace: true });
-    } catch (err) {
-      console.error('Error during sign out:', err);
-    }
-  }, [navigate, clearAuthState]);
-
-  const fetchUserProfile = async (userId: string) => {
+  // Function to get user profile, with error handling
+  const fetchUserProfile = useCallback(async (userId: string) => {
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -63,11 +68,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Profile fetch error:', error);
       return null;
     }
-  };
+  }, []);
 
-  const fetchUserOrganizations = async (userId: string) => {
+  // Function to get user organizations, with error handling
+  const fetchUserOrganizations = useCallback(async (userId: string) => {
     try {
-      // Get user-organization mappings with organization details
       const { data, error } = await supabase
         .from('user_organizations')
         .select(`
@@ -80,16 +85,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           )
         `)
         .eq('user_id', userId)
-        .eq('organizations.status', 'active'); // Only get active organizations
+        .eq('organizations.status', 'active');
 
       if (error) {
         console.error('Organizations error:', error);
         return [];
       }
 
-      // Transform the data into the expected format
       return data
-        .filter(item => item.organizations) // Filter out any null organizations
+        .filter(item => item.organizations)
         .map(item => ({
           id: item.organizations.id,
           name: item.organizations.name,
@@ -100,131 +104,145 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Organizations fetch error:', error);
       return [];
     }
-  };
+  }, []);
 
+  // Updated checkAuth function with better state management
   const checkAuth = useCallback(async () => {
-    let timeoutId: NodeJS.Timeout;
+    // Don't check auth if already signed out
+    if (isSignedOutRef.current) {
+      console.log('Skipping auth check because user is signed out');
+      setLoading(false);
+      return;
+    }
+
+    // Prevent concurrent auth checks
+    if (isCheckingAuthRef.current) {
+      console.log('Auth check already in progress, skipping');
+      return;
+    }
 
     try {
+      isCheckingAuthRef.current = true;
       setLoading(true);
 
-      // Get session with timeout
-      const sessionPromise = supabase.auth.getSession();
-      const timeoutPromise = new Promise((_, reject) => {
-        timeoutId = setTimeout(() => {
-          reject(new Error('Session check timeout'));
-        }, SESSION_CHECK_TIMEOUT);
-      });
+      // Update last check time
+      localStorage.setItem(LAST_AUTH_CHECK_KEY, Date.now().toString());
 
-      const { data: { session } } = await Promise.race([
-        sessionPromise,
-        timeoutPromise
-      ]) as Awaited<typeof sessionPromise>;
+      // Get the current session
+      const { data, error } = await supabase.auth.getSession();
 
-      clearTimeout(timeoutId);
-
-      // If no session, clear state and return
-      if (!session?.user) {
+      if (error) {
+        console.error('Session check error:', error);
         clearAuthState();
         return;
       }
 
-      // Set user state
+      const session = data?.session;
+
+      if (!session?.user) {
+        console.log('No active session found');
+        clearAuthState();
+        return;
+      }
+
+      // Clear any signed out flag
+      localStorage.removeItem(IS_SIGNED_OUT_KEY);
+      isSignedOutRef.current = false;
+
+      // Set user from session
       setUser(session.user);
 
-      // Get profile data
-      const profileData = await fetchUserProfile(session.user.id);
-      if (profileData) {
-        setProfile(profileData);
+      // Only fetch profile and orgs if we don't already have them
+      if (!profile) {
+        const profileData = await fetchUserProfile(session.user.id);
+        if (profileData) setProfile(profileData);
       }
 
-      // Get organizations
-      const orgs = await fetchUserOrganizations(session.user.id);
-      setOrganizations(orgs);
-
+      if (organizations.length === 0) {
+        const orgs = await fetchUserOrganizations(session.user.id);
+        setOrganizations(orgs);
+      }
     } catch (error) {
-      if (error instanceof Error) {
-        if (error.message === 'Session check timeout') {
-          console.warn('Session check timed out, retrying...');
-          // Optional: Implement retry logic here if needed
-        } else if (error.message.includes('JWT')) {
-          console.warn('JWT error, signing out:', error);
-          await handleSignOut();
-        } else {
-          console.error('Auth check error:', error);
-        }
-      }
+      console.error('Auth check error:', error);
+      clearAuthState();
     } finally {
       setLoading(false);
+      // Use a timeout to reset the checking flag to prevent immediate rechecks
+      setTimeout(() => {
+        isCheckingAuthRef.current = false;
+      }, 500);
     }
-  }, [clearAuthState, handleSignOut]);
+  }, [clearAuthState, fetchUserProfile, fetchUserOrganizations, organizations.length, profile]);
 
+  // Initial auth check on component mount
   useEffect(() => {
-    let mounted = true;
-    let retryTimeout: NodeJS.Timeout;
+    let isMounted = true;
+    let authChangeSubscription: { unsubscribe: () => void } | null = null;
 
     const initialize = async () => {
-      try {
-        await checkAuth();
-      } catch (error) {
-        if (mounted) {
-          console.error('Auth initialization error:', error);
-          // Retry after 5 seconds
-          retryTimeout = setTimeout(initialize, 5000);
-        }
+      if (!isMounted) return;
+
+      // Check if user has explicitly signed out
+      if (localStorage.getItem(IS_SIGNED_OUT_KEY) === 'true') {
+        console.log('User is signed out, skipping initial auth check');
+        isSignedOutRef.current = true;
+        setLoading(false);
+        return;
       }
+
+      await checkAuth();
     };
 
     initialize();
 
-    // Set up auth state change listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!mounted) return;
+    // Auth state change listener
+    authChangeSubscription = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('Auth state change:', event);
 
-      console.log('Auth state change:', event);
+        if (!isMounted) return;
 
-      switch (event) {
-        case 'SIGNED_IN':
-          if (session?.user) {
-            setUser(session.user);
-            await checkAuth();
-          }
-          break;
+        switch (event) {
+          case 'SIGNED_IN':
+            if (session?.user) {
+              // Clear signed out flag
+              localStorage.removeItem(IS_SIGNED_OUT_KEY);
+              isSignedOutRef.current = false;
+              setUser(session.user);
 
-        case 'TOKEN_REFRESHED':
-          if (session?.user) {
-            setUser(session.user);
-            await checkAuth();
-          }
-          break;
+              // Only update last check time, delay full profile/org fetch
+              localStorage.setItem(LAST_AUTH_CHECK_KEY, Date.now().toString());
+              if (isMounted) checkAuth();
+            }
+            break;
 
-        case 'SIGNED_OUT':
-          clearAuthState();
-          navigate('/', { replace: true });
-          break;
-
-        case 'USER_DELETED':
-          clearAuthState();
-          navigate('/', { replace: true });
-          break;
+          case 'SIGNED_OUT':
+          case 'USER_DELETED':
+            clearAuthState();
+            navigate('/', { replace: true });
+            break;
+        }
       }
-    });
+    ).data.subscription;
 
     return () => {
-      mounted = false;
-      clearTimeout(retryTimeout);
-      subscription.unsubscribe();
+      isMounted = false;
+      if (authChangeSubscription) {
+        authChangeSubscription.unsubscribe();
+      }
     };
   }, [checkAuth, clearAuthState, navigate]);
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      profile, 
-      organizations,
-      loading, 
-      checkAuth 
-    }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        profile,
+        organizations,
+        loading,
+        checkAuth
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
@@ -237,209 +255,3 @@ export function useAuth() {
   }
   return context;
 }
-
-
-
-// import { createContext, useContext, useEffect, useState, useCallback } from 'react';
-// import { useNavigate } from 'react-router-dom';
-// import { supabase } from '../lib/supabase';
-// import type { User } from '@supabase/supabase-js';
-
-// type Organization = {
-//   id: string;
-//   name: string;
-//   status: 'active' | 'inactive';
-//   role: 'owner' | 'admin' | 'member';
-// };
-
-// interface AuthContextType {
-//   user: User | null;
-//   profile: any;
-//   organizations: Organization[];
-//   loading: boolean;
-//   checkAuth: () => Promise<void>;
-// }
-
-// const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-// const SESSION_CHECK_TIMEOUT = 1000; // Increased to 1 second
-// const MAX_RETRY_ATTEMPTS = 3;
-
-// export function AuthProvider({ children }: { children: React.ReactNode }) {
-//   const [user, setUser] = useState<User | null>(null);
-//   const [profile, setProfile] = useState<any>(null);
-//   const [organizations, setOrganizations] = useState<Organization[]>([]);
-//   const [loading, setLoading] = useState(true);
-//   const navigate = useNavigate();
-
-//   const clearAuthState = useCallback(() => {
-//     setUser(null);
-//     setProfile(null);
-//     setOrganizations([]);
-//   }, []);
-
-//   const handleSignOut = useCallback(async () => {
-//     try {
-//       await supabase.auth.signOut();
-//       clearAuthState();
-//       navigate('/', { replace: true });
-//     } catch (err) {
-//       console.error('Error during sign out:', err);
-//     }
-//   }, [navigate, clearAuthState]);
-
-//   const fetchUserProfile = async (userId: string) => {
-//     try {
-//       const { data, error } = await supabase
-//         .from('profiles')
-//         .select('*')
-//         .eq('id', userId)
-//         .maybeSingle();
-
-//       if (error) {
-//         console.error('Profile fetch error:', error);
-//         return null;
-//       }
-
-//       return data;
-//     } catch (error) {
-//       console.error('Profile fetch error:', error);
-//       return null;
-//     }
-//   };
-
-//   const fetchUserOrganizations = async (userId: string) => {
-//     try {
-//       const { data, error } = await supabase
-//         .from('user_organizations')
-//         .select(`
-//           organization_id,
-//           role,
-//           organizations (
-//             id,
-//             name,
-//             status
-//           )
-//         `)
-//         .eq('user_id', userId)
-//         .eq('organizations.status', 'active');
-
-//       if (error) {
-//         console.error('Organizations error:', error);
-//         return [];
-//       }
-
-//       return data
-//         .filter(item => item.organizations)
-//         .map(item => ({
-//           id: item.organizations.id,
-//           name: item.organizations.name,
-//           status: item.organizations.status,
-//           role: item.role
-//         }));
-//     } catch (error) {
-//       console.error('Organizations fetch error:', error);
-//       return [];
-//     }
-//   };
-
-//   const checkAuth = useCallback(async (retryCount = 0) => {
-//     try {
-//       setLoading(true);
-
-//       // Use getSession without timeout to prevent interrupting the process
-//       const { data: { session } } = await supabase.auth.getSession();
-
-//       // If no session, clear state and return
-//       if (!session?.user) {
-//         clearAuthState();
-//         return;
-//       }
-
-//       // Set user state
-//       setUser(session.user);
-
-//       // Parallel fetching of profile and organizations
-//       const [profileData, orgs] = await Promise.all([
-//         fetchUserProfile(session.user.id),
-//         fetchUserOrganizations(session.user.id)
-//       ]);
-
-//       if (profileData) {
-//         setProfile(profileData);
-//       }
-
-//       setOrganizations(orgs);
-
-//     } catch (error) {
-//       if (retryCount < MAX_RETRY_ATTEMPTS) {
-//         console.warn(`Auth check failed, retrying (${retryCount + 1})...`);
-//         await new Promise(resolve => setTimeout(resolve, 1000)); // Slight delay between retries
-//         await checkAuth(retryCount + 1);
-//       } else {
-//         console.error('Auth check failed after multiple attempts:', error);
-//         // Optional: sign out if persistent errors
-//         await handleSignOut();
-//       }
-//     } finally {
-//       setLoading(false);
-//     }
-//   }, [clearAuthState, handleSignOut]);
-
-//   useEffect(() => {
-//     let mounted = true;
-
-//     const initialize = async () => {
-//       if (mounted) {
-//         await checkAuth();
-//       }
-//     };
-
-//     initialize();
-
-//     // Simplified auth state change listener
-//     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-//       if (!mounted) return;
-
-//       switch (event) {
-//         case 'SIGNED_IN':
-//         case 'TOKEN_REFRESHED':
-//           if (session?.user) {
-//             await checkAuth();
-//           }
-//           break;
-
-//         case 'SIGNED_OUT':
-//         case 'USER_DELETED':
-//           clearAuthState();
-//           navigate('/', { replace: true });
-//           break;
-//       }
-//     });
-
-//     return () => {
-//       mounted = false;
-//       subscription.unsubscribe();
-//     };
-//   }, [checkAuth, clearAuthState, navigate]);
-
-//   return (
-//     <AuthContext.Provider value={{
-//       user,
-//       profile,
-//       organizations,
-//       loading,
-//       checkAuth
-//     }}>
-//       {children}
-//     </AuthContext.Provider>
-//   );
-// }
-
-// export function useAuth() {
-//   const context = useContext(AuthContext);
-//   if (context === undefined) {
-//     throw new Error('useAuth must be used within an AuthProvider');
-//   }
-//   return context;
-// }

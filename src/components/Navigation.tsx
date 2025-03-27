@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X, LogIn, UserPlus, LogOut, LayoutDashboard, User } from 'lucide-react';
@@ -10,13 +10,47 @@ export function Navigation() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const profileButtonRef = useRef<HTMLButtonElement>(null);
-  
+
+  const { user, loading } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, loading } = useAuth();
 
+  // Track if we've already logged the user state to reduce console spam
+  const userRef = useRef<User | null | undefined>(undefined);
+  const loadingRef = useRef<boolean | undefined>(undefined);
+  const logMountRef = useRef(false);
+
+  // Log component mounting only once
+  useEffect(() => {
+    if (!logMountRef.current) {
+      console.log('[Navigation] Component mounted');
+      logMountRef.current = true;
+    }
+    return () => {
+      console.log('[Navigation] Component unmounted');
+    };
+  }, []);
+
+  // Track user changes with minimal logging
+  useEffect(() => {
+    if (userRef.current !== user) {
+      console.log('[Navigation] user changed:', user ? 'authenticated' : 'null');
+      userRef.current = user;
+    }
+  }, [user]);
+
+  // Track loading state changes with minimal logging
+  useEffect(() => {
+    if (loadingRef.current !== loading) {
+      console.log('[Navigation] loading changed:', loading);
+      loadingRef.current = loading;
+    }
+  }, [loading]);
+
+  // Handle scroll events
   useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 50);
@@ -26,6 +60,7 @@ export function Navigation() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Handle clicks outside of profile menu
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -42,21 +77,33 @@ export function Navigation() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Close profile menu on route change
   useEffect(() => {
     setIsProfileMenuOpen(false);
   }, [location.pathname]);
 
-  const handleSignOut = async () => {
+  // Handle sign out with error prevention
+  const handleSignOut = useCallback(async () => {
     try {
-      await signOut();
-      navigate('/');
-      setIsProfileMenuOpen(false);
-    } catch (error) {
-      console.error('Error signing out:', error);
-    }
-  };
+      // Prevent multiple sign-out attempts
+      if (isSigningOut) return;
 
-  const scrollToSection = (sectionId: string) => {
+      // Update UI state first
+      setIsSigningOut(true);
+      setIsProfileMenuOpen(false);
+
+      // Handle sign out
+      await signOut();
+
+      // Navigate home
+      navigate('/', { replace: true });
+    } catch (error) {
+      console.error('[Navigation] Error signing out:', error);
+    }
+  }, [navigate, isSigningOut]);
+
+  // Scroll to section function
+  const scrollToSection = useCallback((sectionId: string) => {
     const element = document.getElementById(sectionId);
     if (element) {
       const offset = 80;
@@ -69,11 +116,18 @@ export function Navigation() {
       });
     }
     setIsMobileMenuOpen(false);
-  };
+  }, []);
 
+  // Skip rendering on admin pages
   if (location.pathname.startsWith('/admin')) {
     return null;
   }
+
+  // Check if signed out
+  const isSignedOut = localStorage.getItem('is_signed_out') === 'true';
+
+  // Determine if user is authenticated (must be both: has user AND not signed out)
+  const isAuthenticated = !!user && !isSignedOut;
 
   const navItems = [
     { href: '/', label: 'Home', action: () => window.scrollTo({ top: 0, behavior: 'smooth' }) },
@@ -130,11 +184,12 @@ export function Navigation() {
             <div className="relative">
               {loading ? (
                 <div className="w-8 h-8 animate-pulse bg-gray-200 rounded-full" />
-              ) : user ? (
+              ) : isAuthenticated ? (
                 <button
                   ref={profileButtonRef}
                   onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
                   className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center hover:bg-primary-200 transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+                  disabled={isSigningOut}
                 >
                   <User className="w-5 h-5 text-primary-600" />
                 </button>
@@ -156,7 +211,7 @@ export function Navigation() {
               )}
 
               <AnimatePresence>
-                {isProfileMenuOpen && user && (
+                {isProfileMenuOpen && isAuthenticated && (
                   <motion.div
                     ref={profileMenuRef}
                     initial={{ opacity: 0, y: -10 }}
@@ -175,9 +230,10 @@ export function Navigation() {
                     <button
                       onClick={handleSignOut}
                       className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      disabled={isSigningOut}
                     >
                       <LogOut className="w-4 h-4 inline-block mr-2" />
-                      Sign Out
+                      {isSigningOut ? 'Signing Out...' : 'Sign Out'}
                     </button>
                   </motion.div>
                 )}
@@ -226,7 +282,7 @@ export function Navigation() {
                 {/* Mobile Auth Buttons */}
                 {loading ? (
                   <div className="w-full h-12 animate-pulse bg-gray-200 rounded-md" />
-                ) : user ? (
+                ) : isAuthenticated ? (
                   <>
                     <Link
                       to="/admin"
@@ -239,9 +295,10 @@ export function Navigation() {
                     <button
                       onClick={handleSignOut}
                       className="flex items-center px-4 py-2 text-gray-600 hover:text-primary-500"
+                      disabled={isSigningOut}
                     >
                       <LogOut className="w-4 h-4 mr-2" />
-                      Sign Out
+                      {isSigningOut ? 'Signing Out...' : 'Sign Out'}
                     </button>
                   </>
                 ) : (

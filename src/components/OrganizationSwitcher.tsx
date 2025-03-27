@@ -51,10 +51,14 @@ export function OrganizationSwitcher() {
             {organizations.map((org) => (
               <button
                 key={org.id}
-                onClick={() => {
-                  setSelectedOrganization(org);
+                onClick={async () => {
+                  if (org.id !== selectedOrganization.id) {
+                    await setSelectedOrganization(org);
+                    window.location.reload();
+                  }
                   setIsOpen(false);
                 }}
+
                 className={cn(
                   "w-full px-4 py-2 text-left flex items-center space-x-3",
                   "hover:bg-gray-50 transition-colors",
