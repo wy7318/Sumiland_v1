@@ -18,6 +18,10 @@ export function TasksPage() {
     const [error, setError] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+    const [filters, setFilters] = useState({
+        isDone: null, // null means "all", true means "done", false means "not done"
+        isPersonal: null // null means "all", true means "personal", false means "not personal"
+    });
 
     useEffect(() => {
         fetchTasks();
@@ -75,9 +79,25 @@ export function TasksPage() {
         }
     };
 
-    const filteredTasks = tasks.filter(task =>
-        task.title.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const filteredTasks = tasks.filter(task => {
+        // Search query filter
+        const matchesSearch = task.title.toLowerCase().includes(searchQuery.toLowerCase());
+
+        // Status filter
+        const matchesStatus = filters.isDone === null || task.is_done === filters.isDone;
+
+        // Personal filter
+        const matchesPersonal = filters.isPersonal === null || task.is_personal === filters.isPersonal;
+
+        // Visibility rules (keep your existing logic)
+        const isCreatedByUser = task.created_by === user.id;
+        const isAssignedToUser = task.assigned_to === user.id;
+        const matchesVisibility = task.is_personal
+            ? (isCreatedByUser || isAssignedToUser)
+            : true;
+
+        return matchesSearch && matchesStatus && matchesPersonal && matchesVisibility;
+    });
 
     const tasksOnSelectedDate = selectedDate
         ? tasks.filter(task => {
@@ -177,7 +197,7 @@ export function TasksPage() {
                 {/* Task List Panel */}
                 <div className="bg-white shadow rounded-lg lg:w-3/4">
                     <div className="p-4 border-b border-gray-200">
-                        <div className="relative">
+                        <div className="relative mb-4">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
                             <input
                                 type="text"
@@ -186,6 +206,56 @@ export function TasksPage() {
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
                             />
+                        </div>
+
+                        <div className="flex flex-wrap gap-4">
+                            {/* Status Filter */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                                <select
+                                    value={filters.isDone === null ? 'all' : filters.isDone ? 'done' : 'pending'}
+                                    onChange={(e) => {
+                                        const value = e.target.value;
+                                        setFilters(prev => ({
+                                            ...prev,
+                                            isDone: value === 'all' ? null : value === 'done'
+                                        }));
+                                    }}
+                                    className="rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                                >
+                                    <option value="all">All Tasks</option>
+                                    <option value="done">Completed</option>
+                                    <option value="pending">Pending</option>
+                                </select>
+                            </div>
+
+                            {/* Personal/Team Filter */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Visibility</label>
+                                <select
+                                    value={filters.isPersonal === null ? 'all' : filters.isPersonal ? 'personal' : 'team'}
+                                    onChange={(e) => {
+                                        const value = e.target.value;
+                                        setFilters(prev => ({
+                                            ...prev,
+                                            isPersonal: value === 'all' ? null : value === 'personal'
+                                        }));
+                                    }}
+                                    className="rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                                >
+                                    <option value="all">All Tasks</option>
+                                    <option value="personal">Personal</option>
+                                    <option value="team">Team</option>
+                                </select>
+                            </div>
+                            {filters.isDone !== null || filters.isPersonal !== null ? (
+                                <button
+                                    onClick={() => setFilters({ isDone: null, isPersonal: null })}
+                                    className="text-sm text-primary-600 hover:text-primary-800"
+                                >
+                                    Clear Filters
+                                </button>
+                            ) : null}
                         </div>
                     </div>
 
