@@ -12,7 +12,11 @@ import { AccountDetailsModal } from './AccountDetailsModal';
 import { CustomFieldsSection } from './CustomFieldsSection';
 import { useAuth } from '../../contexts/AuthContext';
 import { useOrganization } from '../../contexts/OrganizationContext';
-
+import { RelatedEmails } from './RelatedEmails';
+import { RelatedTasks } from './RelatedTasks';
+import { EmailConfigModal } from './EmailConfigModal';
+import { EmailModal } from './EmailModal';
+import { getEmailConfig } from '../../lib/email';
 
 type Quote = {
   quote_id: string;
@@ -68,6 +72,9 @@ export function QuoteDetailPage() {
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [quoteStatuses, setQuoteStatuses] = useState<PicklistValue[]>([]);
   const [creatingOrder, setCreatingOrder] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [showEmailConfigModal, setShowEmailConfigModal] = useState(false);
+  const [refreshEmailList, setRefreshEmailList] = useState(0);
 
   useEffect(() => {
     fetchPicklists();
@@ -142,6 +149,22 @@ export function QuoteDetailPage() {
       setError(err instanceof Error ? err.message : 'Failed to load quote');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleEmailClick = async () => {
+    if (!user) return;
+
+    try {
+      const config = await getEmailConfig(user.id);
+      if (!config) {
+        setShowEmailConfigModal(true);
+      } else {
+        setShowEmailModal(true);
+      }
+    } catch (err) {
+      console.error('Error checking email config:', err);
+      setError(err instanceof Error ? err.message : 'Failed to check email configuration');
     }
   };
 
@@ -246,319 +269,413 @@ export function QuoteDetailPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <button
-          onClick={() => navigate('/admin/quotes')}
-          className="inline-flex items-center text-gray-600 hover:text-gray-900"
-        >
-          <ArrowLeft className="w-5 h-5 mr-2" />
-          Back to Quotes
-        </button>
-        <div className="flex items-center gap-4">
-          <button
-            onClick={handleCreateOrder}
-            disabled={creatingOrder}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 disabled:opacity-50"
-          >
-            <ShoppingBag className="w-4 h-4 mr-2" />
-            {creatingOrder ? 'Creating Order...' : 'Create Order'}
-          </button>
-          <div className="flex space-x-3">
-            <Link
-              to={`/admin/quotes/${id}/edit`}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
+    <div className="flex flex-col lg:flex-row gap-4">
+      <div className="lg:w-3/4 space-y-6">
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <button
+              onClick={() => navigate('/admin/quotes')}
+              className="inline-flex items-center text-gray-600 hover:text-gray-900"
             >
-              <Edit className="w-4 h-4 mr-2" />
-              Edit Quote
-            </Link>
-            <Link
-              to={`/admin/tasks/new?module=quote_hdr&recordId=${id}`}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700"
-            >
-              <Calendar className="w-4 h-4 mr-2" />
-              Add Task
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      {error && (
-        <div className="bg-red-50 text-red-600 p-4 rounded-lg flex items-center">
-          <AlertCircle className="w-5 h-5 mr-2" />
-          {error}
-        </div>
-      )}
-
-      <div className="bg-white shadow rounded-lg overflow-hidden">
-        <div className="p-6">
-          <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
-            <div>
-              <h1 className="text-2xl font-bold mb-2">{quote.quote_number}</h1>
-              <div className="flex items-center gap-4 text-sm text-gray-500">
-                <span className="flex items-center">
-                  <Calendar className="w-4 h-4 mr-1" />
-                  {new Date(quote.created_at).toLocaleDateString()}
-                </span>
-                <select
-                  value={quote.status}
-                  onChange={(e) => handleStatusChange(e.target.value)}
-                  className="text-sm font-medium rounded-full px-3 py-1"
-                  style={getStatusStyle(quote.status)}
+              <ArrowLeft className="w-5 h-5 mr-2" />
+              Back to Quotes
+            </button>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={handleCreateOrder}
+                disabled={creatingOrder}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 disabled:opacity-50"
+              >
+                <ShoppingBag className="w-4 h-4 mr-2" />
+                {creatingOrder ? 'Creating Order...' : 'Create Order'}
+              </button>
+              <div className="flex space-x-3">
+                <Link
+                  to={`/admin/quotes/${id}/edit`}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
                 >
-                  {quoteStatuses.map(status => (
-                    <option key={status.id} value={status.value}>
-                      {status.label}
-                    </option>
-                  ))}
-                </select>
+                  <Edit className="w-4 h-4 mr-2" />
+                  Edit Quote
+                </Link>
+                <Link
+                  to={`/admin/tasks/new?module=quote_hdr&recordId=${id}`}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700"
+                >
+                  <Calendar className="w-4 h-4 mr-2" />
+                  Add Task
+                </Link>
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Account Information */}
-            {quote.vendor && (
-              <div>
-                <h2 className="text-lg font-semibold mb-4">Account Information</h2>
-                <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <Building2 className="w-5 h-5 text-gray-400 mr-3" />
-                      <div>
-                        <div className="font-medium">{quote.vendor.name}</div>
-                        <div className="text-sm text-gray-500">
-                          Type: {quote.vendor.type}
-                        </div>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => setShowAccountModal(true)}
-                      className="text-primary-600 hover:text-primary-700 text-sm"
+          {error && (
+            <div className="bg-red-50 text-red-600 p-4 rounded-lg flex items-center">
+              <AlertCircle className="w-5 h-5 mr-2" />
+              {error}
+            </div>
+          )}
+
+          <div className="bg-white shadow rounded-lg overflow-hidden">
+            <div className="p-6">
+              <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
+                <div>
+                  <h1 className="text-2xl font-bold mb-2">{quote.quote_number}</h1>
+                  <div className="flex items-center gap-4 text-sm text-gray-500">
+                    <span className="flex items-center">
+                      <Calendar className="w-4 h-4 mr-1" />
+                      {new Date(quote.created_at).toLocaleDateString()}
+                    </span>
+                    <select
+                      value={quote.status}
+                      onChange={(e) => handleStatusChange(e.target.value)}
+                      className="text-sm font-medium rounded-full px-3 py-1"
+                      style={getStatusStyle(quote.status)}
                     >
-                      View Details
-                    </button>
+                      {quoteStatuses.map(status => (
+                        <option key={status.id} value={status.value}>
+                          {status.label}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                  {quote.vendor.customer && (
-                    <div className="space-y-2">
-                      <div className="flex items-center">
-                        <User className="w-4 h-4 text-gray-400 mr-2" />
-                        <span className="text-sm text-gray-600">
-                          Contact: {quote.vendor.customer.first_name} {quote.vendor.customer.last_name}
-                        </span>
-                      </div>
-                      <div className="flex items-center">
-                        <Mail className="w-4 h-4 text-gray-400 mr-2" />
-                        <a
-                          href={`mailto:${quote.vendor.customer.email}`}
-                          className="text-sm text-primary-600 hover:text-primary-700"
-                        >
-                          {quote.vendor.customer.email}
-                        </a>
-                      </div>
-                      {quote.vendor.customer.phone && (
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Account Information */}
+                {quote.vendor && (
+                  <div>
+                    <h2 className="text-lg font-semibold mb-4">Account Information</h2>
+                    <div className="bg-gray-50 rounded-lg p-4 space-y-4">
+                      <div className="flex items-center justify-between">
                         <div className="flex items-center">
-                          <Phone className="w-4 h-4 text-gray-400 mr-2" />
-                          <a
-                            href={`tel:${quote.vendor.customer.phone}`}
-                            className="text-sm text-primary-600 hover:text-primary-700"
+                          <Building2 className="w-5 h-5 text-gray-400 mr-3" />
+                          <div>
+                            <div className="font-medium">{quote.vendor.name}</div>
+                            <div className="text-sm text-gray-500">
+                              Type: {quote.vendor.type}
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => setShowAccountModal(true)}
+                          className="text-primary-600 hover:text-primary-700 text-sm"
+                        >
+                          View Details
+                        </button>
+                      </div>
+                      {quote.vendor.customer && (
+                        <div className="space-y-2">
+                          <div className="flex items-center">
+                            <User className="w-4 h-4 text-gray-400 mr-2" />
+                            <span className="text-sm text-gray-600">
+                              Contact: {quote.vendor.customer.first_name} {quote.vendor.customer.last_name}
+                            </span>
+                          </div>
+                          <div className="flex items-center">
+                            <Mail className="w-4 h-4 text-gray-400 mr-2" />
+                            <a
+                              href={`mailto:${quote.vendor.customer.email}`}
+                              className="text-sm text-primary-600 hover:text-primary-700"
+                            >
+                              {quote.vendor.customer.email}
+                            </a>
+                          </div>
+                          <button
+                            onClick={handleEmailClick}
+                            className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
                           >
-                            {quote.vendor.customer.phone}
-                          </a>
+                            <Send className="w-4 h-4 mr-2" />
+                            Send Email
+                          </button>
+                          {quote.vendor.customer.phone && (
+                            <div className="flex items-center">
+                              <Phone className="w-4 h-4 text-gray-400 mr-2" />
+                              <a
+                                href={`tel:${quote.vendor.customer.phone}`}
+                                className="text-sm text-primary-600 hover:text-primary-700"
+                              >
+                                {quote.vendor.customer.phone}
+                              </a>
+                            </div>
+                            
+                          )}
                         </div>
                       )}
                     </div>
-                  )}
-                </div>
-              </div>
-            )}
+                  </div>
+                )}
 
-            {/* Customer Information */}
-            <div>
-              <h2 className="text-lg font-semibold mb-4">Customer Information</h2>
-              <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-                <div className="flex items-center">
-                  <User className="w-5 h-5 text-gray-400 mr-3" />
-                  <div>
-                    <div className="font-medium">
-                      {quote.customer.first_name} {quote.customer.last_name}
+                {/* Customer Information */}
+                <div>
+                  <h2 className="text-lg font-semibold mb-4">Customer Information</h2>
+                  <div className="bg-gray-50 rounded-lg p-4 space-y-4">
+                    <div className="flex items-center">
+                      <User className="w-5 h-5 text-gray-400 mr-3" />
+                      <div>
+                        <div className="font-medium">
+                          {quote.customer.first_name} {quote.customer.last_name}
+                        </div>
+                        {quote.customer.company && (
+                          <div className="text-sm text-gray-500">
+                            {quote.customer.company}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    {quote.customer.company && (
-                      <div className="text-sm text-gray-500">
-                        {quote.customer.company}
+                    {quote.customer.email && (
+                      <div className="flex items-center">
+                        <Mail className="w-5 h-5 text-gray-400 mr-3" />
+                        <a
+                          href={`mailto:${quote.customer.email}`}
+                          className="text-primary-600 hover:text-primary-700"
+                        >
+                          {quote.customer.email}
+                        </a>
                       </div>
                     )}
                   </div>
                 </div>
-                {quote.customer.email && (
-                  <div className="flex items-center">
-                    <Mail className="w-5 h-5 text-gray-400 mr-3" />
-                    <a
-                      href={`mailto:${quote.customer.email}`}
-                      className="text-primary-600 hover:text-primary-700"
-                    >
-                      {quote.customer.email}
-                    </a>
+
+                {/* Notes */}
+                {quote.notes && (
+                  <div>
+                    <h2 className="text-lg font-semibold mb-4">Notes</h2>
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <p className="text-gray-600 whitespace-pre-wrap">{quote.notes}</p>
+                    </div>
                   </div>
                 )}
-              </div>
-            </div>
 
-            {/* Notes */}
-            {quote.notes && (
-              <div>
-                <h2 className="text-lg font-semibold mb-4">Notes</h2>
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <p className="text-gray-600 whitespace-pre-wrap">{quote.notes}</p>
+                {/* Add Custom Fields section */}
+                <div className="md:col-span-2">
+                  <CustomFieldsSection
+                    entityType="quotes"
+                    entityId={id || ''}
+                    organizationId={selectedOrganization?.id}
+                    className="bg-gray-50 rounded-lg p-4"
+                  />
                 </div>
               </div>
-            )}
 
-            {/* Add Custom Fields section */}
-            <div className="md:col-span-2">
-              <CustomFieldsSection
-                entityType="quotes"
-                entityId={id || ''}
-                organizationId={selectedOrganization?.id}
-                className="bg-gray-50 rounded-lg p-4"
-              />
+              <div className="mt-8">
+                <h2 className="text-lg font-semibold mb-4">Quote Items</h2>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Item
+                        </th>
+                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Quantity
+                        </th>
+                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Unit Price
+                        </th>
+                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Total
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {quote.items.map((item) => (
+                        <tr key={item.quote_dtl_id}>
+                          <td className="px-6 py-4">
+                            <div>
+                              <div className="font-medium text-gray-900">
+                                {item.item_name}
+                              </div>
+                              {item.item_desc && (
+                                <div className="text-sm text-gray-500">
+                                  {item.item_desc}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-right whitespace-nowrap">
+                            <div className="text-sm text-gray-900">{item.quantity}</div>
+                          </td>
+                          <td className="px-6 py-4 text-right whitespace-nowrap">
+                            <div className="text-sm text-gray-900">
+                              {formatCurrency(item.unit_price)}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-right whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">
+                              {formatCurrency(item.quantity * item.unit_price)}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              
+                {/* Tax and Discount Section */}
+                <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <h3 className="text-lg font-semibold mb-4">Tax Details</h3>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Tax Percentage:</span>
+                        <span className="text-sm text-gray-900">
+                          {quote.tax_percent !== null ? `${quote.tax_percent}%` : 'N/A'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Tax Amount:</span>
+                        <span className="text-sm text-gray-900">
+                          {quote.tax_amount !== null ? formatCurrency(quote.tax_amount) : 'N/A'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+              
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <h3 className="text-lg font-semibold mb-4">Discount Details</h3>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Discount Percentage:</span>
+                        <span className="text-sm text-gray-900">
+                          {quote.discount_percent !== null ? `${quote.discount_percent}%` : 'N/A'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Discount Amount:</span>
+                        <span className="text-sm text-gray-900">
+                          {quote.discount_amount !== null ? formatCurrency(quote.discount_amount) : 'N/A'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              
+                {/* Total Amount Section */}
+                <div className="mt-6 bg-gray-50 rounded-lg p-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-lg font-semibold">Subtotal:</span>
+                    <span className="text-lg font-bold text-gray-900">
+                      {formatCurrency(quote.subtotal)}
+                    </span>
+                  </div>
+                  {quote.tax_amount !== null && (
+                    <div className="flex justify-between items-center mt-2">
+                      <span className="text-lg font-semibold">Tax:</span>
+                      <span className="text-lg font-bold text-gray-900">
+                        {formatCurrency(quote.tax_amount)}
+                      </span>
+                    </div>
+                  )}
+                  {quote.discount_amount !== null && (
+                    <div className="flex justify-between items-center mt-2">
+                      <span className="text-lg font-semibold">Discount:</span>
+                      <span className="text-lg font-bold text-gray-900">
+                        {formatCurrency(quote.discount_amount)}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center mt-2">
+                    <span className="text-lg font-semibold">Total Amount:</span>
+                    <span className="text-lg font-bold text-gray-900">
+                      {formatCurrency(quote.total_amount)}
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="mt-8">
-            <h2 className="text-lg font-semibold mb-4">Quote Items</h2>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Item
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Quantity
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Unit Price
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Total
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {quote.items.map((item) => (
-                    <tr key={item.quote_dtl_id}>
-                      <td className="px-6 py-4">
-                        <div>
-                          <div className="font-medium text-gray-900">
-                            {item.item_name}
-                          </div>
-                          {item.item_desc && (
-                            <div className="text-sm text-gray-500">
-                              {item.item_desc}
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-right whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{item.quantity}</div>
-                      </td>
-                      <td className="px-6 py-4 text-right whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {formatCurrency(item.unit_price)}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-right whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          {formatCurrency(item.quantity * item.unit_price)}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          {/* Email Modals */}
+          {showEmailConfigModal && (
+            <EmailConfigModal
+              onClose={() => setShowEmailConfigModal(false)}
+              onSuccess={() => {
+                setShowEmailConfigModal(false);
+                setShowEmailModal(true);
+              }}
+            />
+          )}
+
+          {showEmailModal && quote.customer && (
+            <EmailModal
+              to={quote.customer.email}
+              caseTitle={quote.quote_number}
+              orgId={selectedOrganization?.id}
+              caseId={id}
+              onClose={() => setShowEmailModal(false)}
+              onSuccess={() => {
+                setShowEmailModal(false);
+                setRefreshEmailList(prev => prev + 1); // 🔁 refresh RelatedEmails
+              }}
+            />
+          )}
+
+          {showAccountModal && quote.vendor && (
+            <AccountDetailsModal
+              vendor={quote.vendor}
+              onClose={() => setShowAccountModal(false)}
+            />
+          )}
+        </div>
+      </div>
+      {/* Related Tabs */}
+      <div className="lg:w-1/4">
+        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          {/* Tab Header */}
+          <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+            <h2 className="text-base font-semibold text-gray-800 flex items-center">
+              <svg
+                className="w-4 h-4 text-gray-500 mr-2"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+                />
+              </svg>
+              Related Records
+            </h2>
+          </div>
+
+          {/* Tab Content */}
+          <div className="divide-y divide-gray-200">
+            <div className="p-4">
+              <RelatedEmails
+                recordId={id}
+                organizationId={selectedOrganization?.id}
+                refreshKey={refreshEmailList}
+                title="Email Communications"
+              />
             </div>
-          
-            {/* Tax and Discount Section */}
-            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="text-lg font-semibold mb-4">Tax Details</h3>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Tax Percentage:</span>
-                    <span className="text-sm text-gray-900">
-                      {quote.tax_percent !== null ? `${quote.tax_percent}%` : 'N/A'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Tax Amount:</span>
-                    <span className="text-sm text-gray-900">
-                      {quote.tax_amount !== null ? formatCurrency(quote.tax_amount) : 'N/A'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-          
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="text-lg font-semibold mb-4">Discount Details</h3>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Discount Percentage:</span>
-                    <span className="text-sm text-gray-900">
-                      {quote.discount_percent !== null ? `${quote.discount_percent}%` : 'N/A'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Discount Amount:</span>
-                    <span className="text-sm text-gray-900">
-                      {quote.discount_amount !== null ? formatCurrency(quote.discount_amount) : 'N/A'}
-                    </span>
-                  </div>
-                </div>
-              </div>
+            <div className="p-4">
+              <RelatedTasks
+                recordId={id}
+                organizationId={selectedOrganization?.id}
+                refreshKey={refreshEmailList}
+                title="Tasks"
+              />
             </div>
-          
-            {/* Total Amount Section */}
-            <div className="mt-6 bg-gray-50 rounded-lg p-4">
-              <div className="flex justify-between items-center">
-                <span className="text-lg font-semibold">Subtotal:</span>
-                <span className="text-lg font-bold text-gray-900">
-                  {formatCurrency(quote.subtotal)}
-                </span>
-              </div>
-              {quote.tax_amount !== null && (
-                <div className="flex justify-between items-center mt-2">
-                  <span className="text-lg font-semibold">Tax:</span>
-                  <span className="text-lg font-bold text-gray-900">
-                    {formatCurrency(quote.tax_amount)}
-                  </span>
-                </div>
-              )}
-              {quote.discount_amount !== null && (
-                <div className="flex justify-between items-center mt-2">
-                  <span className="text-lg font-semibold">Discount:</span>
-                  <span className="text-lg font-bold text-gray-900">
-                    {formatCurrency(quote.discount_amount)}
-                  </span>
-                </div>
-              )}
-              <div className="flex justify-between items-center mt-2">
-                <span className="text-lg font-semibold">Total Amount:</span>
-                <span className="text-lg font-bold text-gray-900">
-                  {formatCurrency(quote.total_amount)}
-                </span>
-              </div>
+
+            {/* You can add more related components here with the same styling */}
+            {/* Example placeholder for another related component */}
+            <div className="p-4">
+              <div className="text-sm text-gray-500 italic">More related records would appear here</div>
             </div>
+          </div>
+
+          {/* Optional footer */}
+          <div className="bg-gray-50 px-4 py-2 border-t border-gray-200 text-right">
+            <button className="text-xs text-blue-600 hover:text-blue-800 font-medium">
+              View All Related Records
+            </button>
           </div>
         </div>
       </div>
-
-      {showAccountModal && quote.vendor && (
-        <AccountDetailsModal
-          vendor={quote.vendor}
-          onClose={() => setShowAccountModal(false)}
-        />
-      )}
     </div>
   );
 }

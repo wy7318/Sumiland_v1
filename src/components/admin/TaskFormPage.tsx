@@ -145,6 +145,31 @@ export function TaskFormPage() {
                 if (error) throw error;
             }
 
+            // Check if we came from a module and redirect back if so
+            const moduleParam = searchParams.get('module');
+            const recordParam = searchParams.get('recordId');
+
+            if (moduleParam && recordParam) {
+                // Find the module option to get the proper URL structure
+                const moduleOption = moduleOptions.find(m => m.table === moduleParam);
+                if (moduleOption) {
+                    // Construct the URL based on the module
+                    let basePath = moduleOption.table;
+                    // Special cases for URLs that might be different
+                    if (moduleOption.table === 'order_hdr') basePath = 'orders';
+                    if (moduleOption.table === 'quote_hdr') basePath = 'quotes';
+                    if (moduleOption.table === 'customers') basePath = 'customers';
+                    if (moduleOption.table === 'opportunities') basePath = 'opportunities';
+                    if (moduleOption.table === 'leads') basePath = 'leads';
+                    if (moduleOption.table === 'vendors') basePath = 'vendors';
+                    if (moduleOption.table === 'cases') basePath = 'cases';
+                    // Add more special cases as needed
+                
+                    navigate(`/admin/${basePath}/${recordParam}`);
+                    return;
+                }
+            }
+
             navigate('/admin/tasks');
         } catch (err) {
             console.error('Error saving task:', err);

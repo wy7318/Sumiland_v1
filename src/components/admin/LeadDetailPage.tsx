@@ -12,6 +12,12 @@ import { CustomFieldsSection } from './CustomFieldsSection';
 import { UserSearch } from './UserSearch';
 import type { Database } from '../../lib/database.types';
 import { useOrganization } from '../../contexts/OrganizationContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { EmailConfigModal } from './EmailConfigModal';
+import { getEmailConfig } from '../../lib/email';
+import { EmailModal } from './EmailModal';
+import { RelatedEmails } from './RelatedEmails';
+import { RelatedTasks } from './RelatedTasks';
 
 type Lead = Database['public']['Tables']['leads']['Row'] & {
   owner: {
@@ -48,6 +54,7 @@ type PicklistValue = {
 export function LeadDetailPage() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const { organizations, user } = useAuth();
   const { selectedOrganization } = useOrganization();
   const [lead, setLead] = useState<Lead | null>(null);
   const [loading, setLoading] = useState(true);
@@ -60,6 +67,9 @@ export function LeadDetailPage() {
   const [leadSources, setLeadSources] = useState<PicklistValue[]>([]);
   const [converting, setConverting] = useState(false);
   const [conversionError, setConversionError] = useState<string | null>(null);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [showEmailConfigModal, setShowEmailConfigModal] = useState(false);
+  const [refreshEmailList, setRefreshEmailList] = useState(0);
 
   useEffect(() => {
     fetchPicklists();
@@ -150,6 +160,22 @@ export function LeadDetailPage() {
       console.error('Error fetching feeds:', err);
     }
   };
+
+  const handleEmailClick = async () => {
+      if (!user) return;
+      
+      try {
+        const config = await getEmailConfig(user.id);
+        if (!config) {
+          setShowEmailConfigModal(true);
+        } else {
+          setShowEmailModal(true);
+        }
+      } catch (err) {
+        console.error('Error checking email config:', err);
+        setError(err instanceof Error ? err.message : 'Failed to check email configuration');
+      }
+    };
 
   const handleStatusChange = async (newStatus: string) => {
     try {
@@ -456,237 +482,330 @@ export function LeadDetailPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <button
-          onClick={() => navigate('/admin/leads')}
-          className="inline-flex items-center text-gray-600 hover:text-gray-900"
-        >
-          <ArrowLeft className="w-5 h-5 mr-2" />
-          Back to Leads
-        </button>
-        <div className="flex space-x-3">
-          <Link
-            to={`/admin/leads/${id}/edit`}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
-          >
-            <Edit className="w-4 h-4 mr-2" />
-            Edit Lead
-          </Link>
-          <Link
-            to={`/admin/tasks/new?module=leads&recordId=${id}`}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700"
-          >
-            <Calendar className="w-4 h-4 mr-2" />
-            Add Task
-          </Link>
-        </div>
-      </div>
-
-      <div className="bg-white shadow rounded-lg overflow-hidden">
-        <div className="p-6">
-          <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
-            <div>
-              <h1 className="text-2xl font-bold mb-2">{lead.first_name} {lead.last_name}</h1>
-              <div className="flex items-center gap-4">
-                <select
-                  value={lead.status}
-                  onChange={(e) => handleStatusChange(e.target.value)}
-                  className="text-sm font-medium rounded-full px-3 py-1"
-                  style={getStatusStyle(lead.status)}
-                >
-                  {leadStatuses.map(status => (
-                    <option key={status.id} value={status.value}>
-                      {status.label}
-                    </option>
-                  ))}
-                </select>
-                {lead.lead_source && (
-                  <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
-                    {leadSources.find(s => s.value === lead.lead_source)?.label || lead.lead_source}
-                  </span>
-                )}
-              </div>
-            </div>
-
-            <div className="mt-4 md:mt-0 flex gap-4">
-              <button
-                onClick={handleConvertToContact}
-                disabled={converting}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 disabled:opacity-50"
+    <div className="flex flex-col lg:flex-row gap-4">
+      <div className="lg:w-3/4 space-y-6">
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <button
+              onClick={() => navigate('/admin/leads')}
+              className="inline-flex items-center text-gray-600 hover:text-gray-900"
+            >
+              <ArrowLeft className="w-5 h-5 mr-2" />
+              Back to Leads
+            </button>
+            <div className="flex space-x-3">
+              <Link
+                to={`/admin/leads/${id}/edit`}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
               >
-                <UserPlus className="w-4 h-4 mr-2" />
-                Convert to Contact
-              </button>
-              <button
-                onClick={handleConvertToOpportunity}
-                disabled={converting}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+                <Edit className="w-4 h-4 mr-2" />
+                Edit Lead
+              </Link>
+              <Link
+                to={`/admin/tasks/new?module=leads&recordId=${id}`}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700"
               >
-                <Target className="w-4 h-4 mr-2" />
-                Convert to Opportunity
-              </button>
+                <Calendar className="w-4 h-4 mr-2" />
+                Add Task
+              </Link>
             </div>
           </div>
 
-          {conversionError && (
-            <div className="mb-6 bg-red-50 text-red-600 p-4 rounded-lg flex items-center">
-              <AlertCircle className="w-5 h-5 mr-2" />
-              {conversionError}
-            </div>
-          )}
+          <div className="bg-white shadow rounded-lg overflow-hidden">
+            <div className="p-6">
+              <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
+                <div>
+                  <h1 className="text-2xl font-bold mb-2">{lead.first_name} {lead.last_name}</h1>
+                  <div className="flex items-center gap-4">
+                    <select
+                      value={lead.status}
+                      onChange={(e) => handleStatusChange(e.target.value)}
+                      className="text-sm font-medium rounded-full px-3 py-1"
+                      style={getStatusStyle(lead.status)}
+                    >
+                      {leadStatuses.map(status => (
+                        <option key={status.id} value={status.value}>
+                          {status.label}
+                        </option>
+                      ))}
+                    </select>
+                    {lead.lead_source && (
+                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+                        {leadSources.find(s => s.value === lead.lead_source)?.label || lead.lead_source}
+                      </span>
+                    )}
+                  </div>
+                </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Contact Information */}
-            <div>
-              <h2 className="text-lg font-semibold mb-4">Contact Information</h2>
-              <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-                <div className="flex items-center">
-                  <User className="w-5 h-5 text-gray-400 mr-3" />
-                  <div>
-                    <div className="font-medium">
-                      {lead.first_name} {lead.last_name}
+                <div className="mt-4 md:mt-0 flex gap-4">
+                  <button
+                    onClick={handleConvertToContact}
+                    disabled={converting}
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 disabled:opacity-50"
+                  >
+                    <UserPlus className="w-4 h-4 mr-2" />
+                    Convert to Contact
+                  </button>
+                  <button
+                    onClick={handleConvertToOpportunity}
+                    disabled={converting}
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    <Target className="w-4 h-4 mr-2" />
+                    Convert to Opportunity
+                  </button>
+                </div>
+              </div>
+
+              {conversionError && (
+                <div className="mb-6 bg-red-50 text-red-600 p-4 rounded-lg flex items-center">
+                  <AlertCircle className="w-5 h-5 mr-2" />
+                  {conversionError}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Contact Information */}
+                <div>
+                  <h2 className="text-lg font-semibold mb-4">Contact Information</h2>
+                  <div className="bg-gray-50 rounded-lg p-4 space-y-4">
+                    <div className="flex items-center">
+                      <User className="w-5 h-5 text-gray-400 mr-3" />
+                      <div>
+                        <div className="font-medium">
+                          {lead.first_name} {lead.last_name}
+                        </div>
+                        {lead.company && (
+                          <div className="text-sm text-gray-500">
+                            {lead.company}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    {lead.company && (
-                      <div className="text-sm text-gray-500">
-                        {lead.company}
+                    <div className="flex items-center">
+                      <Mail className="w-5 h-5 text-gray-400 mr-3" />
+                      <a
+                        href={`mailto:${lead.email}`}
+                        className="text-primary-600 hover:text-primary-700"
+                      >
+                        {lead.email}
+                      </a>
+                    </div>
+                    <button
+                      onClick={handleEmailClick}
+                      className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
+                    >
+                      <Send className="w-4 h-4 mr-2" />
+                      Send Email
+                    </button>
+                    {lead.phone && (
+                      <div className="flex items-center">
+                        <Phone className="w-5 h-5 text-gray-400 mr-3" />
+                        <a
+                          href={`tel:${lead.phone}`}
+                          className="text-primary-600 hover:text-primary-700"
+                        >
+                          {lead.phone}
+                        </a>
+                      </div>
+                    )}
+                    {lead.website && (
+                      <div className="flex items-center">
+                        <Globe className="w-5 h-5 text-gray-400 mr-3" />
+                        <a
+                          href={lead.website}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary-600 hover:text-primary-700"
+                        >
+                          {lead.website}
+                        </a>
                       </div>
                     )}
                   </div>
                 </div>
-                <div className="flex items-center">
-                  <Mail className="w-5 h-5 text-gray-400 mr-3" />
-                  <a
-                    href={`mailto:${lead.email}`}
-                    className="text-primary-600 hover:text-primary-700"
-                  >
-                    {lead.email}
-                  </a>
-                </div>
-                {lead.phone && (
-                  <div className="flex items-center">
-                    <Phone className="w-5 h-5 text-gray-400 mr-3" />
-                    <a
-                      href={`tel:${lead.phone}`}
-                      className="text-primary-600 hover:text-primary-700"
-                    >
-                      {lead.phone}
-                    </a>
-                  </div>
-                )}
-                {lead.website && (
-                  <div className="flex items-center">
-                    <Globe className="w-5 h-5 text-gray-400 mr-3" />
-                    <a
-                      href={lead.website}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-primary-600 hover:text-primary-700"
-                    >
-                      {lead.website}
-                    </a>
-                  </div>
-                )}
-              </div>
-            </div>
 
-            {/* Assignment */}
-            <div>
-              <h2 className="text-lg font-semibold mb-4">Assignment</h2>
-              <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-                <UserSearch
-                  organizationId={lead.organization_id}
-                  selectedUserId={lead.owner_id}
-                  onSelect={handleAssign}
-                />
-              </div>
-            </div>
-
-            {/* Lead Details */}
-            <div className="md:col-span-2">
-              <h2 className="text-lg font-semibold mb-4">Lead Details</h2>
-              <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-                {lead.description && (
-                  <div>
-                    <div className="text-sm font-medium text-gray-500 mb-1">Description</div>
-                    <p className="text-gray-700 whitespace-pre-wrap">{lead.description}</p>
-                  </div>
-                )}
-                {lead.product_interest && (
-                  <div>
-                    <div className="text-sm font-medium text-gray-500 mb-1">Product Interest</div>
-                    <p className="text-gray-700">{lead.product_interest}</p>
-                  </div>
-                )}
+                {/* Assignment */}
                 <div>
-                  <div className="text-sm font-medium text-gray-500 mb-1">Email Preferences</div>
-                  <p className="text-gray-700">
-                    {lead.email_opt_out ? 'Opted out of emails' : 'Opted in to emails'}
-                  </p>
+                  <h2 className="text-lg font-semibold mb-4">Assignment</h2>
+                  <div className="bg-gray-50 rounded-lg p-4 space-y-4">
+                    <UserSearch
+                      organizationId={lead.organization_id}
+                      selectedUserId={lead.owner_id}
+                      onSelect={handleAssign}
+                    />
+                  </div>
+                </div>
+
+                {/* Lead Details */}
+                <div className="md:col-span-2">
+                  <h2 className="text-lg font-semibold mb-4">Lead Details</h2>
+                  <div className="bg-gray-50 rounded-lg p-4 space-y-4">
+                    {lead.description && (
+                      <div>
+                        <div className="text-sm font-medium text-gray-500 mb-1">Description</div>
+                        <p className="text-gray-700 whitespace-pre-wrap">{lead.description}</p>
+                      </div>
+                    )}
+                    {lead.product_interest && (
+                      <div>
+                        <div className="text-sm font-medium text-gray-500 mb-1">Product Interest</div>
+                        <p className="text-gray-700">{lead.product_interest}</p>
+                      </div>
+                    )}
+                    <div>
+                      <div className="text-sm font-medium text-gray-500 mb-1">Email Preferences</div>
+                      <p className="text-gray-700">
+                        {lead.email_opt_out ? 'Opted out of emails' : 'Opted in to emails'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Add Custom Fields section */}
+                <div className="md:col-span-2">
+                  <CustomFieldsSection
+                    entityType="leads"
+                    entityId={id}
+                    organizationId={lead.organization_id}
+                    className="bg-gray-50 rounded-lg p-4"
+                  />
                 </div>
               </div>
-            </div>
 
-            {/* Add Custom Fields section */}
-            <div className="md:col-span-2">
-              <CustomFieldsSection
-                entityType="leads"
-                entityId={id}
-                organizationId={lead.organization_id}
-                className="bg-gray-50 rounded-lg p-4"
-              />
+              {/* Add Feed Section */}
+              <div className="mt-8">
+                <h2 className="text-lg font-semibold mb-4">Comments</h2>
+
+                <div className="space-y-4">
+                  {/* Comment Form */}
+                  <form onSubmit={handleSubmitComment} className="space-y-4">
+                    {replyTo && (
+                      <div className="flex items-center justify-between bg-gray-50 p-2 rounded-lg">
+                        <span className="text-sm text-gray-600">
+                          Replying to {replyTo.profile.name}'s comment
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setReplyTo(null)}
+                          className="p-1 hover:bg-gray-200 rounded-full"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+                    <div className="flex items-start space-x-4">
+                      <div className="flex-1">
+                        <textarea
+                          value={newComment}
+                          onChange={(e) => setNewComment(e.target.value)}
+                          placeholder="Add a comment..."
+                          rows={3}
+                          className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={!newComment.trim()}
+                        className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                      >
+                        <Send className="w-4 h-4 mr-2" />
+                        Send
+                      </button>
+                    </div>
+                  </form>
+
+                  {/* Feed Items */}
+                  <div className="space-y-4">
+                    {feeds
+                      .filter(feed => !feed.parent_id)
+                      .map(feed => renderFeedItem(feed))}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Add Feed Section */}
-          <div className="mt-8">
-            <h2 className="text-lg font-semibold mb-4">Comments</h2>
+          {/* Email Modals */}
+          {showEmailConfigModal && (
+            <EmailConfigModal
+              onClose={() => setShowEmailConfigModal(false)}
+              onSuccess={() => {
+                setShowEmailConfigModal(false);
+                setShowEmailModal(true);
+              }}
+            />
+          )}
 
-            <div className="space-y-4">
-              {/* Comment Form */}
-              <form onSubmit={handleSubmitComment} className="space-y-4">
-                {replyTo && (
-                  <div className="flex items-center justify-between bg-gray-50 p-2 rounded-lg">
-                    <span className="text-sm text-gray-600">
-                      Replying to {replyTo.profile.name}'s comment
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setReplyTo(null)}
-                      className="p-1 hover:bg-gray-200 rounded-full"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                )}
-                <div className="flex items-start space-x-4">
-                  <div className="flex-1">
-                    <textarea
-                      value={newComment}
-                      onChange={(e) => setNewComment(e.target.value)}
-                      placeholder="Add a comment..."
-                      rows={3}
-                      className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-                    />
-                  </div>
-                  <button
-                    type="submit"
-                    disabled={!newComment.trim()}
-                    className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
-                  >
-                    <Send className="w-4 h-4 mr-2" />
-                    Send
-                  </button>
-                </div>
-              </form>
+          {showEmailModal && (
+            <EmailModal
+              to={lead.email}
+              caseTitle={lead.company}
+              orgId={selectedOrganization?.id}
+              caseId={id}
+              onClose={() => setShowEmailModal(false)}
+              onSuccess={() => {
+                setShowEmailModal(false);
+                setRefreshEmailList(prev => prev + 1); // 🔁 refresh RelatedEmails
+              }}
+            />
+          )}
+        </div>
+      </div>
+      {/* Related Tabs */}
+      <div className="lg:w-1/4">
+        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          {/* Tab Header */}
+          <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+            <h2 className="text-base font-semibold text-gray-800 flex items-center">
+              <svg
+                className="w-4 h-4 text-gray-500 mr-2"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+                />
+              </svg>
+              Related Records
+            </h2>
+          </div>
 
-              {/* Feed Items */}
-              <div className="space-y-4">
-                {feeds
-                  .filter(feed => !feed.parent_id)
-                  .map(feed => renderFeedItem(feed))}
-              </div>
+          {/* Tab Content */}
+          <div className="divide-y divide-gray-200">
+            <div className="p-4">
+              <RelatedEmails
+                recordId={id}
+                organizationId={selectedOrganization?.id}
+                refreshKey={refreshEmailList}
+                title="Email Communications"
+              />
             </div>
+            <div className="p-4">
+              <RelatedTasks
+                recordId={id}
+                organizationId={selectedOrganization?.id}
+                refreshKey={refreshEmailList}
+                title="Tasks"
+              />
+            </div>
+
+            {/* You can add more related components here with the same styling */}
+            {/* Example placeholder for another related component */}
+            <div className="p-4">
+              <div className="text-sm text-gray-500 italic">More related records would appear here</div>
+            </div>
+          </div>
+
+          {/* Optional footer */}
+          <div className="bg-gray-50 px-4 py-2 border-t border-gray-200 text-right">
+            <button className="text-xs text-blue-600 hover:text-blue-800 font-medium">
+              View All Related Records
+            </button>
           </div>
         </div>
       </div>

@@ -12,6 +12,11 @@ import { AccountDetailsModal } from './AccountDetailsModal';
 import { CustomFieldsSection } from './CustomFieldsSection';
 import { useAuth } from '../../contexts/AuthContext';
 import { useOrganization } from '../../contexts/OrganizationContext';
+import { RelatedEmails } from './RelatedEmails';
+import { RelatedTasks } from './RelatedTasks';
+import { EmailConfigModal } from './EmailConfigModal';
+import { EmailModal } from './EmailModal';
+import { getEmailConfig } from '../../lib/email';
 
 
 type Order = {
@@ -99,6 +104,9 @@ export function OrderDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [orderStatuses, setOrderStatuses] = useState<PicklistValue[]>([]);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [showEmailConfigModal, setShowEmailConfigModal] = useState(false);
+  const [refreshEmailList, setRefreshEmailList] = useState(0);
 
   useEffect(() => {
     fetchPicklists();
@@ -230,6 +238,22 @@ export function OrderDetailPage() {
     }
   };
 
+  const handleEmailClick = async () => {
+    if (!user) return;
+
+    try {
+      const config = await getEmailConfig(user.id);
+      if (!config) {
+        setShowEmailConfigModal(true);
+      } else {
+        setShowEmailModal(true);
+      }
+    } catch (err) {
+      console.error('Error checking email config:', err);
+      setError(err instanceof Error ? err.message : 'Failed to check email configuration');
+    }
+  };
+
   const handleStatusChange = async (newStatus: string) => {
     try {
       if (!id || !order) return;
@@ -283,316 +307,409 @@ export function OrderDetailPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <button
-          onClick={() => navigate('/admin/orders')}
-          className="inline-flex items-center text-gray-600 hover:text-gray-900"
-        >
-          <ArrowLeft className="w-5 h-5 mr-2" />
-          Back to Orders
-        </button>
-        <div className="flex space-x-3">
-          <Link
-            to={`/admin/orders/${id}/edit`}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
-          >
-            <Edit className="w-4 h-4 mr-2" />
-            Edit Order
-          </Link>
-          <Link
-            to={`/admin/tasks/new?module=order_hdr&recordId=${id}`}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700"
-          >
-            <Calendar className="w-4 h-4 mr-2" />
-            Add Task
-          </Link>
-        </div>
-      </div>
-
-      {error && (
-        <div className="bg-red-50 text-red-600 p-4 rounded-lg flex items-center">
-          <AlertCircle className="w-5 h-5 mr-2" />
-          {error}
-        </div>
-      )}
-
-      <div className="bg-white shadow rounded-lg overflow-hidden">
-        <div className="p-6">
-          <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
-            <div>
-              <div className="flex items-center gap-4 mb-2">
-                <h1 className="text-2xl font-bold">{order.order_number}</h1>
-                {order.quote_id && order.quote_number && (
-                  <Link
-                    to={`/admin/quotes/${order.quote_id}`}
-                    className="inline-flex items-center text-sm text-primary-600 hover:text-primary-700"
-                  >
-                    <FileText className="w-4 h-4 mr-1" />
-                    From Quote: {order.quote_number}
-                  </Link>
-                )}
-              </div>
-              <div className="flex items-center gap-4 text-sm text-gray-500">
-                <span className="flex items-center">
-                  <Calendar className="w-4 h-4 mr-1" />
-                  {new Date(order.created_at).toLocaleDateString()}
-                </span>
-                <select
-                  value={order.status}
-                  onChange={(e) => handleStatusChange(e.target.value)}
-                  className="text-sm font-medium rounded-full px-3 py-1"
-                  style={getStatusStyle(order.status)}
-                >
-                  {orderStatuses.map(status => (
-                    <option key={status.id} value={status.value}>
-                      {status.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+    <div className="flex flex-col lg:flex-row gap-4">
+      <div className="lg:w-3/4 space-y-6">
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <button
+              onClick={() => navigate('/admin/orders')}
+              className="inline-flex items-center text-gray-600 hover:text-gray-900"
+            >
+              <ArrowLeft className="w-5 h-5 mr-2" />
+              Back to Orders
+            </button>
+            <div className="flex space-x-3">
+              <Link
+                to={`/admin/orders/${id}/edit`}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
+              >
+                <Edit className="w-4 h-4 mr-2" />
+                Edit Order
+              </Link>
+              <Link
+                to={`/admin/tasks/new?module=order_hdr&recordId=${id}`}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700"
+              >
+                <Calendar className="w-4 h-4 mr-2" />
+                Add Task
+              </Link>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Account Information */}
-            {order.vendor && (
-              <div>
-                <h2 className="text-lg font-semibold mb-4">Account Information</h2>
-                <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <Building2 className="w-5 h-5 text-gray-400 mr-3" />
-                      <div>
-                        <div className="font-medium">{order.vendor.name}</div>
-                        <div className="text-sm text-gray-500">
-                          Type: {order.vendor.type}
-                        </div>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => setShowAccountModal(true)}
-                      className="text-primary-600 hover:text-primary-700 text-sm"
-                    >
-                      View Details
-                    </button>
+          {error && (
+            <div className="bg-red-50 text-red-600 p-4 rounded-lg flex items-center">
+              <AlertCircle className="w-5 h-5 mr-2" />
+              {error}
+            </div>
+          )}
+
+          <div className="bg-white shadow rounded-lg overflow-hidden">
+            <div className="p-6">
+              <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
+                <div>
+                  <div className="flex items-center gap-4 mb-2">
+                    <h1 className="text-2xl font-bold">{order.order_number}</h1>
+                    {order.quote_id && order.quote_number && (
+                      <Link
+                        to={`/admin/quotes/${order.quote_id}`}
+                        className="inline-flex items-center text-sm text-primary-600 hover:text-primary-700"
+                      >
+                        <FileText className="w-4 h-4 mr-1" />
+                        From Quote: {order.quote_number}
+                      </Link>
+                    )}
                   </div>
-                  {order.vendor.customer && (
-                    <div className="space-y-2">
-                      <div className="flex items-center">
-                        <User className="w-4 h-4 text-gray-400 mr-2" />
-                        <span className="text-sm text-gray-600">
-                          Contact: {order.vendor.customer.first_name} {order.vendor.customer.last_name}
-                        </span>
-                      </div>
-                      <div className="flex items-center">
-                        <Mail className="w-4 h-4 text-gray-400 mr-2" />
-                        <a
-                          href={`mailto:${order.vendor.customer.email}`}
-                          className="text-sm text-primary-600 hover:text-primary-700"
-                        >
-                          {order.vendor.customer.email}
-                        </a>
-                      </div>
-                      {order.vendor.customer.phone && (
+                  <div className="flex items-center gap-4 text-sm text-gray-500">
+                    <span className="flex items-center">
+                      <Calendar className="w-4 h-4 mr-1" />
+                      {new Date(order.created_at).toLocaleDateString()}
+                    </span>
+                    <select
+                      value={order.status}
+                      onChange={(e) => handleStatusChange(e.target.value)}
+                      className="text-sm font-medium rounded-full px-3 py-1"
+                      style={getStatusStyle(order.status)}
+                    >
+                      {orderStatuses.map(status => (
+                        <option key={status.id} value={status.value}>
+                          {status.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Account Information */}
+                {order.vendor && (
+                  <div>
+                    <h2 className="text-lg font-semibold mb-4">Account Information</h2>
+                    <div className="bg-gray-50 rounded-lg p-4 space-y-4">
+                      <div className="flex items-center justify-between">
                         <div className="flex items-center">
-                          <Phone className="w-4 h-4 text-gray-400 mr-2" />
-                          <a
-                            href={`tel:${order.vendor.customer.phone}`}
-                            className="text-sm text-primary-600 hover:text-primary-700"
-                          >
-                            {order.vendor.customer.phone}
-                          </a>
+                          <Building2 className="w-5 h-5 text-gray-400 mr-3" />
+                          <div>
+                            <div className="font-medium">{order.vendor.name}</div>
+                            <div className="text-sm text-gray-500">
+                              Type: {order.vendor.type}
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => setShowAccountModal(true)}
+                          className="text-primary-600 hover:text-primary-700 text-sm"
+                        >
+                          View Details
+                        </button>
+                      </div>
+                      {order.vendor.customer && (
+                        <div className="space-y-2">
+                          <div className="flex items-center">
+                            <User className="w-4 h-4 text-gray-400 mr-2" />
+                            <span className="text-sm text-gray-600">
+                              Contact: {order.vendor.customer.first_name} {order.vendor.customer.last_name}
+                            </span>
+                          </div>
+                          <div className="flex items-center">
+                            <Mail className="w-4 h-4 text-gray-400 mr-2" />
+                            <a
+                              href={`mailto:${order.vendor.customer.email}`}
+                              className="text-sm text-primary-600 hover:text-primary-700"
+                            >
+                              {order.vendor.customer.email}
+                            </a>
+                          </div>
+                          {order.vendor.customer.phone && (
+                            <div className="flex items-center">
+                              <Phone className="w-4 h-4 text-gray-400 mr-2" />
+                              <a
+                                href={`tel:${order.vendor.customer.phone}`}
+                                className="text-sm text-primary-600 hover:text-primary-700"
+                              >
+                                {order.vendor.customer.phone}
+                              </a>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
-                  )}
-                </div>
-              </div>
-            )}
+                  </div>
+                )}
 
-            {/* Customer Information */}
-            <div>
-              <h2 className="text-lg font-semibold mb-4">Customer Information</h2>
-              <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-                <div className="flex items-center">
-                  <User className="w-5 h-5 text-gray-400 mr-3" />
-                  <div>
-                    <div className="font-medium">
-                      {order.customer.first_name} {order.customer.last_name}
+                {/* Customer Information */}
+                <div>
+                  <h2 className="text-lg font-semibold mb-4">Customer Information</h2>
+                  <div className="bg-gray-50 rounded-lg p-4 space-y-4">
+                    <div className="flex items-center">
+                      <User className="w-5 h-5 text-gray-400 mr-3" />
+                      <div>
+                        <div className="font-medium">
+                          {order.customer.first_name} {order.customer.last_name}
+                        </div>
+                        {order.customer.company && (
+                          <div className="text-sm text-gray-500">
+                            {order.customer.company}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    {order.customer.company && (
-                      <div className="text-sm text-gray-500">
-                        {order.customer.company}
+                    {order.customer.email && (
+                      <div className="flex items-center">
+                        <Mail className="w-5 h-5 text-gray-400 mr-3" />
+                        <a
+                          href={`mailto:${order.customer.email}`}
+                          className="text-primary-600 hover:text-primary-700"
+                        >
+                          {order.customer.email}
+                        </a>
+                        <button
+                          onClick={handleEmailClick}
+                          className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
+                        >
+                          <Send className="w-4 h-4 mr-2" />
+                          Send Email
+                        </button>
+                      </div>
+                    )}
+                    {order.customer.phone && (
+                      <div className="flex items-center">
+                        <Phone className="w-5 h-5 text-gray-400 mr-3" />
+                        <a
+                          href={`tel:${order.customer.phone}`}
+                          className="text-primary-600 hover:text-primary-700"
+                        >
+                          {order.customer.phone}
+                        </a>
                       </div>
                     )}
                   </div>
                 </div>
-                {order.customer.email && (
-                  <div className="flex items-center">
-                    <Mail className="w-5 h-5 text-gray-400 mr-3" />
-                    <a
-                      href={`mailto:${order.customer.email}`}
-                      className="text-primary-600 hover:text-primary-700"
-                    >
-                      {order.customer.email}
-                    </a>
+
+                {/* Payment Information */}
+                <div>
+                  <h2 className="text-lg font-semibold mb-4">Payment Information</h2>
+                    <div className="bg-gray-50 rounded-lg p-4 space-y-4">
+                      <div className="flex justify-between items-center">
+                      <span className="text-gray-600">Subtotal:</span>
+                      <span className="font-medium">{formatCurrency(order.subtotal)}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">Tax ({order.tax_percent ?? 0}%):</span>
+                      <span className="font-medium">{formatCurrency(order.tax_amount ?? 0)}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">Discount:</span>
+                      <span className="font-medium text-red-600">
+                        -{formatCurrency(order.discount_amount ?? 0)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">Total Amount:</span>
+                      <span className="font-medium">{formatCurrency(order.total_amount)}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">Amount Received:</span>
+                      <span className="font-medium">{formatCurrency(order.payment_amount)}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">Balance Due:</span>
+                      <span className="font-medium text-red-600">
+                        {formatCurrency(order.total_amount - order.payment_amount)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">Payment Status:</span>
+                      <span className={cn(
+                        "px-2 py-1 text-xs font-medium rounded-full",
+                        order.payment_status === 'Pending' && "bg-gray-100 text-gray-800",
+                        order.payment_status === 'Partial Received' && "bg-orange-100 text-orange-800",
+                        order.payment_status === 'Fully Received' && "bg-green-100 text-green-800"
+                      )}>
+                        {order.payment_status}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Notes */}
+                {order.notes && (
+                  <div>
+                    <h2 className="text-lg font-semibold mb-4">Notes</h2>
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <p className="text-gray-600 whitespace-pre-wrap">{order.notes}</p>
+                    </div>
                   </div>
                 )}
-                {order.customer.phone && (
-                  <div className="flex items-center">
-                    <Phone className="w-5 h-5 text-gray-400 mr-3" />
-                    <a
-                      href={`tel:${order.customer.phone}`}
-                      className="text-primary-600 hover:text-primary-700"
-                    >
-                      {order.customer.phone}
-                    </a>
-                  </div>
-                )}
-              </div>
-            </div>
 
-            {/* Payment Information */}
-            <div>
-              <h2 className="text-lg font-semibold mb-4">Payment Information</h2>
-                <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-                  <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Subtotal:</span>
-                  <span className="font-medium">{formatCurrency(order.subtotal)}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Tax ({order.tax_percent ?? 0}%):</span>
-                  <span className="font-medium">{formatCurrency(order.tax_amount ?? 0)}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Discount:</span>
-                  <span className="font-medium text-red-600">
-                    -{formatCurrency(order.discount_amount ?? 0)}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Total Amount:</span>
-                  <span className="font-medium">{formatCurrency(order.total_amount)}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Amount Received:</span>
-                  <span className="font-medium">{formatCurrency(order.payment_amount)}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Balance Due:</span>
-                  <span className="font-medium text-red-600">
-                    {formatCurrency(order.total_amount - order.payment_amount)}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Payment Status:</span>
-                  <span className={cn(
-                    "px-2 py-1 text-xs font-medium rounded-full",
-                    order.payment_status === 'Pending' && "bg-gray-100 text-gray-800",
-                    order.payment_status === 'Partial Received' && "bg-orange-100 text-orange-800",
-                    order.payment_status === 'Fully Received' && "bg-green-100 text-green-800"
-                  )}>
-                    {order.payment_status}
-                  </span>
+                {/* Add Custom Fields section */}
+                <div className="md:col-span-2">
+                  <CustomFieldsSection
+                    entityType="orders"
+                    entityId={id || ''}
+                    organizationId={selectedOrganization?.id}
+                    className="bg-gray-50 rounded-lg p-4"
+                  />
                 </div>
               </div>
-            </div>
 
-            {/* Notes */}
-            {order.notes && (
-              <div>
-                <h2 className="text-lg font-semibold mb-4">Notes</h2>
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <p className="text-gray-600 whitespace-pre-wrap">{order.notes}</p>
+              <div className="mt-8">
+                <h2 className="text-lg font-semibold mb-4">Order Items</h2>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Item
+                        </th>
+                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Quantity
+                        </th>
+                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Unit Price
+                        </th>
+                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Total
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {order.items.map((item) => (
+                        <tr key={item.id}>
+                          <td className="px-6 py-4">
+                            <div>
+                              <div className="font-medium text-gray-900">
+                                {item.product?.name || item.item_name || 'Custom Item'}
+                              </div>
+                              {(item.product?.description || item.description) && (
+                                <div className="text-sm text-gray-500">
+                                  {item.product?.description || item.description}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-right whitespace-nowrap">
+                            <div className="text-sm text-gray-900">{item.quantity}</div>
+                          </td>
+                          <td className="px-6 py-4 text-right whitespace-nowrap">
+                            <div className="text-sm text-gray-900">
+                              {formatCurrency(item.unit_price)}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-right whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">
+                              {formatCurrency(item.quantity * item.unit_price)}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                      <tr className="bg-gray-50">
+                        <td colSpan={3} className="px-6 py-4 text-right font-medium">
+                          Total Amount:
+                        </td>
+                        <td className="px-6 py-4 text-right whitespace-nowrap">
+                          <div className="text-lg font-bold text-gray-900">
+                            {formatCurrency(order.total_amount)}
+                          </div>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
               </div>
-            )}
-
-            {/* Add Custom Fields section */}
-            <div className="md:col-span-2">
-              <CustomFieldsSection
-                entityType="orders"
-                entityId={id || ''}
-                organizationId={selectedOrganization?.id}
-                className="bg-gray-50 rounded-lg p-4"
-              />
             </div>
           </div>
 
-          <div className="mt-8">
-            <h2 className="text-lg font-semibold mb-4">Order Items</h2>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Item
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Quantity
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Unit Price
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Total
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {order.items.map((item) => (
-                    <tr key={item.id}>
-                      <td className="px-6 py-4">
-                        <div>
-                          <div className="font-medium text-gray-900">
-                            {item.product?.name || item.item_name || 'Custom Item'}
-                          </div>
-                          {(item.product?.description || item.description) && (
-                            <div className="text-sm text-gray-500">
-                              {item.product?.description || item.description}
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-right whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{item.quantity}</div>
-                      </td>
-                      <td className="px-6 py-4 text-right whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {formatCurrency(item.unit_price)}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-right whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          {formatCurrency(item.quantity * item.unit_price)}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                  <tr className="bg-gray-50">
-                    <td colSpan={3} className="px-6 py-4 text-right font-medium">
-                      Total Amount:
-                    </td>
-                    <td className="px-6 py-4 text-right whitespace-nowrap">
-                      <div className="text-lg font-bold text-gray-900">
-                        {formatCurrency(order.total_amount)}
-                      </div>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+          {/* Email Modals */}
+          {showEmailConfigModal && (
+            <EmailConfigModal
+              onClose={() => setShowEmailConfigModal(false)}
+              onSuccess={() => {
+                setShowEmailConfigModal(false);
+                setShowEmailModal(true);
+              }}
+            />
+          )}
+
+          {showEmailModal && order.customer && (
+            <EmailModal
+              to={order.customer.email}
+              caseTitle={order.order_number}
+              orgId={selectedOrganization?.id}
+              caseId={id}
+              onClose={() => setShowEmailModal(false)}
+              onSuccess={() => {
+                setShowEmailModal(false);
+                setRefreshEmailList(prev => prev + 1); // 🔁 refresh RelatedEmails
+              }}
+            />
+          )}
+
+          {showAccountModal && order.vendor && (
+            <AccountDetailsModal
+              vendor={order.vendor}
+              onClose={() => setShowAccountModal(false)}
+            />
+          )}
+        </div>
+      </div>
+      {/* Related Tabs */}
+      <div className="lg:w-1/4">
+        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          {/* Tab Header */}
+          <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+            <h2 className="text-base font-semibold text-gray-800 flex items-center">
+              <svg
+                className="w-4 h-4 text-gray-500 mr-2"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+                />
+              </svg>
+              Related Records
+            </h2>
+          </div>
+
+          {/* Tab Content */}
+          <div className="divide-y divide-gray-200">
+            <div className="p-4">
+              <RelatedEmails
+                recordId={id}
+                organizationId={selectedOrganization?.id}
+                refreshKey={refreshEmailList}
+                title="Email Communications"
+              />
             </div>
+            <div className="p-4">
+              <RelatedTasks
+                recordId={id}
+                organizationId={selectedOrganization?.id}
+                refreshKey={refreshEmailList}
+                title="Tasks"
+              />
+            </div>
+
+            {/* You can add more related components here with the same styling */}
+            {/* Example placeholder for another related component */}
+            <div className="p-4">
+              <div className="text-sm text-gray-500 italic">More related records would appear here</div>
+            </div>
+          </div>
+
+          {/* Optional footer */}
+          <div className="bg-gray-50 px-4 py-2 border-t border-gray-200 text-right">
+            <button className="text-xs text-blue-600 hover:text-blue-800 font-medium">
+              View All Related Records
+            </button>
           </div>
         </div>
       </div>
-
-      {showAccountModal && order.vendor && (
-        <AccountDetailsModal
-          vendor={order.vendor}
-          onClose={() => setShowAccountModal(false)}
-        />
-      )}
     </div>
   );
 }
