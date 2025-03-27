@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { updateSupabaseHeaders } from '../lib/supabase';
@@ -19,64 +19,127 @@ interface OrganizationContextType {
 
 const OrganizationContext = createContext<OrganizationContextType | undefined>(undefined);
 
+// Storage key for consistent access
+const SELECTED_ORG_KEY = 'selectedOrganization';
+
 export function OrganizationProvider({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, organizations: userOrgs } = useAuth();
-  const [selectedOrganization, setSelectedOrganization] = useState<Organization | null>(() => {
-    const stored = sessionStorage.getItem('selectedOrganization');
-    return stored ? JSON.parse(stored) : null;
-  });
+  const { user, organizations: userOrgs, loading: authLoading } = useAuth();
+
+  // Get organization from sessionStorage with improved error handling
+  const getStoredOrg = useCallback((): Organization | null => {
+    try {
+      const stored = sessionStorage.getItem(SELECTED_ORG_KEY);
+      if (stored) {
+        console.log('[OrgProvider] Loading stored organization from sessionStorage');
+        return JSON.parse(stored);
+      }
+      return null;
+    } catch (error) {
+      console.error('[OrgProvider] Error loading from sessionStorage:', error);
+      return null;
+    }
+  }, []);
+
+  const [selectedOrganization, setSelectedOrgState] = useState<Organization | null>(getStoredOrg);
   const [loading, setLoading] = useState(true);
 
+  // No longer need redirectAttempted as we'll use a different approach
+
+  // Clear on logout
   useEffect(() => {
-    // Clear selected organization on logout
     if (!user) {
-      setSelectedOrganization(null);
-      sessionStorage.removeItem('selectedOrganization');
+      setSelectedOrgState(null);
+      sessionStorage.removeItem(SELECTED_ORG_KEY);
       updateSupabaseHeaders(null);
     }
   }, [user]);
 
+  // Sync from sessionStorage on mount and location changes
   useEffect(() => {
-    // If user has organizations but none selected, redirect to selector
-    // Only redirect if not already on the selector page
-    if (userOrgs.length > 0 && !selectedOrganization && user && location.pathname !== '/select-organization') {
-      navigate('/select-organization');
-    }
-    setLoading(false);
-  }, [userOrgs, selectedOrganization, user, navigate, location]);
+    const storedOrg = getStoredOrg();
 
+    // If we have a stored org but the state doesn't match, update state
+    if (storedOrg && (!selectedOrganization || storedOrg.id !== selectedOrganization.id)) {
+      console.log('[OrgProvider] Syncing from sessionStorage to state');
+      setSelectedOrgState(storedOrg);
+      updateSupabaseHeaders(storedOrg.id).catch(console.error);
+    }
+
+    // If we have a selected org in state but not in storage, update storage
+    if (selectedOrganization && !storedOrg) {
+      console.log('[OrgProvider] Syncing from state to sessionStorage');
+      sessionStorage.setItem(SELECTED_ORG_KEY, JSON.stringify(selectedOrganization));
+      updateSupabaseHeaders(selectedOrganization.id).catch(console.error);
+    }
+  }, [location.pathname, getStoredOrg, selectedOrganization]);
+
+  // Simplified organization redirect logic
+  useEffect(() => {
+    const handleOrgRedirection = async () => {
+      const storedOrg = getStoredOrg();
+
+      // Only handle redirects if auth is loaded and we have a user
+      if (!authLoading && user) {
+        // Update Supabase headers if we have an org
+        if (storedOrg) {
+          await updateSupabaseHeaders(storedOrg.id);
+        }
+
+        // Check if we need to redirect to org selector
+        const needsOrgSelection = userOrgs.length > 0 && !storedOrg;
+        const isSelectOrgPage = location.pathname === '/select-organization';
+        const isLoginPage = location.pathname === '/login';
+
+        if (needsOrgSelection && !isSelectOrgPage && !isLoginPage) {
+          console.log('[OrgProvider] Redirecting to org selector (no org selected)');
+          navigate('/select-organization', { replace: true });
+        } else if (!needsOrgSelection && isSelectOrgPage && storedOrg) {
+          console.log('[OrgProvider] Redirecting to admin (org already selected)');
+          navigate('/admin', { replace: true });
+        }
+      }
+
+      setLoading(false);
+    };
+
+    handleOrgRedirection();
+  }, [authLoading, user, userOrgs, location.pathname, navigate, getStoredOrg]);
+
+  // Improved setSelectedOrganization with better error handling and state updates
   const handleSetSelectedOrganization = async (org: Organization | null) => {
     try {
       if (org) {
-        sessionStorage.setItem('selectedOrganization', JSON.stringify(org));
+        console.log(`[OrgProvider] Setting organization: ${org.name} (${org.id})`);
+        // Update sessionStorage first
+        sessionStorage.setItem(SELECTED_ORG_KEY, JSON.stringify(org));
+        // Update Supabase headers
         await updateSupabaseHeaders(org.id);
+        // Finally update state
+        setSelectedOrgState(org);
       } else {
-        sessionStorage.removeItem('selectedOrganization');
+        console.log('[OrgProvider] Clearing selected organization');
+        sessionStorage.removeItem(SELECTED_ORG_KEY);
         await updateSupabaseHeaders(null);
+        setSelectedOrgState(null);
       }
-      setSelectedOrganization(org);
+      return true;
     } catch (error) {
-      console.error('Error setting organization:', error);
+      console.error('[OrgProvider] Error setting organization:', error);
       throw error;
     }
   };
 
-  // Set organization header on initial load
-  useEffect(() => {
-    if (selectedOrganization) {
-      updateSupabaseHeaders(selectedOrganization.id);
-    }
-  }, []);
-
   return (
-    <OrganizationContext.Provider value={{
-      selectedOrganization,
-      setSelectedOrganization: handleSetSelectedOrganization,
-      organizations: userOrgs,
-      loading
-    }}>
+    <OrganizationContext.Provider
+      value={{
+        selectedOrganization,
+        setSelectedOrganization: handleSetSelectedOrganization,
+        organizations: userOrgs,
+        loading
+      }}
+    >
       {children}
     </OrganizationContext.Provider>
   );

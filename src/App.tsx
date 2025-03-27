@@ -78,6 +78,36 @@ function App() {
                       <OrganizationProvider>
 
                         <Routes>
+                            <Route
+                                path="/debug-fix-org"
+                                element={
+                                    <div className="p-8">
+                                        <h1 className="text-2xl mb-4">Debug Organization</h1>
+                                        <div className="bg-gray-100 p-4 rounded mb-4">
+                                            <pre>{JSON.stringify({
+                                                sessionOrg: JSON.parse(sessionStorage.getItem('selectedOrganization') || 'null'),
+                                                pathname: window.location.pathname
+                                            }, null, 2)}</pre>
+                                        </div>
+                                        <button
+                                            onClick={() => {
+                                                // Get org directly from storage
+                                                const org = sessionStorage.getItem('selectedOrganization');
+                                                if (org) {
+                                                    // Force set in context
+                                                    const parsed = JSON.parse(org);
+                                                    window.location.href = '/admin';
+                                                } else {
+                                                    window.location.href = '/select-organization';
+                                                }
+                                            }}
+                                            className="px-4 py-2 bg-blue-600 text-white rounded"
+                                        >
+                                            Force Navigation to Admin
+                                        </button>
+                                    </div>
+                                }
+                            />
                             <Route path="/" element={<HomePage />} />
                             <Route path="/blog" element={<BlogPage />} />
                             <Route path="/blog/:slug" element={<BlogPost />} />
