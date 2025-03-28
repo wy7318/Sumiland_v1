@@ -5,9 +5,10 @@ import { CSS } from '@dnd-kit/utilities';
 type Props = {
   id: string;
   children: React.ReactNode;
+  isDraggingAny?: boolean; // New prop to know if any card is being dragged
 };
 
-export function KanbanCard({ id, children }: Props) {
+export function KanbanCard({ id, children, isDraggingAny = false }: Props) {
   const {
     attributes,
     listeners,
@@ -22,6 +23,9 @@ export function KanbanCard({ id, children }: Props) {
     transition,
     opacity: isDragging ? 0.5 : 1,
     zIndex: isDragging ? 999 : 'auto',
+    // During dragging of any card, disable pointer events on cards that aren't being dragged
+    // This lets the column receive the drop events through the cards
+    pointerEvents: isDraggingAny && !isDragging ? 'none' : 'auto' as any,
   };
 
   return (

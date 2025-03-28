@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { 
-  Plus, Search, Filter, ChevronDown, ChevronUp, Edit, Trash2, 
+import {
+  Plus, Search, Filter, ChevronDown, ChevronUp, Edit, Trash2,
   Eye, Package, Calendar, DollarSign, Building2, AlertCircle,
-  FileDown, Send
+  FileDown, Send, User, LayoutGrid, LayoutList
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { cn, formatCurrency } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
 import { useOrganization } from '../../contexts/OrganizationContext';
+import { KanbanBoard, KanbanCard } from './KanbanBoard';
 
 type Order = {
   order_id: string;
@@ -44,6 +45,74 @@ type Order = {
   }[];
 };
 
+// Type for Kanban compatibility
+type KanbanOrder = Order & {
+  id: string; // Required for KanbanBoard
+};
+
+type StatusOption = {
+  value: string;
+  label: string;
+  color: string;
+  text_color: string;
+};
+
+type ViewMode = 'list' | 'kanban';
+
+// Order Card Component for Kanban View
+function OrderCard({ order }: { order: KanbanOrder }) {
+  return (
+    <KanbanCard id={order.id}>
+      <div className="space-y-2">
+        <h4 className="font-medium">{order.order_number}</h4>
+
+        <div className="flex items-center text-sm text-gray-500">
+          <DollarSign className="w-4 h-4 mr-1" />
+          {formatCurrency(order.total_amount)}
+        </div>
+
+        <div className="flex items-center text-sm text-gray-500">
+          <User className="w-4 h-4 mr-1" />
+          {order.customer.first_name} {order.customer.last_name}
+        </div>
+
+        {order.customer.company && (
+          <div className="flex items-center text-sm text-gray-500">
+            <Building2 className="w-4 h-4 mr-1" />
+            {order.customer.company}
+          </div>
+        )}
+
+        <div className={cn(
+          "px-2 py-1 text-xs rounded-full inline-flex items-center",
+          order.payment_status === 'Pending' && "bg-gray-100 text-gray-800",
+          order.payment_status === 'Partial Received' && "bg-orange-100 text-orange-800",
+          order.payment_status === 'Fully Received' && "bg-green-100 text-green-800"
+        )}>
+          {order.payment_status}
+        </div>
+
+        <div className="flex justify-end gap-2 mt-2">
+          <Link
+            to={`/admin/orders/${order.order_id}`}
+            className="text-primary-600 hover:text-primary-900"
+            onClick={e => e.stopPropagation()}
+          >
+            <Eye className="w-4 h-4" />
+          </Link>
+          <Link
+            to={`/admin/orders/${order.order_id}/edit`}
+            className="text-blue-600 hover:text-blue-900"
+            onClick={e => e.stopPropagation()}
+          >
+            <Edit className="w-4 h-4" />
+          </Link>
+        </div>
+      </div>
+    </KanbanCard>
+  );
+}
+
 export function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -55,6 +124,16 @@ export function OrdersPage() {
   const [paymentStatusFilter, setPaymentStatusFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'created_at' | 'order_number' | 'total_amount'>('created_at');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
+
+  // Define status options for Kanban board
+  const orderStatuses: StatusOption[] = [
+    { value: 'New', label: 'New', color: '#DBEAFE', text_color: '#1E40AF' },
+    { value: 'In Progress', label: 'In Progress', color: '#FEF3C7', text_color: '#92400E' },
+    { value: 'In Review', label: 'In Review', color: '#F3E8FF', text_color: '#6B21A8' },
+    { value: 'Completed', label: 'Completed', color: '#DCFCE7', text_color: '#166534' },
+    { value: 'Cancelled', label: 'Cancelled', color: '#FEE2E2', text_color: '#991B1B' }
+  ];
 
   useEffect(() => {
     fetchOrders();
@@ -87,7 +166,7 @@ export function OrdersPage() {
     try {
       const { error } = await supabase
         .from('order_hdr')
-        .update({ 
+        .update({
           status: newStatus,
           updated_at: new Date().toISOString()
         })
@@ -99,6 +178,11 @@ export function OrdersPage() {
       console.error('Error updating order status:', err);
       setError(err instanceof Error ? err.message : 'Failed to update status');
     }
+  };
+
+  // Wrapper for kanban status change
+  const handleKanbanStatusChange = async (itemId: string, newStatus: string) => {
+    await handleStatusChange(itemId, newStatus);
   };
 
   const handleDelete = async (orderId: string) => {
@@ -118,12 +202,17 @@ export function OrdersPage() {
     }
   };
 
+  const exportToCSV = () => {
+    // Implementation for CSV export
+    console.log("Export to CSV");
+  };
+
   const filteredOrders = orders.filter(order => {
-    const matchesSearch = 
+    const matchesSearch =
       order.order_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
       `${order.customer.first_name} ${order.customer.last_name}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
       order.customer.company?.toLowerCase().includes(searchQuery.toLowerCase());
-    
+
     const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
     const matchesPaymentStatus = paymentStatusFilter === 'all' || order.payment_status === paymentStatusFilter;
 
@@ -136,6 +225,21 @@ export function OrdersPage() {
     const multiplier = sortOrder === 'asc' ? 1 : -1;
     return (aValue < bValue ? -1 : 1) * multiplier;
   });
+
+  // Transform orders for kanban view
+  const kanbanOrders: KanbanOrder[] = sortedOrders.map(order => ({
+    ...order,
+    id: order.order_id // Use order_id directly as the id for kanban
+  }));
+
+  // Transform status options for kanban board
+  const kanbanStatuses = orderStatuses.map(status => ({
+    id: status.value,
+    value: status.value,
+    label: status.label,
+    color: status.color,
+    text_color: status.textColor
+  }));
 
   if (loading) {
     return (
@@ -150,6 +254,22 @@ export function OrdersPage() {
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Order Management</h1>
         <div className="flex gap-4">
+          <button
+            onClick={() => setViewMode(viewMode === 'list' ? 'kanban' : 'list')}
+            className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+          >
+            {viewMode === 'list' ? (
+              <>
+                <LayoutGrid className="w-4 h-4 mr-2" />
+                Kanban View
+              </>
+            ) : (
+              <>
+                <LayoutList className="w-4 h-4 mr-2" />
+                List View
+              </>
+            )}
+          </button>
           <button
             onClick={() => exportToCSV()}
             className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
@@ -214,134 +334,149 @@ export function OrdersPage() {
               <option value="Fully Received">Fully Received</option>
             </select>
 
-            <button
-              onClick={() => setSortOrder(order => order === 'asc' ? 'desc' : 'asc')}
-              className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50"
-            >
-              <Filter className={cn(
-                "w-5 h-5 transition-transform",
-                sortOrder === 'desc' ? "transform rotate-180" : ""
-              )} />
-            </button>
+            {viewMode === 'list' && (
+              <button
+                onClick={() => setSortOrder(order => order === 'asc' ? 'desc' : 'asc')}
+                className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50"
+              >
+                <Filter className={cn(
+                  "w-5 h-5 transition-transform",
+                  sortOrder === 'desc' ? "transform rotate-180" : ""
+                )} />
+              </button>
+            )}
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Order Number
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Customer
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Payment Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Amount
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Created
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {sortedOrders.map((order) => (
-                <tr key={order.order_id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">
-                      {order.order_number}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">
-                      {order.customer.first_name} {order.customer.last_name}
-                    </div>
-                    {order.customer.company && (
-                      <div className="text-sm text-gray-500">
-                        {order.customer.company}
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <select
-                      value={order.status}
-                      onChange={(e) => handleStatusChange(order.order_id, e.target.value)}
-                      className={cn(
-                        "text-sm font-medium rounded-full px-3 py-1",
-                        order.status === 'New' && "bg-blue-100 text-blue-800",
-                        order.status === 'In Progress' && "bg-yellow-100 text-yellow-800",
-                        order.status === 'In Review' && "bg-purple-100 text-purple-800",
-                        order.status === 'Completed' && "bg-green-100 text-green-800",
-                        order.status === 'Cancelled' && "bg-red-100 text-red-800"
-                      )}
-                    >
-                      <option value="New">New</option>
-                      <option value="In Progress">In Progress</option>
-                      <option value="In Review">In Review</option>
-                      <option value="Completed">Completed</option>
-                      <option value="Cancelled">Cancelled</option>
-                    </select>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={cn(
-                      "px-2 inline-flex text-xs leading-5 font-semibold rounded-full",
-                      order.payment_status === 'Pending' && "bg-gray-100 text-gray-800",
-                      order.payment_status === 'Partial Received' && "bg-orange-100 text-orange-800",
-                      order.payment_status === 'Fully Received' && "bg-green-100 text-green-800"
-                    )}>
-                      {order.payment_status}
-                    </span>
-                    <div className="text-sm text-gray-500 mt-1">
-                      {((order.payment_amount / order.total_amount) * 100).toFixed(0)}%
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">
-                      {formatCurrency(order.total_amount)}
-                    </div>
-                    <div className="text-sm text-gray-500">
-                      Paid: {formatCurrency(order.payment_amount)}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(order.created_at).toLocaleDateString()}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex justify-end space-x-2">
-                      <Link
-                        to={`/admin/orders/${order.order_id}`}
-                        className="text-primary-600 hover:text-primary-900"
-                      >
-                        <Eye className="w-5 h-5" />
-                      </Link>
-                      <Link
-                        to={`/admin/orders/${order.order_id}/edit`}
-                        className="text-blue-600 hover:text-blue-900"
-                      >
-                        <Edit className="w-5 h-5" />
-                      </Link>
-                      <button
-                        onClick={() => handleDelete(order.order_id)}
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
-                    </div>
-                  </td>
+        {viewMode === 'list' ? (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Order Number
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Customer
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Payment Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Amount
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Created
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {sortedOrders.map((order) => (
+                  <tr key={order.order_id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">
+                        {order.order_number}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">
+                        {order.customer.first_name} {order.customer.last_name}
+                      </div>
+                      {order.customer.company && (
+                        <div className="text-sm text-gray-500">
+                          {order.customer.company}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <select
+                        value={order.status}
+                        onChange={(e) => handleStatusChange(order.order_id, e.target.value)}
+                        className={cn(
+                          "text-sm font-medium rounded-full px-3 py-1",
+                          order.status === 'New' && "bg-blue-100 text-blue-800",
+                          order.status === 'In Progress' && "bg-yellow-100 text-yellow-800",
+                          order.status === 'In Review' && "bg-purple-100 text-purple-800",
+                          order.status === 'Completed' && "bg-green-100 text-green-800",
+                          order.status === 'Cancelled' && "bg-red-100 text-red-800"
+                        )}
+                      >
+                        <option value="New">New</option>
+                        <option value="In Progress">In Progress</option>
+                        <option value="In Review">In Review</option>
+                        <option value="Completed">Completed</option>
+                        <option value="Cancelled">Cancelled</option>
+                      </select>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={cn(
+                        "px-2 inline-flex text-xs leading-5 font-semibold rounded-full",
+                        order.payment_status === 'Pending' && "bg-gray-100 text-gray-800",
+                        order.payment_status === 'Partial Received' && "bg-orange-100 text-orange-800",
+                        order.payment_status === 'Fully Received' && "bg-green-100 text-green-800"
+                      )}>
+                        {order.payment_status}
+                      </span>
+                      <div className="text-sm text-gray-500 mt-1">
+                        {((order.payment_amount / order.total_amount) * 100).toFixed(0)}%
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">
+                        {formatCurrency(order.total_amount)}
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        Paid: {formatCurrency(order.payment_amount)}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {new Date(order.created_at).toLocaleDateString()}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <div className="flex justify-end space-x-2">
+                        <Link
+                          to={`/admin/orders/${order.order_id}`}
+                          className="text-primary-600 hover:text-primary-900"
+                        >
+                          <Eye className="w-5 h-5" />
+                        </Link>
+                        <Link
+                          to={`/admin/orders/${order.order_id}/edit`}
+                          className="text-blue-600 hover:text-blue-900"
+                        >
+                          <Edit className="w-5 h-5" />
+                        </Link>
+                        <button
+                          onClick={() => handleDelete(order.order_id)}
+                          className="text-red-600 hover:text-red-900"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <div className="min-w-[1200px] p-4">
+              <KanbanBoard
+                items={kanbanOrders}
+                statuses={kanbanStatuses}
+                onStatusChange={handleKanbanStatusChange}
+                renderCard={(order) => <OrderCard order={order as KanbanOrder} />}
+              />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
