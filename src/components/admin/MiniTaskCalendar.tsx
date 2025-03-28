@@ -5,7 +5,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useOrganization } from '../../contexts/OrganizationContext';
 import { useNavigate } from 'react-router-dom';
-
+import { DateTime } from 'luxon';
 
 export function MiniTaskCalendar() {
     const { user } = useAuth();
@@ -14,12 +14,38 @@ export function MiniTaskCalendar() {
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [selectedTask, setSelectedTask] = useState(null);
     const [showModal, setShowModal] = useState(false);
+    const [orgTimezone, setOrgTimezone] = useState('UTC');
     const navigate = useNavigate();
 
+    // Fetch organization timezone
+    useEffect(() => {
+        const fetchTimezone = async () => {
+            if (!selectedOrganization?.id) return;
 
+            const { data, error } = await supabase
+                .from('organizations')
+                .select('timezone')
+                .eq('id', selectedOrganization.id)
+                .single();
+
+            if (error) {
+                console.error('Failed to fetch org timezone:', error);
+                return;
+            }
+
+            if (data?.timezone) {
+                setOrgTimezone(data.timezone);
+                console.log('MiniCalendar - Using timezone:', data.timezone);
+            }
+        };
+
+        fetchTimezone();
+    }, [selectedOrganization]);
+
+    // Fetch tasks
     useEffect(() => {
         fetchTasks();
-    }, [selectedOrganization, user]);
+    }, [selectedOrganization, user, orgTimezone]);
 
     const fetchTasks = async () => {
         try {
@@ -81,13 +107,51 @@ export function MiniTaskCalendar() {
         );
     };
 
+    // Check if a date has tasks (using proper timezone handling)
+    const dateHasTasks = (date) => {
+        // Convert JS Date to Luxon DateTime in browser's timezone
+        const browserTzDate = DateTime.fromJSDate(date);
 
+        // The selected date at midnight in the org timezone
+        const targetDate = DateTime.fromObject({
+            year: browserTzDate.year,
+            month: browserTzDate.month,
+            day: browserTzDate.day
+        }, { zone: orgTimezone });
+
+        return tasks.some(task => {
+            // Parse the task date in the org timezone
+            const taskDate = DateTime.fromISO(task.due_date, { zone: orgTimezone });
+
+            // Compare year, month, and day
+            return (
+                taskDate.year === targetDate.year &&
+                taskDate.month === targetDate.month &&
+                taskDate.day === targetDate.day
+            );
+        });
+    };
+
+    // Get tasks for selected date with timezone handling
     const tasksOnSelectedDate = tasks.filter(task => {
-        const taskDate = new Date(task.due_date);
+        // Convert the selected date (JS Date) to Luxon DateTime
+        const selectedLuxon = DateTime.fromJSDate(selectedDate);
+
+        // Create a date in org timezone with same year/month/day as selected date
+        const targetDate = DateTime.fromObject({
+            year: selectedLuxon.year,
+            month: selectedLuxon.month,
+            day: selectedLuxon.day
+        }, { zone: orgTimezone });
+
+        // Parse the task date in org timezone
+        const taskDate = DateTime.fromISO(task.due_date, { zone: orgTimezone });
+
+        // Compare year, month, and day
         return (
-            taskDate.getFullYear() === selectedDate.getFullYear() &&
-            taskDate.getMonth() === selectedDate.getMonth() &&
-            taskDate.getDate() === selectedDate.getDate()
+            taskDate.year === targetDate.year &&
+            taskDate.month === targetDate.month &&
+            taskDate.day === targetDate.day
         );
     });
 
@@ -101,6 +165,12 @@ export function MiniTaskCalendar() {
         setSelectedTask(null);
     };
 
+    // Format a date string properly using the org timezone
+    const formatDate = (dateStr) => {
+        return DateTime.fromISO(dateStr, { zone: orgTimezone })
+            .toLocaleString(DateTime.DATE_FULL);
+    };
+
     return (
         <div className="bg-white shadow rounded-lg p-4">
             <h2 className="text-lg font-semibold mb-4">Task Calendar</h2>
@@ -108,38 +178,29 @@ export function MiniTaskCalendar() {
                 onChange={setSelectedDate}
                 value={selectedDate}
                 tileContent={({ date }) => {
-                    const hasTask = tasks.some(task => {
-                        const taskDate = new Date(task.due_date);
-                        return (
-                            taskDate.getFullYear() === date.getFullYear() &&
-                            taskDate.getMonth() === date.getMonth() &&
-                            taskDate.getDate() === date.getDate()
-                        );
-                    });
-                    return hasTask ? <div className="task-dot mt-1" /> : null;
+                    return dateHasTasks(date) ? <div className="task-dot mt-1" /> : null;
                 }}
                 className="custom-calendar"
             />
             <div className="mt-4">
                 <h3 className="text-md font-semibold mb-2">
-                    Tasks on {selectedDate.toDateString()}
+                    Tasks on {DateTime.fromJSDate(selectedDate).setZone(orgTimezone).toLocaleString()}
                 </h3>
                 {tasksOnSelectedDate.length ? (
                     <ul className="space-y-2">
                         {tasksOnSelectedDate.map(task => (
                             <li
-                            key={task.id}
-                            onClick={() => handleTaskClick(task)}
-                            className={`p-2 rounded cursor-pointer text-sm border 
-                                ${task.is_done 
-                                ? 'bg-green-50 border-green-200 text-green-800 hover:bg-green-100' 
-                                : 'hover:bg-gray-100 border-gray-200 text-gray-800'}`}
+                                key={task.id}
+                                onClick={() => handleTaskClick(task)}
+                                className={`p-2 rounded cursor-pointer text-sm border 
+                                    ${task.is_done
+                                        ? 'bg-green-50 border-green-200 text-green-800 hover:bg-green-100'
+                                        : 'hover:bg-gray-100 border-gray-200 text-gray-800'}`}
                             >
-                            {task.title}
+                                {task.title}
                             </li>
                         ))}
                     </ul>
-
                 ) : (
                     <p className="text-gray-500 text-sm">No tasks for this date.</p>
                 )}
@@ -164,7 +225,7 @@ export function MiniTaskCalendar() {
                         <div className="space-y-4">
                             <div>
                                 <h3 className="text-sm font-medium text-gray-500">Due Date</h3>
-                                <p className="text-gray-900">{new Date(selectedTask.due_date).toLocaleDateString()}</p>
+                                <p className="text-gray-900">{formatDate(selectedTask.due_date)}</p>
                             </div>
 
                             <div>
@@ -189,7 +250,6 @@ export function MiniTaskCalendar() {
                                 </label>
                             </div>
 
-
                             {selectedTask.description && (
                                 <div>
                                     <h3 className="text-sm font-medium text-gray-500">Description</h3>
@@ -210,7 +270,6 @@ export function MiniTaskCalendar() {
                                         closeModal();
                                         navigate(`/admin/tasks/${selectedTask.id}/edit`);
                                     }}
-
                                     className="flex-1 bg-blue-600 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                                 >
                                     Edit Task

@@ -1,12 +1,13 @@
+// UPDATED: TaskFormPage with Org Timezone support
+
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useOrganization } from '../../contexts/OrganizationContext';
 import { X, Save, AlertCircle, Calendar, Search } from 'lucide-react';
 import { UserSearch } from './UserSearch';
-import { useSearchParams } from 'react-router-dom';
-
+import { DateTime } from 'luxon';
 
 const moduleOptions = [
     { name: 'Opportunities', table: 'opportunities', idField: 'id', nameField: 'name' },
@@ -33,40 +34,39 @@ export function TaskFormPage() {
     const [assignedTo, setAssignedTo] = useState<string>('');
     const [isPersonal, setIsPersonal] = useState(true);
     const [selectedModule, setSelectedModule] = useState<any | null>(null);
-    // const [moduleName, setModuleName] = useState('');
     const [recordId, setRecordId] = useState('');
-
     const [moduleRecords, setModuleRecords] = useState<any[]>([]);
     const [recordSearch, setRecordSearch] = useState('');
-    const [isDone, setIsDone] = useState(false);  // New state
-
-    
+    const [isDone, setIsDone] = useState(false);
+    const [orgTimezone, setOrgTimezone] = useState('UTC');
 
     useEffect(() => {
         if (!id) {
             const moduleParam = searchParams.get('module');
             const recordParam = searchParams.get('recordId');
-
             if (moduleParam) {
                 const mod = moduleOptions.find(m => m.table === moduleParam);
-                if (mod) {
-                    setSelectedModule(mod);
-                }
+                if (mod) setSelectedModule(mod);
             }
-            if (recordParam) {
-                setRecordId(recordParam);
-            }
+            if (recordParam) setRecordId(recordParam);
         }
     }, [id, searchParams]);
 
     useEffect(() => {
-        if (id) {
-            fetchTask();
+        if (selectedOrganization?.id) {
+            supabase.from('organizations')
+                .select('timezone')
+                .eq('id', selectedOrganization.id)
+                .single()
+                .then(({ data, error }) => {
+                    if (!error && data?.timezone) setOrgTimezone(data.timezone);
+                });
         }
+    }, [selectedOrganization]);
+
+    useEffect(() => {
+        if (id) fetchTask();
     }, [id]);
-
-
-
 
     useEffect(() => {
         if (selectedModule) fetchModuleRecords();
@@ -80,10 +80,10 @@ export function TaskFormPage() {
             if (data) {
                 setTitle(data.title);
                 setDescription(data.description || '');
-                setDueDate(data.due_date);
+                setDueDate(DateTime.fromISO(data.due_date, { zone: 'utc' }).setZone(orgTimezone).toISODate());
                 setAssignedTo(data.assigned_to || '');
                 setIsPersonal(data.is_personal);
-                setIsDone(data.is_done); // Load is_done
+                setIsDone(data.is_done);
                 const moduleInfo = moduleOptions.find(mod => mod.table === data.module_name);
                 setSelectedModule(moduleInfo || null);
                 setRecordId(data.record_id || '');
@@ -124,13 +124,15 @@ export function TaskFormPage() {
         setError(null);
 
         try {
+            const dueDateUtc = DateTime.fromISO(dueDate, { zone: orgTimezone }).toUTC().toISO();
+
             const payload = {
                 title,
                 description,
-                due_date: dueDate,
+                due_date: dueDateUtc,
                 assigned_to: assignedTo || null,
                 is_personal: isPersonal,
-                is_done: isDone, // Add this
+                is_done: isDone,
                 organization_id: selectedOrganization?.id || null,
                 created_by: user?.id,
                 module_name: selectedModule?.table || null,
@@ -145,17 +147,12 @@ export function TaskFormPage() {
                 if (error) throw error;
             }
 
-            // Check if we came from a module and redirect back if so
             const moduleParam = searchParams.get('module');
             const recordParam = searchParams.get('recordId');
-
             if (moduleParam && recordParam) {
-                // Find the module option to get the proper URL structure
                 const moduleOption = moduleOptions.find(m => m.table === moduleParam);
                 if (moduleOption) {
-                    // Construct the URL based on the module
                     let basePath = moduleOption.table;
-                    // Special cases for URLs that might be different
                     if (moduleOption.table === 'order_hdr') basePath = 'orders';
                     if (moduleOption.table === 'quote_hdr') basePath = 'quotes';
                     if (moduleOption.table === 'customers') basePath = 'customers';
@@ -163,13 +160,10 @@ export function TaskFormPage() {
                     if (moduleOption.table === 'leads') basePath = 'leads';
                     if (moduleOption.table === 'vendors') basePath = 'vendors';
                     if (moduleOption.table === 'cases') basePath = 'cases';
-                    // Add more special cases as needed
-                
                     navigate(`/admin/${basePath}/${recordParam}`);
                     return;
                 }
             }
-
             navigate('/admin/tasks');
         } catch (err) {
             console.error('Error saving task:', err);

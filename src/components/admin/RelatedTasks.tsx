@@ -5,8 +5,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { cn } from '../../lib/utils';
 import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
-import { useRouter } from 'next/router';
 import { CheckCircle, Circle, Calendar, ChevronRight, X } from 'lucide-react';
+import { DateTime } from 'luxon';
 
 interface Task {
     id: string;
@@ -33,6 +33,32 @@ export function RelatedTasks({ recordId, organizationId, title = 'Tasks', refres
     const [loading, setLoading] = useState(true);
     const [selectedTask, setSelectedTask] = useState<Task | null>(null);
     const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
+    const [orgTimezone, setOrgTimezone] = useState('UTC');
+
+    // Fetch the organization timezone
+    useEffect(() => {
+        const fetchTimezone = async () => {
+            if (!organizationId) return;
+
+            const { data, error } = await supabase
+                .from('organizations')
+                .select('timezone')
+                .eq('id', organizationId)
+                .single();
+
+            if (error) {
+                console.error('Failed to fetch org timezone:', error);
+                return;
+            }
+
+            if (data?.timezone) {
+                setOrgTimezone(data.timezone);
+                console.log('RelatedTasks - Using timezone:', data.timezone);
+            }
+        };
+
+        fetchTimezone();
+    }, [organizationId]);
 
     const fetchTasks = async () => {
         if (!user?.id || !recordId || !organizationId) return;
@@ -74,6 +100,32 @@ export function RelatedTasks({ recordId, organizationId, title = 'Tasks', refres
     useEffect(() => {
         fetchTasks();
     }, [recordId, organizationId, user?.id, refreshKey]);
+
+    // Format dates using the organization timezone
+    const formatDate = (dateStr: string) => {
+        if (!dateStr) return 'Invalid date';
+
+        try {
+            // Parse the date in the organization timezone
+            const dt = DateTime.fromISO(dateStr, { zone: orgTimezone });
+
+            if (!dt.isValid) {
+                console.error('Invalid date:', dateStr);
+                return 'Invalid date';
+            }
+
+            // Format as localized date string
+            return dt.toLocaleString(DateTime.DATE_MED);
+        } catch (error) {
+            console.error('Error formatting date:', error);
+            return 'Date error';
+        }
+    };
+
+    // Format the completion date (current date in org timezone)
+    const formatCompletionDate = () => {
+        return DateTime.now().setZone(orgTimezone).toLocaleString(DateTime.DATE_MED);
+    };
 
     return (
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
@@ -125,7 +177,7 @@ export function RelatedTasks({ recordId, organizationId, title = 'Tasks', refres
                                     </p>
                                     <div className="flex items-center mt-1 text-xs text-gray-500">
                                         <Calendar className="w-3 h-3 mr-1" />
-                                        {new Date(task.due_date).toLocaleDateString()}
+                                        {formatDate(task.due_date)}
                                         {task.is_personal && (
                                             <span className="ml-2 bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-xxs">
                                                 Personal
@@ -142,7 +194,7 @@ export function RelatedTasks({ recordId, organizationId, title = 'Tasks', refres
 
             {tasks.length > 0 && (
                 <div className="bg-gray-50 px-4 py-2 border-t border-gray-200 text-right">
-                    <button 
+                    <button
                         onClick={() => (navigate(`/admin/tasks`))}
                         className="text-xs text-blue-600 hover:text-blue-800 font-medium"
                     >
@@ -205,7 +257,7 @@ export function RelatedTasks({ recordId, organizationId, title = 'Tasks', refres
                                 <div>
                                     <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</p>
                                     <p className="text-sm text-gray-900 mt-1">
-                                        {new Date(selectedTask.due_date).toLocaleDateString()}
+                                        {formatDate(selectedTask.due_date)}
                                     </p>
                                 </div>
                             </div>
@@ -224,9 +276,9 @@ export function RelatedTasks({ recordId, organizationId, title = 'Tasks', refres
                         <div className="bg-gray-50 px-6 py-3 border-t border-gray-200 flex justify-between items-center">
                             <div className="text-xs text-gray-500">
                                 {selectedTask.is_done ? (
-                                    `Completed on ${new Date().toLocaleDateString()}`
+                                    `Completed on ${formatCompletionDate()}`
                                 ) : (
-                                    `Created on ${new Date(selectedTask.due_date).toLocaleDateString()}`
+                                    `Created on ${formatDate(selectedTask.due_date)}`
                                 )}
                             </div>
                             <div className="flex space-x-2">

@@ -12,6 +12,7 @@ import { CustomFieldsSection } from './CustomFieldsSection';
 import { AccountDetailsModal } from './AccountDetailsModal';
 import { useAuth } from '../../contexts/AuthContext';
 import { useOrganization } from '../../contexts/OrganizationContext';
+import { DateTime } from 'luxon';
 
 
 type Opportunity = {
@@ -101,6 +102,32 @@ export function OpportunityDetailPage() {
   const [opportunityStages, setOpportunityStages] = useState<PicklistValue[]>([]);
   const [opportunityTypes, setOpportunityTypes] = useState<PicklistValue[]>([]);
   const [productStatuses, setProductStatuses] = useState<PicklistValue[]>([]);
+  const [orgTimezone, setOrgTimezone] = useState('UTC');
+
+  // Add this effect to fetch the organization timezone
+  useEffect(() => {
+    const fetchTimezone = async () => {
+      if (!selectedOrganization?.id) return;
+
+      const { data, error } = await supabase
+        .from('organizations')
+        .select('timezone')
+        .eq('id', selectedOrganization.id)
+        .single();
+
+      if (error) {
+        console.error('Failed to fetch org timezone:', error);
+        return;
+      }
+
+      if (data?.timezone) {
+        setOrgTimezone(data.timezone);
+        console.log('Opportunity page - Using timezone:', data.timezone);
+      }
+    };
+
+    fetchTimezone();
+  }, [selectedOrganization]);
 
   useEffect(() => {
     fetchPicklists();
@@ -114,6 +141,32 @@ export function OpportunityDetailPage() {
       fetchFeeds();
     }
   }, [opportunity]);
+
+  // Add this utility function for formatting dates
+  const formatDate = (dateStr, format = DateTime.DATE_MED) => {
+    if (!dateStr) return '';
+
+    try {
+      // Parse the date in the organization timezone
+      const dt = DateTime.fromISO(dateStr, { zone: orgTimezone });
+
+      if (!dt.isValid) {
+        console.error('Invalid date:', dateStr);
+        return 'Invalid date';
+      }
+
+      // Format as localized date string
+      return dt.toLocaleString(format);
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return 'Date error';
+    }
+  };
+
+  // Add this utility function for formatting date-times
+  const formatDateTime = (dateStr) => {
+    return formatDate(dateStr, DateTime.DATETIME_MED);
+  };
 
   const fetchPicklists = async () => {
     try {
@@ -389,8 +442,9 @@ export function OpportunityDetailPage() {
             </div>
             <div>
               <div className="font-medium">{feed.profile.name}</div>
+              {/* // REPLACE THE FEED CREATED_AT DISPLAY WITH THIS: */}
               <div className="text-sm text-gray-500">
-                {new Date(feed.created_at).toLocaleString()}
+                {formatDateTime(feed.created_at)}
                 {feed.updated_at && (
                   <span className="ml-2 text-xs">(edited)</span>
                 )}
@@ -550,9 +604,10 @@ export function OpportunityDetailPage() {
               <div className="text-sm text-gray-500">
                 Probability: {opportunity.probability}%
               </div>
+              {/* // REPLACE THE EXPECTED CLOSE DATE DISPLAY WITH THIS: */}
               {opportunity.expected_close_date && (
                 <div className="text-sm text-gray-500">
-                  Expected Close: {new Date(opportunity.expected_close_date).toLocaleDateString()}
+                  Expected Close: {formatDate(opportunity.expected_close_date)}
                 </div>
               )}
             </div>

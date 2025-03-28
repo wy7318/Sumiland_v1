@@ -18,6 +18,8 @@ import { ResponsiveLine } from '@nivo/line'; // Install: npm i @nivo/line @nivo/
 import { ResponsiveBar } from '@nivo/bar'; // Install: npm i @nivo/bar @nivo/core
 import { ResponsivePie } from '@nivo/pie'; // Import npm i @nivo/pie @nivo/core
 import { MiniTaskCalendar } from './MiniTaskCalendar';
+import { DateTime } from 'luxon';
+
 
 
 
@@ -74,10 +76,49 @@ function AnimatedCount({ value }: { value: number }) {
   );
 }
 
+function formatDateToOrgTimezone(date: string | Date, timezone: string = 'UTC') {
+  if (!date) return 'Invalid date';
+
+  try {
+    const iso = typeof date === 'string' ? date : date.toISOString();
+
+    // Log the incoming date for debugging
+    // console.log("Original date:", iso, "Converting to timezone:", timezone);
+
+    // First create a DateTime object from the ISO string, specifying it's in UTC
+    const dateTime = DateTime.fromISO(iso, { zone: 'utc' });
+
+    // Check if valid before proceeding
+    if (!dateTime.isValid) {
+      console.error("Invalid DateTime created:", dateTime.invalidReason, dateTime.invalidExplanation);
+      return 'Invalid date';
+    }
+
+    // Set the zone to the target timezone
+    const converted = dateTime.setZone(timezone);
+
+    // Check if timezone conversion worked correctly
+    if (!converted.isValid) {
+      console.error("Invalid timezone conversion:", converted.invalidReason, converted.invalidExplanation);
+      return 'Timezone error';
+    }
+
+    // Format the date and return
+    return converted.toFormat('MMM dd, yyyy, h:mm:ss a');
+  } catch (error) {
+    console.error("Error formatting date:", error);
+    return 'Date error';
+  }
+}
+
+
+
 
 export function DashboardPage() {
   const { user } = useAuth();
   const { selectedOrganization } = useOrganization();
+  const [orgTimezone, setOrgTimezone] = useState<string>('UTC');
+
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -89,6 +130,7 @@ export function DashboardPage() {
   const [rangeType, setRangeType] = useState<'daily' | 'monthly' | 'yearly' | 'custom'>('daily');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
+  
   const chartColors = {
     Opportunities: '#8b5cf6',
     Quotes: '#ec4899',
@@ -108,6 +150,34 @@ export function DashboardPage() {
   });
 
   useEffect(() => {
+    const fetchOrgTimezone = async () => {
+      if (!selectedOrganization?.id) return;
+
+      const { data, error } = await supabase
+        .from('organizations')
+        .select('timezone')
+        .eq('id', selectedOrganization.id)
+        .single();
+
+      if (error) {
+        console.error('Error fetching organization timezone:', error);
+        return;
+      }
+
+      if (data?.timezone) {
+        setOrgTimezone(data.timezone);
+      }
+    };
+
+    fetchOrgTimezone();
+  }, [selectedOrganization]);
+
+
+
+  useEffect(() => {
+    console.log("Organization :", selectedOrganization?.id);
+    console.log("Organization timezone:", selectedOrganization?.timezone);
+    console.log("Using timezone:", orgTimezone);
     fetchReports();
   }, [selectedOrganization]);
 
@@ -119,30 +189,58 @@ export function DashboardPage() {
     setLoading(true);
 
     let startDate: string;
-    const today = new Date();
+    let endDate: string;
+
+    const today = DateTime.now().setZone(orgTimezone);
+    console.log("Organization timezone:", selectedOrganization?.timezone);
+    console.log("today:", today);
 
     switch (range) {
-      case 'monthly':
-        startDate = new Date(today.getFullYear(), today.getMonth(), 1).toISOString();
+      case 'daily': {
+        const start = today.startOf('day').toUTC();
+        const end = today.endOf('day').toUTC();
+        startDate = start.toISO();
+        endDate = end.toISO();
         break;
-      case 'yearly':
-        startDate = new Date(today.getFullYear(), 0, 1).toISOString();
+      }
+
+      case 'monthly': {
+        const start = today.startOf('month').toUTC();
+        const end = today.endOf('month').toUTC();
+        startDate = start.toISO();
+        endDate = end.toISO();
         break;
-      case 'custom':
+      }
+
+      case 'yearly': {
+        const start = today.startOf('year').toUTC();
+        const end = today.endOf('year').toUTC();
+        startDate = start.toISO();
+        endDate = end.toISO();
+        break;
+      }
+
+      case 'custom': {
         if (!customStartDate || !customEndDate) {
           alert('Please select both start and end dates.');
           setLoading(false);
           return;
         }
-        startDate = new Date(customStartDate).toISOString();
+        const start = DateTime.fromISO(customStartDate, { zone: orgTimezone }).startOf('day').toUTC();
+        const end = DateTime.fromISO(customEndDate, { zone: orgTimezone }).endOf('day').toUTC();
+        startDate = start.toISO();
+        endDate = end.toISO();
         break;
-      case 'daily':
+      }
       default:
-        startDate = new Date(today.toISOString().split('T')[0] + 'T00:00:00Z').toISOString();
+        const fallbackStart = today.startOf('day').toUTC();
+        const fallbackEnd = today.endOf('day').toUTC();
+        startDate = fallbackStart.toISO();
+        endDate = fallbackEnd.toISO();
         break;
     }
 
-    const endDate = range === 'custom' ? new Date(customEndDate).toISOString() : today.toISOString();
+    // const endDate = range === 'custom' ? new Date(customEndDate).toISOString() : today.toISOString();
 
     const results: any = {};
 
@@ -720,7 +818,7 @@ export function DashboardPage() {
                           >
                             <p className="font-medium text-gray-800">{rec[module.nameField] || 'No Title'}</p>
                             <p className="text-xs text-gray-500">
-                              {new Date(rec.created_at).toLocaleString()}
+                              {formatDateToOrgTimezone(rec.created_at, orgTimezone)}
                             </p>
                           </Link>
                         ))
@@ -803,7 +901,7 @@ export function DashboardPage() {
                           >
                             <p className="font-medium text-gray-800">{rec[module.nameField] || 'No Title'}</p>
                             <p className="text-xs text-gray-500">
-                              {new Date(rec.created_at).toLocaleString()}
+                              {formatDateToOrgTimezone(rec.created_at, orgTimezone)}
                             </p>
                           </Link>
                         ))
