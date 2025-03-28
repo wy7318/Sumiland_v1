@@ -42,8 +42,15 @@ export function evaluateFormula(
     formulaFields: FormulaField[] = []
 ): any {
     try {
+        // Special handling for CURRENT_TIMESTAMP
+        if (formula.includes('CURRENT_TIMESTAMP')) {
+            // Replace CURRENT_TIMESTAMP with now() in the formula
+            formula = formula.replace(/CURRENT_TIMESTAMP/g, 'now()');
+        }
+
         // Debug available fields
         console.log('Available fields in data:', Object.keys(record));
+        
 
         // First check if this is a date difference formula (common case)
         if (formula.includes('-') && formula.split('-').length === 2) {
@@ -79,6 +86,7 @@ export function evaluateFormula(
         // For more complex formulas, build a safe evaluation context
         // Create a scope with field values from the record
         const scope: any = {};
+        
 
         // FIXED SECTION: Include ALL fields from record in scope, not just primitive types
         // This was the source of the bug - fields like 'converted_at' were being filtered out
@@ -93,6 +101,27 @@ export function evaluateFormula(
                 }
             }
         }
+
+        // Add JavaScript built-ins to the scope
+        scope.Math = Math;
+        scope.Date = Date;
+        scope.parseFloat = parseFloat;
+        scope.parseInt = parseInt;
+        scope.CURRENT_TIMESTAMP = new Date();
+
+        // Add helper functions for date operations
+        scope.now = function () {
+            return new Date();
+        };
+        scope.dateObj = function (dateStr) {
+            return new Date(dateStr);
+        };
+        scope.daysBetween = function (date1, date2) {
+            const d1 = typeof date1 === 'string' ? new Date(date1) : date1;
+            const d2 = typeof date2 === 'string' ? new Date(date2) : date2;
+            return Math.floor(Math.abs(d1 - d2) / (1000 * 60 * 60 * 24));
+        };
+        // END OF NEW CODE
 
         // Then add formula fields (calculated on demand)
         for (const field of formulaFields) {
@@ -122,7 +151,11 @@ export function evaluateFormula(
 
         // Filter out known function names and JavaScript keywords
         const jsKeywords = ['if', 'else', 'true', 'false', 'null', 'undefined'];
-        const knownFunctions = ['SUM', 'AVG', 'MIN', 'MAX', 'ROUND', 'ABS'];
+        const knownFunctions = [
+            'SUM', 'AVG', 'MIN', 'MAX', 'ROUND', 'ABS',
+            'Math', 'Date', 'parseFloat', 'parseInt',
+            'CURRENT_TIMESTAMP', 'now', 'dateObj', 'daysBetween'
+        ];
 
         const possibleFields = matches.filter(match =>
             !jsKeywords.includes(match) &&
@@ -148,8 +181,21 @@ export function evaluateFormula(
             // Debug the formula that will be evaluated
             console.log('Evaluating formula:', formula);
 
+            // CHANGE THIS SECTION - Add global functions to the evaluation
+            let functionBody = `
+        // Add global date functions
+        function now() { return new Date(); }
+        function daysBetween(date1, date2) {
+            const d1 = typeof date1 === 'string' ? new Date(date1) : date1;
+            const d2 = typeof date2 === 'string' ? new Date(date2) : date2;
+            return Math.floor(Math.abs(d1 - d2) / (1000 * 60 * 60 * 24));
+        }
+        
+        return ${formula};
+    `;
+
             // Create a function that evaluates the formula with the provided scope
-            const evalFunction = new Function(...scopeKeys, `return ${formula};`);
+            const evalFunction = new Function(...scopeKeys, functionBody);
 
             // Execute the function with our scope values
             const result = evalFunction(...scopeValues);
