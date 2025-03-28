@@ -9,6 +9,7 @@ import {
 import { supabase } from '../../../lib/supabase';
 import { cn } from '../../../lib/utils';
 import { useOrganization } from '../../../contexts/OrganizationContext';
+import { evaluateFormula, formatTimeDifference } from './formulaUtils';
 
 type Props = {
   report: Report;
@@ -16,6 +17,7 @@ type Props = {
   onEdit: (report: Report) => void;
 };
 
+// Update the Report type to include formula_fields
 type Report = {
   id: string;
   name: string;
@@ -35,8 +37,9 @@ type Report = {
     x_field: string;
     y_field: string;
     group_by?: string;
-    aggregation?: 'count' | 'sum' | 'avg';
+    aggregation?: 'count' | 'sum' | 'avg' | 'direct'; // Added 'direct' option
   }[];
+  formula_fields?: FormulaField[]; // Added formula_fields
   is_favorite: boolean;
   is_shared: boolean;
   folder_id: string | null;
@@ -77,8 +80,27 @@ export function ReportViewer({ report, onClose, onEdit }: Props) {
   }, [report, dateFilter, currentPage, pageSize, sortConfig]);
 
   const processChartData = (rawData: any[]) => {
-    const processedData = report.charts.map(chart => {
-      if (!chart.x_field) return { ...chart, data: [] };
+    const processedData = (report.charts || []).map(chart => {
+      // Skip incomplete chart configurations
+      if (!chart.x_field) {
+        return { ...chart, data: [] };
+      }
+
+      // For direct values (no aggregation), handle formula fields directly
+      if (chart.aggregation === 'direct' && chart.y_field) {
+        // Simply map the data directly without grouping
+        const chartData = rawData.map(item => {
+          return {
+            name: item[chart.x_field] || 'Unknown',
+            value: item[chart.y_field] || 0
+          };
+        });
+
+        return {
+          ...chart,
+          data: chartData
+        };
+      }
 
       // Group data by x-axis field
       const groupedData = rawData.reduce((acc: any, item: any) => {
@@ -96,6 +118,7 @@ export function ReportViewer({ report, onClose, onEdit }: Props) {
 
         acc[xValue].count++;
         if (chart.y_field) {
+          // Ensure we handle null/undefined values properly
           const value = parseFloat(item[chart.y_field]) || 0;
           acc[xValue].sum += value;
           acc[xValue].total += value;
@@ -121,6 +144,52 @@ export function ReportViewer({ report, onClose, onEdit }: Props) {
 
     return processedData;
   };
+
+  // const processChartData = (rawData: any[]) => {
+  //   const processedData = report.charts.map(chart => {
+  //     if (!chart.x_field) return { ...chart, data: [] };
+
+  //     // Group data by x-axis field
+  //     const groupedData = rawData.reduce((acc: any, item: any) => {
+  //       const xValue = item[chart.x_field] || 'Unknown';
+
+  //       if (!acc[xValue]) {
+  //         acc[xValue] = {
+  //           [chart.x_field]: xValue,
+  //           count: 0,
+  //           sum: 0,
+  //           total: 0,
+  //           records: []
+  //         };
+  //       }
+
+  //       acc[xValue].count++;
+  //       if (chart.y_field) {
+  //         const value = parseFloat(item[chart.y_field]) || 0;
+  //         acc[xValue].sum += value;
+  //         acc[xValue].total += value;
+  //         acc[xValue].records.push(item);
+  //       }
+
+  //       return acc;
+  //     }, {});
+
+  //     // Convert grouped data to array format
+  //     const chartData = Object.values(groupedData).map((group: any) => ({
+  //       name: group[chart.x_field],
+  //       value: chart.aggregation === 'count' ? group.count :
+  //         chart.aggregation === 'sum' ? group.sum :
+  //           chart.aggregation === 'avg' ? (group.total / group.count) : 0
+  //     }));
+
+  //     return {
+  //       ...chart,
+  //       data: chartData
+  //     };
+  //   });
+
+  //   return processedData;
+  // };
 
   const fetchReportData = async () => {
     try {
@@ -201,10 +270,35 @@ export function ReportViewer({ report, onClose, onEdit }: Props) {
         setRecordCount(count);
       }
 
-      // If there are custom fields, fetch their values
+
+      // Calculate formula fields for each record
       let finalData = standardData || [];
 
-      // Process chart data
+      // Calculate formula fields if they exist
+      if (report.formula_fields && report.formula_fields.length > 0) {
+        finalData = finalData.map(record => {
+          const recordWithFormulas = { ...record };
+
+          report.formula_fields?.forEach(formula => {
+            try {
+              // Use the evaluateFormula function to calculate the value
+              recordWithFormulas[formula.id] = evaluateFormula(
+                formula.formula,
+                record,
+                report.formula_fields
+              );
+            } catch (err) {
+              console.error(`Error calculating formula ${formula.name}:`, err);
+              // Don't fail the whole record if one formula fails
+              recordWithFormulas[formula.id] = null;
+            }
+          });
+
+          return recordWithFormulas;
+        });
+      }
+
+      // Process chart data with formula fields
       let processedChartData: any[] = [];
       if (report.charts?.length && finalData.length > 0) {
         processedChartData = processChartData(finalData);
@@ -219,6 +313,49 @@ export function ReportViewer({ report, onClose, onEdit }: Props) {
       setLoading(false);
     }
   };
+
+  const formatDurationForChart = (seconds) => {
+    if (isNaN(seconds)) return 'Invalid';
+
+    // For days (show with 1 decimal place for better precision)
+    if (seconds >= 86400) {
+      const days = (seconds / 86400).toFixed(1);
+      return `${days} day${days !== "1.0" ? 's' : ''}`;
+    }
+
+    // For hours
+    if (seconds >= 3600) {
+      const hours = Math.floor(seconds / 3600);
+      return `${hours} hr${hours !== 1 ? 's' : ''}`;
+    }
+
+    // For minutes
+    if (seconds >= 60) {
+      const minutes = Math.floor(seconds / 60);
+      return `${minutes} min`;
+    }
+
+    // For seconds
+    return `${Math.round(seconds)} sec`;
+  };
+
+  // Define the CustomTooltip component outside any loops
+  const CustomTooltip = ({ active, payload, label, isDuration }) => {
+    if (!active || !payload || !payload.length) return null;
+
+    return (
+      <div className="bg-white p-2 border border-gray-200 shadow-sm rounded text-xs">
+        <p className="font-medium">{label}</p>
+        {payload.map((entry, index) => (
+          <p key={index} style={{ color: entry.color }} className="mt-1">
+            {entry.name}: {isDuration ? formatDurationForChart(entry.value) : entry.value.toLocaleString()}
+          </p>
+        ))}
+      </div>
+    );
+  };
+
+ 
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -481,6 +618,12 @@ export function ReportViewer({ report, onClose, onEdit }: Props) {
                       {chartData.map((chart, index) => {
                         if (!chart.data?.length) return null;
 
+                        const isDurationField = report.formula_fields?.some(f =>
+                          f.id === chart.y_field &&
+                          (f.result_type === 'duration' || f.name?.toLowerCase().includes('time'))
+                        );
+
+
                         return (
                           <div key={index} className="bg-white p-4 rounded-lg shadow border border-gray-200">
                             <h3 className="text-lg font-medium mb-4">{chart.title || `Chart ${index + 1}`}</h3>
@@ -495,38 +638,46 @@ export function ReportViewer({ report, onClose, onEdit }: Props) {
                                       textAnchor="end"
                                       height={80}
                                     />
-                                    <YAxis />
-                                    <Tooltip />
+                                    <YAxis
+                                      tickFormatter={isDurationField ? formatDurationForChart : (value) => value.toLocaleString()}
+                                      label={{ value: isDurationField ? "Time (days/hours)" : "", angle: -90, position: 'insideLeft' }}
+                                    />
+                                    <Tooltip content={<CustomTooltip isDuration={isDurationField} />} />
                                     <Legend />
                                     <Bar
                                       dataKey="value"
                                       fill="#8884d8"
                                       name={chart.aggregation === 'count' ? 'Count' :
                                         chart.aggregation === 'sum' ? 'Sum' :
-                                          'Average'}
+                                          chart.aggregation === 'avg' ? (isDurationField ? 'Average Time' : 'Average') :
+                                            chart.aggregation === 'direct' ? (isDurationField ? 'Time' : chart.y_field || 'Value') : 'Value'}
                                     />
                                   </BarChart>
                                 ) : chart.type === 'line' ? (
-                                  <LineChart data={chart.data}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis
-                                      dataKey="name"
-                                      angle={-45}
-                                      textAnchor="end"
-                                      height={80}
-                                    />
-                                    <YAxis />
-                                    <Tooltip />
-                                    <Legend />
-                                    <Line
-                                      type="monotone"
-                                      dataKey="value"
-                                      stroke="#8884d8"
-                                      name={chart.aggregation === 'count' ? 'Count' :
-                                        chart.aggregation === 'sum' ? 'Sum' :
-                                          'Average'}
-                                    />
-                                  </LineChart>
+                                    <LineChart data={chart.data}>
+                                      <CartesianGrid strokeDasharray="3 3" />
+                                      <XAxis
+                                        dataKey="name"
+                                        angle={-45}
+                                        textAnchor="end"
+                                        height={80}
+                                      />
+                                      <YAxis
+                                        tickFormatter={isDurationField ? formatDurationForChart : (value) => value.toLocaleString()}
+                                        label={{ value: isDurationField ? "Time (days/hours)" : "", angle: -90, position: 'insideLeft' }}
+                                      />
+                                      <Tooltip content={<CustomTooltip isDuration={isDurationField} />} />
+                                      <Legend />
+                                      <Line
+                                        type="monotone"
+                                        dataKey="value"
+                                        stroke="#8884d8"
+                                        name={chart.aggregation === 'count' ? 'Count' :
+                                          chart.aggregation === 'sum' ? 'Sum' :
+                                            chart.aggregation === 'avg' ? (isDurationField ? 'Average Time' : 'Average') :
+                                              chart.aggregation === 'direct' ? (isDurationField ? 'Time' : chart.y_field || 'Value') : 'Value'}
+                                      />
+                                    </LineChart>
                                 ) : (
                                   <PieChart>
                                     <Pie
@@ -654,7 +805,13 @@ export function ReportViewer({ report, onClose, onEdit }: Props) {
                                   currentView === 'compact' && "py-2 px-3 text-xs"
                                 )}
                               >
-                                {typeof row[field] === 'object' ? JSON.stringify(row[field]) : row[field] ?? ''}
+                                {report.formula_fields?.some(f => f.id === field)
+                                  ? (field === 'time_to_conversion' || field.includes('time') || field.includes('duration'))
+                                    ? formatTimeDifference(row[field])
+                                    : row[field]
+                                  : typeof row[field] === 'object'
+                                    ? JSON.stringify(row[field])
+                                    : row[field] ?? ''}
                               </td>
                             ))}
                           </tr>
@@ -746,3 +903,4 @@ export function ReportViewer({ report, onClose, onEdit }: Props) {
     </motion.div>
   );
 }
+
