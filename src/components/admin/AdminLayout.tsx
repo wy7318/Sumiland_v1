@@ -24,11 +24,12 @@ export function AdminLayout() {
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
   const { organizations } = useAuth();
 
-  const searchRef = useRef<HTMLDivElement>(null);
+  const searchButtonRef = useRef<HTMLDivElement>(null); // For positioning
   const moreMenuRef = useRef<HTMLDivElement>(null);
   const settingsMenuRef = useRef<HTMLDivElement>(null);
   const [screenWidth, setScreenWidth] = useState(window.innerWidth);
   const [scrolled, setScrolled] = useState(false);
+  const [searchPosition, setSearchPosition] = useState({ top: 0, left: 0 });
 
   useEffect(() => {
     const handleResize = () => setScreenWidth(window.innerWidth);
@@ -43,23 +44,35 @@ export function AdminLayout() {
 
   useEffect(() => {
     checkAuth();
+
     const handleClickOutside = (event: MouseEvent) => {
-      if (searchRef.current && !searchRef.current.contains(event.target as Node)) setShowSearch(false);
-      if (moreMenuRef.current && !moreMenuRef.current.contains(event.target as Node)) setShowMoreMenu(false);
-      if (settingsMenuRef.current && !settingsMenuRef.current.contains(event.target as Node)) setShowSettingsMenu(false);
+      if (
+        searchButtonRef.current &&
+        !searchButtonRef.current.contains(event.target as Node)
+      ) {
+        setShowSearch(false);
+      }
+
+      if (moreMenuRef.current && !moreMenuRef.current.contains(event.target as Node))
+        setShowMoreMenu(false);
+
+      if (settingsMenuRef.current && !settingsMenuRef.current.contains(event.target as Node))
+        setShowSettingsMenu(false);
     };
+
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const getVisibleMenuCount = () => {
-    if (screenWidth > 1400) return 12;
-    if (screenWidth > 1024) return 7;
-    if (screenWidth > 768) return 5;
-    return 3;
-  };
-
-  const visibleCount = getVisibleMenuCount();
+  useEffect(() => {
+    if (showSearch && searchButtonRef.current) {
+      const rect = searchButtonRef.current.getBoundingClientRect();
+      setSearchPosition({
+        top: rect.bottom + window.scrollY + 4,
+        left: rect.left + window.scrollX,
+      });
+    }
+  }, [showSearch]);
 
   const checkAuth = async () => {
     const userData = await getCurrentUser();
@@ -106,6 +119,14 @@ export function AdminLayout() {
     ] : [])
   ];
 
+  const getVisibleMenuCount = () => {
+    if (screenWidth > 1400) return 12;
+    if (screenWidth > 1024) return 7;
+    if (screenWidth > 768) return 5;
+    return 3;
+  };
+
+  const visibleCount = getVisibleMenuCount();
   const visibleMenuItems = menuItems.slice(0, visibleCount);
   const moreMenuItems = menuItems.slice(visibleCount);
   const filteredMenuItems = menuItems.filter(item => item.label.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -120,8 +141,6 @@ export function AdminLayout() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* NAVIGATION WRAPPER WITH SCROLL EFFECT */}
-      {/* NAVIGATION WRAPPER WITH SCROLL EFFECT */}
       <div className={cn(
         "fixed top-0 left-0 w-full z-50 transition-colors duration-300",
         scrolled ? "bg-white shadow border-b border-gray-200" : ""
@@ -135,10 +154,9 @@ export function AdminLayout() {
 
           {/* CENTER: Module Nav (Blue Box) */}
           <div className="relative flex-grow min-w-[250px] max-w-full">
-            {/* Blue Nav Box with horizontal scroll */}
             <div className="bg-blue-50 border border-blue-200 rounded-xl shadow px-2 py-2 flex items-center overflow-x-auto space-x-2 scrollbar-hide">
-              {/* Go/Search Button */}
-              <div ref={searchRef} className="relative flex-shrink-0">
+              {/* Go Button */}
+              <div ref={searchButtonRef} className="relative flex-shrink-0">
                 <button
                   onClick={() => setShowSearch(!showSearch)}
                   className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-full flex items-center whitespace-nowrap"
@@ -146,22 +164,9 @@ export function AdminLayout() {
                   <Search className="w-5 h-5 mr-1" />
                   <span className="text-sm font-medium">Go</span>
                 </button>
-                {/* Search Dropdown */}
-                <AnimatePresence>
-                  {showSearch && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      className="absolute z-50 w-64 mt-1 bg-white rounded-lg shadow-lg border border-gray-200"
-                    >
-                      {/* Add search input/results here */}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
               </div>
 
-              {/* Visible Menu Items */}
+              {/* Visible Module Buttons */}
               {visibleMenuItems.map((item) => (
                 <Link
                   key={item.path}
@@ -193,7 +198,7 @@ export function AdminLayout() {
               </div>
             </div>
 
-            {/* More Menu Dropdown (OUTSIDE Blue Box) */}
+            {/* More Menu */}
             {showMoreMenu && (
               <motion.div
                 ref={moreMenuRef}
@@ -220,7 +225,7 @@ export function AdminLayout() {
             )}
           </div>
 
-          {/* RIGHT: Notification + Settings */}
+          {/* RIGHT SIDE */}
           <div className="flex-shrink-0 flex items-center space-x-2">
             <NotificationPanel />
             <div ref={settingsMenuRef} className="relative">
@@ -244,26 +249,15 @@ export function AdminLayout() {
                     exit={{ opacity: 0, y: -10 }}
                     className="absolute right-0 mt-2 w-48 max-w-xs bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50"
                   >
-                    <Link
-                      to="/admin/settings"
-                      className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                      onClick={() => setShowSettingsMenu(false)}
-                    >
+                    <Link to="/admin/settings" className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                       <Settings className="w-4 h-4 mr-3" />
                       Settings
                     </Link>
-                    <Link
-                      to="/"
-                      className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                      onClick={() => setShowSettingsMenu(false)}
-                    >
+                    <Link to="/" className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                       <Home className="w-4 h-4 mr-3" />
                       Home
                     </Link>
-                    <button
-                      onClick={handleSignOut}
-                      className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                    >
+                    <button onClick={handleSignOut} className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                       <LogOut className="w-4 h-4 mr-3" />
                       Sign Out
                     </button>
@@ -275,8 +269,53 @@ export function AdminLayout() {
         </div>
       </div>
 
+      {/* Search Dropdown FLOATING OUTSIDE */}
+      <AnimatePresence>
+        {showSearch && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            style={{
+              position: 'absolute',
+              top: searchPosition.top,
+              left: searchPosition.left,
+              zIndex: 9999
+            }}
+            className="w-64 bg-white rounded-lg shadow-lg border border-gray-200 p-3 space-y-2"
+          >
+            <input
+              type="text"
+              placeholder="Search modules..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+              autoFocus
+            />
+            <div className="max-h-60 overflow-y-auto">
+              {filteredMenuItems.length ? (
+                filteredMenuItems.map(item => (
+                  <button
+                    key={item.path}
+                    onClick={() => {
+                      setSearchQuery('');
+                      setShowSearch(false);
+                      navigate(item.path);
+                    }}
+                    className="w-full text-left flex items-center px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded"
+                  >
+                    <item.icon className="w-4 h-4 mr-2 text-gray-400" />
+                    {item.label}
+                  </button>
+                ))
+              ) : (
+                <p className="text-sm text-gray-400 px-2">No matching modules</p>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* MAIN CONTENT */}
       <main className="pt-28 pb-8 px-6 w-full">
         <Outlet />
       </main>
