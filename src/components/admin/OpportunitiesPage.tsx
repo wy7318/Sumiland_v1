@@ -11,6 +11,7 @@ import { cn, formatCurrency } from '../../lib/utils';
 import { KanbanBoard, KanbanCard } from './KanbanBoard';
 import { useAuth } from '../../contexts/AuthContext';
 import { useOrganization } from '../../contexts/OrganizationContext';
+import { DateTime } from 'luxon';
 
 type Opportunity = {
   id: string;
@@ -130,11 +131,63 @@ export function OpportunitiesPage() {
   const [opportunityStages, setOpportunityStages] = useState<PicklistValue[]>([]);
   const [opportunityTypes, setOpportunityTypes] = useState<PicklistValue[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [orgTimezone, setOrgTimezone] = useState('UTC');
+
+  // Add this effect to fetch the organization timezone
+  useEffect(() => {
+    const fetchTimezone = async () => {
+      if (!selectedOrganization?.id) return;
+
+      const { data, error } = await supabase
+        .from('organizations')
+        .select('timezone')
+        .eq('id', selectedOrganization.id)
+        .single();
+
+      if (error) {
+        console.error('Failed to fetch org timezone:', error);
+        return;
+      }
+
+      if (data?.timezone) {
+        setOrgTimezone(data.timezone);
+        console.log('Opportunity page - Using timezone:', data.timezone);
+      }
+    };
+
+    fetchTimezone();
+  }, [selectedOrganization]);
 
   useEffect(() => {
     fetchPicklists();
     fetchOpportunities();
   }, []);
+
+  // Add this utility function for formatting dates
+  const formatDate = (dateStr, format = DateTime.DATE_MED) => {
+    if (!dateStr) return '';
+
+    try {
+      // Parse the date in the organization timezone
+      const dt = DateTime.fromISO(dateStr, { zone: orgTimezone });
+
+      if (!dt.isValid) {
+        console.error('Invalid date:', dateStr);
+        return 'Invalid date';
+      }
+
+      // Format as localized date string
+      return dt.toLocaleString(format);
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return 'Date error';
+    }
+  };
+
+  // Add this utility function for formatting date-times
+  const formatDateTime = (dateStr) => {
+    return formatDate(dateStr, DateTime.DATETIME_MED);
+  };
 
   const fetchPicklists = async () => {
     try {
@@ -564,7 +617,7 @@ export function OpportunitiesPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {opp.expected_close_date ? (
-                        new Date(opp.expected_close_date).toLocaleDateString()
+                        formatDate(opp.expected_close_date)
                       ) : (
                         <span className="text-gray-400">Not set</span>
                       )}

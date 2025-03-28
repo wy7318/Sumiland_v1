@@ -26,6 +26,7 @@ type Organization = {
   shipping_country: string | null;
   status: 'active' | 'inactive';
   type: string | null;
+  timezone: string | null;
 };
 
 export function OrganizationSettings() {
@@ -254,6 +255,7 @@ export function OrganizationSettings() {
     const updatePayload = {
       name: organization.name,
       website_url: organization.website_url,
+      timezone: organization.timezone || null,
       shipping_address_line1: organization.shipping_address_line1,
       shipping_address_line2: organization.shipping_address_line2,
       shipping_city: organization.shipping_city,
@@ -394,6 +396,25 @@ export function OrganizationSettings() {
             </div>
           </div>
         </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Timezone
+          </label>
+          <select
+            value={organization.timezone || ''}
+            onChange={(e) => setOrganization(prev => prev ? { ...prev, timezone: e.target.value } : null)}
+            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+          >
+            <option value="">Select Timezone</option>
+            {Intl.supportedValuesOf('timeZone').map((tz) => (
+              <option key={tz} value={tz}>
+                {tz}
+              </option>
+            ))}
+          </select>
+        </div>
+
 
         {/* Shipping Address */}
         <div className="bg-white rounded-lg shadow p-6">

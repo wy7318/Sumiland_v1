@@ -5,9 +5,9 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useOrganization } from '../../contexts/OrganizationContext';
 import { Link, useNavigate } from 'react-router-dom';
 import Calendar from 'react-calendar';
-import 'react-calendar/dist/Calendar.css'; // Base styles
-
-import '../../styles/CustomCalendar.css'; // Custom styles you'll define below
+import 'react-calendar/dist/Calendar.css';
+import '../../styles/CustomCalendar.css';
+import { DateTime } from 'luxon';
 
 export function TasksPage() {
     const { user } = useAuth();
@@ -18,10 +18,29 @@ export function TasksPage() {
     const [error, setError] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+    const [orgTimezone, setOrgTimezone] = useState('UTC');
     const [filters, setFilters] = useState({
-        isDone: null, // null means "all", true means "done", false means "not done"
-        isPersonal: null // null means "all", true means "personal", false means "not personal"
+        isDone: null,
+        isPersonal: null
     });
+
+    useEffect(() => {
+        const fetchTimezone = async () => {
+            if (!selectedOrganization?.id) return;
+            const { data, error } = await supabase
+                .from('organizations')
+                .select('timezone')
+                .eq('id', selectedOrganization.id)
+                .single();
+            if (error) {
+                console.error('Failed to fetch org timezone:', error);
+                return;
+            }
+            if (data?.timezone) setOrgTimezone(data.timezone);
+            console.log('data?.timezone : ' + data?.timezone);
+        };
+        fetchTimezone();
+    }, [selectedOrganization]);
 
     useEffect(() => {
         fetchTasks();
@@ -30,31 +49,19 @@ export function TasksPage() {
     const fetchTasks = async () => {
         try {
             setLoading(true);
-
             if (!user || !selectedOrganization?.id) return;
-
             const { data, error } = await supabase
                 .from('tasks')
                 .select('*')
                 .eq('organization_id', selectedOrganization.id)
                 .order('due_date', { ascending: true });
-
             if (error) throw error;
 
-            // Filter tasks based on is_personal visibility rules
             const filteredTasks = (data || []).filter(task => {
                 const isCreatedByUser = task.created_by === user.id;
                 const isAssignedToUser = task.assigned_to === user.id;
-
-                if (task.is_personal) {
-                    // Personal task: only visible to creator or assignee
-                    return isCreatedByUser || isAssignedToUser;
-                } else {
-                    // Not personal: visible to all users in org
-                    return true;
-                }
+                return task.is_personal ? (isCreatedByUser || isAssignedToUser) : true;
             });
-
             setTasks(filteredTasks);
         } catch (err) {
             console.error('Error fetching tasks:', err);
@@ -64,14 +71,11 @@ export function TasksPage() {
         }
     };
 
-
     const handleDelete = async (taskId) => {
         if (!window.confirm('Are you sure you want to delete this task?')) return;
-
         try {
             const { error } = await supabase.from('tasks').delete().eq('id', taskId);
             if (error) throw error;
-
             setTasks(prev => prev.filter(task => task.id !== taskId));
         } catch (err) {
             console.error('Error deleting task:', err);
@@ -80,35 +84,33 @@ export function TasksPage() {
     };
 
     const filteredTasks = tasks.filter(task => {
-        // Search query filter
         const matchesSearch = task.title.toLowerCase().includes(searchQuery.toLowerCase());
-
-        // Status filter
         const matchesStatus = filters.isDone === null || task.is_done === filters.isDone;
-
-        // Personal filter
         const matchesPersonal = filters.isPersonal === null || task.is_personal === filters.isPersonal;
-
-        // Visibility rules (keep your existing logic)
         const isCreatedByUser = task.created_by === user.id;
         const isAssignedToUser = task.assigned_to === user.id;
-        const matchesVisibility = task.is_personal
-            ? (isCreatedByUser || isAssignedToUser)
-            : true;
-
+        const matchesVisibility = task.is_personal ? (isCreatedByUser || isAssignedToUser) : true;
         return matchesSearch && matchesStatus && matchesPersonal && matchesVisibility;
     });
 
     const tasksOnSelectedDate = selectedDate
         ? tasks.filter(task => {
-            const taskDate = new Date(task.due_date);
+            const due = DateTime.fromISO(task.due_date, { zone: orgTimezone });
+            // console.log('due.year ; ' + due.year);
+            // console.log('due.month  ; ' + due.month);
+            console.log('selectedDate.getDate() ; ' + selectedDate.getDate());
             return (
-                taskDate.getFullYear() === selectedDate.getFullYear() &&
-                taskDate.getMonth() === selectedDate.getMonth() &&
-                taskDate.getDate() === selectedDate.getDate()
+                due.year === selectedDate.getFullYear() &&
+                due.month === selectedDate.getMonth() + 1 &&
+                due.day === selectedDate.getDate()
             );
         })
         : [];
+
+    const formatDueDate = (dateStr: string) => {
+        const dt = DateTime.fromISO(dateStr, { zone: orgTimezone });
+        return dt.toFormat('MMM dd, yyyy, h:mm a');
+    };
 
     if (loading) {
         return (
@@ -132,22 +134,14 @@ export function TasksPage() {
             </div>
 
             {error && (
-                <div className="bg-red-50 text-red-600 p-4 rounded-lg">
-                    {error}
-                </div>
+                <div className="bg-red-50 text-red-600 p-4 rounded-lg">{error}</div>
             )}
 
-            {/* Calendar + Task List Horizontal Layout */}
             <div className="flex flex-col lg:flex-row gap-6">
-                {/* Calendar Panel */}
-                {/* Calendar Panel */}
                 <div className="bg-white shadow rounded-lg p-4 lg:w-1/4">
                     <div className="flex justify-between items-center mb-4">
                         <h2 className="text-lg font-semibold">Calendar View</h2>
-                        <Link
-                            to="/admin/tasks/calendar"
-                            className="text-blue-600 text-sm hover:underline"
-                        >
+                        <Link to="/admin/tasks/calendar" className="text-blue-600 text-sm hover:underline">
                             Full Calendar View
                         </Link>
                     </div>
@@ -157,11 +151,11 @@ export function TasksPage() {
                         value={selectedDate}
                         tileContent={({ date }) => {
                             const hasTask = tasks.some(task => {
-                                const taskDate = new Date(task.due_date);
+                                const due = DateTime.fromISO(task.due_date, { zone: orgTimezone });
                                 return (
-                                    taskDate.getFullYear() === date.getFullYear() &&
-                                    taskDate.getMonth() === date.getMonth() &&
-                                    taskDate.getDate() === date.getDate()
+                                    due.year === date.getFullYear() &&
+                                    due.month === date.getMonth() + 1 &&
+                                    due.day === date.getDate()
                                 );
                             });
                             return hasTask ? <div className="task-dot mt-1" /> : null;
@@ -193,8 +187,6 @@ export function TasksPage() {
                     )}
                 </div>
 
-
-                {/* Task List Panel */}
                 <div className="bg-white shadow rounded-lg lg:w-3/4">
                     <div className="p-4 border-b border-gray-200">
                         <div className="relative mb-4">
@@ -204,7 +196,7 @@ export function TasksPage() {
                                 placeholder="Search tasks..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                                className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300"
                             />
                         </div>
 
@@ -271,7 +263,7 @@ export function TasksPage() {
                                         )}
                                         {task.title}
                                     </h4>
-                                    <div className="text-sm text-gray-500">Due: {new Date(task.due_date).toLocaleDateString()}</div>
+                                    <div className="text-sm text-gray-500">Due: {formatDueDate(task.due_date)}</div>
                                     {task.assigned_to && (
                                         <div className="text-sm text-gray-500 flex items-center">
                                             <UserCheck className="w-4 h-4 mr-1" />Assigned
@@ -279,16 +271,10 @@ export function TasksPage() {
                                     )}
                                 </div>
                                 <div className="flex gap-2">
-                                    <Link
-                                        to={`/admin/tasks/${task.id}/edit`}
-                                        className="text-blue-600 hover:text-blue-900"
-                                    >
+                                    <Link to={`/admin/tasks/${task.id}/edit`} className="text-blue-600 hover:text-blue-900">
                                         <Edit className="w-5 h-5" />
                                     </Link>
-                                    <button
-                                        onClick={() => handleDelete(task.id)}
-                                        className="text-red-600 hover:text-red-900"
-                                    >
+                                    <button onClick={() => handleDelete(task.id)} className="text-red-600 hover:text-red-900">
                                         <Trash2 className="w-5 h-5" />
                                     </button>
                                 </div>
