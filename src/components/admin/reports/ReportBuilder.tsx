@@ -1,10 +1,10 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus, Search, Filter, ChevronDown, ChevronUp, Edit, Trash2,
   Settings, AlertCircle, Database, Save, X, Check, List, Palette,
   BarChart2, LineChart, PieChart, HelpCircle, Eye, ChevronRight,
-  Columns, RefreshCw, ChevronsRight, Sliders, FileText
+  Columns, RefreshCw, ChevronsRight, Sliders, FileText, ArrowRight
 } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { cn } from '../../../lib/utils';
@@ -14,6 +14,27 @@ import {
   BarChart, Bar, LineChart as RechartsLineChart, Line, PieChart as RechartsPieChart, Pie,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell, ResponsiveContainer
 } from 'recharts';
+import {
+  FormulaField,
+  evaluateFormula,
+  processChartData,
+  formatTimeDifference
+} from './formulaUtils';
+import {
+  FormulaBuilderWithFieldSelector
+} from './FormulaBuilderWithFieldSelector'; 
+import { fetchSampleData, fetchObjectFields as fetchObjectFieldsFromSupabase } from './sampleDataService';
+
+
+// 1. First, extend your Report type to include formula fields
+// type FormulaField = {
+//   id: string;
+//   name: string;
+//   formula: string;
+//   description?: string;
+//   result_type: 'number' | 'string' | 'date' | 'boolean';
+//   format?: string;
+// };
 
 type ObjectField = {
   column_name: string;
@@ -39,6 +60,7 @@ type Report = {
   filters: any[];
   grouping: string[];
   sorting: { field: string; direction: 'asc' | 'desc' }[];
+  formula_fields?: FormulaField[];
   date_range?: {
     field: string;
     start: string | null;
@@ -50,7 +72,7 @@ type Report = {
     x_field: string;
     y_field: string;
     group_by?: string;
-    aggregation?: 'count' | 'sum' | 'avg';
+    aggregation?: 'count' | 'sum' | 'avg' | 'direct'; // Add 'direct' option
   }[];
   is_favorite: boolean;
   is_shared: boolean;
@@ -59,6 +81,8 @@ type Report = {
   created_by: string;
   organization_id: string;
 };
+
+const dataFetcher = fetchSampleData;
 
 // Map of object types to their related tables
 const OBJECT_RELATIONS = {
@@ -172,6 +196,8 @@ export function ReportBuilder({ onClose, onSave, editingReport }: Props) {
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [expandedPreview, setExpandedPreview] = useState(false);
   const previewTimeoutRef = useRef<any>(null);
+  const [availableFields, setAvailableFields] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   const [formData, setFormData] = useState<Partial<Report>>(
     editingReport || {
@@ -246,6 +272,8 @@ export function ReportBuilder({ onClose, onSave, editingReport }: Props) {
 
   const fetchObjectFields = async (objectType: string) => {
     try {
+      setIsLoading(true);
+
       // Get predefined fields for special objects
       const relation = OBJECT_RELATIONS[objectType as keyof typeof OBJECT_RELATIONS];
       if (relation) {
@@ -258,10 +286,15 @@ export function ReportBuilder({ onClose, onSave, editingReport }: Props) {
           is_selected: editingReport?.selected_fields?.includes(f.name) || false
         }));
         setFields(fields);
+        setAvailableFields(fields); // Set available fields for FormulaBuilder
+        setIsLoading(false);
         return;
       }
 
-      // Get custom fields
+      // Get standard fields using the new service
+      const fetchedFields = await fetchObjectFieldsFromSupabase(objectType);
+
+      // Get custom fields (keep your existing code)
       const { data: customFields, error: customError } = await supabase
         .from('custom_fields')
         .select('field_name, field_type, field_label, is_required')
@@ -272,20 +305,10 @@ export function ReportBuilder({ onClose, onSave, editingReport }: Props) {
 
       if (customError) throw customError;
 
-      // Get standard fields
-      const tableName = OBJECT_TYPES.find(t => t.value === objectType)?.table || `${objectType}s`;
-      const { data: standardFields, error: standardError } = await supabase
-        .rpc('get_object_fields', { object_name: tableName });
-
-      if (standardError) throw standardError;
-
       // Combine and transform fields
       const allFields = [
-        ...standardFields.map((field: any) => ({
+        ...fetchedFields.map((field: any) => ({
           ...field,
-          display_name: field.column_name.split('_').map((w: string) =>
-            w.charAt(0).toUpperCase() + w.slice(1)
-          ).join(' '),
           is_selected: editingReport?.selected_fields?.includes(field.column_name) || false
         })),
         ...(customFields || []).map(field => ({
@@ -299,9 +322,12 @@ export function ReportBuilder({ onClose, onSave, editingReport }: Props) {
       ];
 
       setFields(allFields);
+      setAvailableFields(allFields); // Set available fields for FormulaBuilder
     } catch (err) {
       console.error('Error fetching fields:', err);
       setError('Failed to load fields');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -375,10 +401,34 @@ export function ReportBuilder({ onClose, onSave, editingReport }: Props) {
       // If there are custom fields, fetch their values
       let finalData = standardData || [];
 
-      // Process chart data
+      // Calculate formula fields for each record
+      if (formData.formula_fields && formData.formula_fields.length > 0) {
+        finalData = finalData.map(record => {
+          const recordWithFormulas = { ...record };
+
+          formData.formula_fields?.forEach(formula => {
+            // Use the evaluateFormula function to calculate the value
+            recordWithFormulas[formula.id] = evaluateFormula(
+              formula.formula,
+              record,
+              formData.formula_fields
+            );
+
+            // Format the value for display if needed
+            if (formula.result_type === 'number') {
+              // You could add additional formatting here based on formula.format
+              recordWithFormulas[formula.id] = parseFloat(recordWithFormulas[formula.id]).toFixed(2);
+            }
+          });
+
+          return recordWithFormulas;
+        });
+      }
+
+      // Process chart data with formula fields
       let processedChartData: any[] = [];
       if (formData.charts?.length && finalData.length > 0) {
-        processedChartData = processChartData(finalData);
+        processedChartData = processChartData(finalData, formData.charts, formData.formula_fields);
       }
 
       setPreviewData(finalData);
@@ -520,15 +570,28 @@ export function ReportBuilder({ onClose, onSave, editingReport }: Props) {
     }));
   };
 
-  const getFieldOptions = (fieldType?: 'date' | 'number' | 'all') => {
+  // Helper function to get appropriate field options (with filter based on field type)
+  const getFieldOptions = (fieldType?: 'date' | 'number' | 'text' | 'all') => {
     return fields.filter(field => {
-      if (!fieldType) return true;
+      if (!fieldType || fieldType === 'all') return true;
+
       if (fieldType === 'date') {
         return field.data_type.includes('timestamp') || field.data_type.includes('date');
       }
+
       if (fieldType === 'number') {
-        return field.data_type.includes('int') || field.data_type.includes('decimal') || field.data_type.includes('numeric');
+        return field.data_type.includes('int') ||
+          field.data_type.includes('decimal') ||
+          field.data_type.includes('numeric') ||
+          field.data_type.includes('float');
       }
+
+      if (fieldType === 'text') {
+        return field.data_type.includes('varchar') ||
+          field.data_type.includes('text') ||
+          field.data_type.includes('char');
+      }
+
       return true;
     });
   };
@@ -536,6 +599,7 @@ export function ReportBuilder({ onClose, onSave, editingReport }: Props) {
   const steps: { key: StepType; label: string; icon: React.ReactNode }[] = [
     { key: 'object', label: 'Select Object', icon: <Database className="w-5 h-5" /> },
     { key: 'fields', label: 'Choose Fields', icon: <Columns className="w-5 h-5" /> },
+    { key: 'formulas', label: 'Formula Fields', icon: <FileText className="w-5 h-5" /> }, // New step
     { key: 'filters', label: 'Set Filters', icon: <Filter className="w-5 h-5" /> },
     { key: 'charts', label: 'Add Charts', icon: <BarChart2 className="w-5 h-5" /> },
     { key: 'preview', label: 'Preview Report', icon: <Eye className="w-5 h-5" /> }
@@ -805,6 +869,87 @@ export function ReportBuilder({ onClose, onSave, editingReport }: Props) {
                 </div>
               )}
 
+              {currentStep === 'formulas' && (
+                <div>
+                  <h3 className="text-lg font-medium mb-4">Create Formula Fields</h3>
+                  <p className="text-gray-600 mb-4">
+                    Define calculations based on your data fields. These formulas will be calculated at runtime.
+                  </p>
+
+                  <FormulaBuilderWithFieldSelector
+                    formData={formData}
+                    setFormData={setFormData}
+                    fields={fields} // Pass the actual fields, not availableFields 
+                    objectName={formData.object_type} // Pass the object type, not object_name
+                    fetchSampleData={dataFetcher}
+                  />
+
+                  {/* Example formulas section */}
+                  <div className="mt-8 border-t border-gray-200 pt-6">
+                    <h4 className="font-medium mb-3">Common Formula Examples</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="bg-blue-50 p-4 rounded-lg">
+                        <h5 className="font-medium text-blue-800 mb-2">Time to Conversion</h5>
+                        <div className="text-sm text-gray-700 mb-2">
+                          <code>ConvertedDateTime - CreatedDateTime</code>
+                        </div>
+                        <p className="text-xs text-gray-600">
+                          Calculates the time difference in seconds between when a lead was created and when it was converted.
+                        </p>
+                        <button
+                          className="mt-2 text-blue-600 text-xs font-medium"
+                          onClick={() => {
+                            // Pre-fill the formula
+                            const newFormula = {
+                              id: `formula_${Date.now()}`,
+                              name: 'Time to Conversion',
+                              formula: 'ConvertedDateTime - CreatedDateTime',
+                              result_type: 'number',
+                              description: 'Time in seconds between creation and conversion'
+                            };
+                            setFormData(prev => ({
+                              ...prev,
+                              formula_fields: [...(prev.formula_fields || []), newFormula]
+                            }));
+                          }}
+                        >
+                          Add This Formula
+                        </button>
+                      </div>
+
+                      <div className="bg-green-50 p-4 rounded-lg">
+                        <h5 className="font-medium text-green-800 mb-2">Conversion Rate %</h5>
+                        <div className="text-sm text-gray-700 mb-2">
+                          <code>(ConvertedLeads / TotalLeads) * 100</code>
+                        </div>
+                        <p className="text-xs text-gray-600">
+                          Calculates the percentage of leads that were successfully converted.
+                        </p>
+                        <button
+                          className="mt-2 text-green-600 text-xs font-medium"
+                          onClick={() => {
+                            // Pre-fill the formula
+                            const newFormula = {
+                              id: `formula_${Date.now()}`,
+                              name: 'Conversion Rate',
+                              formula: '(ConvertedLeads / TotalLeads) * 100',
+                              result_type: 'number',
+                              description: 'Percentage of leads that converted'
+                            };
+                            setFormData(prev => ({
+                              ...prev,
+                              formula_fields: [...(prev.formula_fields || []), newFormula]
+                            }));
+                          }}
+                        >
+                          Add This Formula
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {currentStep === 'filters' && (
                 <div>
                   <h3 className="text-lg font-medium mb-4">Filter Criteria</h3>
@@ -1006,34 +1151,7 @@ export function ReportBuilder({ onClose, onSave, editingReport }: Props) {
                     </div>
                   </div>
 
-                  <AnimatePresence>
-                    {showChartHelp && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="mb-6 bg-blue-50 p-4 rounded-lg"
-                      >
-                        <h4 className="font-medium text-blue-900 mb-2">Chart Creation Guide</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          {Object.entries(CHART_HELP).map(([type, help]) => (
-                            <div key={type} className="bg-white p-4 rounded-md shadow-sm">
-                              <h5 className="font-medium text-gray-900 mb-2">{help.title}</h5>
-                              <p className="text-gray-600 mb-2">{help.description}</p>
-                              <div className="text-sm text-gray-500">
-                                <strong>Examples:</strong>
-                                <ul className="list-disc list-inside ml-2">
-                                  {help.examples.map((example, i) => (
-                                    <li key={i}>{example}</li>
-                                  ))}
-                                </ul>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                  {/* Chart Help section remains the same */}
 
                   <div className="space-y-4">
                     {(formData.charts || []).map((chart, index) => (
@@ -1088,11 +1206,29 @@ export function ReportBuilder({ onClose, onSave, editingReport }: Props) {
                               className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none text-sm"
                             >
                               <option value="">Select Field</option>
-                              {getFieldOptions().map(field => (
-                                <option key={field.column_name} value={field.column_name}>
-                                  {field.display_name}
-                                </option>
-                              ))}
+                              {/* Standard fields - best for X-axis are categorical fields */}
+                              <optgroup label="Standard Fields">
+                                {getFieldOptions().filter(f =>
+                                  !f.data_type.includes('int') &&
+                                  !f.data_type.includes('decimal') &&
+                                  !f.data_type.includes('numeric')
+                                ).map(field => (
+                                  <option key={field.column_name} value={field.column_name}>
+                                    {field.display_name || field.column_name}
+                                  </option>
+                                ))}
+                              </optgroup>
+
+                              {/* Formula fields - some may be appropriate for X-axis */}
+                              {formData.formula_fields && formData.formula_fields.length > 0 && (
+                                <optgroup label="Formula Fields">
+                                  {formData.formula_fields.map(formula => (
+                                    <option key={formula.id} value={formula.id}>
+                                      {formula.name}
+                                    </option>
+                                  ))}
+                                </optgroup>
+                              )}
                             </select>
                           </div>
 
@@ -1122,12 +1258,65 @@ export function ReportBuilder({ onClose, onSave, editingReport }: Props) {
                                 className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none text-sm"
                               >
                                 <option value="">Select Field</option>
-                                {getFieldOptions('number').map(field => (
-                                  <option key={field.column_name} value={field.column_name}>
-                                    {field.display_name}
-                                  </option>
-                                ))}
+
+                                {/* Standard numeric fields - appropriate for Y-axis */}
+                                <optgroup label="Standard Fields">
+                                  {getFieldOptions('number').map(field => (
+                                    <option key={field.column_name} value={field.column_name}>
+                                      {field.display_name || field.column_name}
+                                    </option>
+                                  ))}
+                                </optgroup>
+
+                                {/* Formula fields - most appropriate for Y-axis, especially time/duration fields */}
+                                {formData.formula_fields && formData.formula_fields.length > 0 && (
+                                  <optgroup label="Formula Fields">
+                                    {formData.formula_fields.map(formula => (
+                                      <option key={formula.id} value={formula.id}>
+                                        {formula.name}{formula.result_type === 'duration' ? ' (Duration)' :
+                                          formula.result_type === 'number' ? ' (Number)' : ''}
+                                      </option>
+                                    ))}
+                                  </optgroup>
+                                )}
                               </select>
+
+                              {/* Helper text to guide users to select appropriate fields */}
+                              {chart.y_field && formData.formula_fields?.some(f => f.id === chart.y_field) && (
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Y-Axis Display
+                                  </label>
+                                  <select
+                                    value={chart.aggregation || 'count'}
+                                    onChange={e => updateChart(index, { aggregation: e.target.value as 'count' | 'sum' | 'avg' | 'direct' })}
+                                    className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none text-sm"
+                                  >
+                                    {chart.y_field && formData.formula_fields?.some(f => f.id === chart.y_field) ? (
+                                      // If a formula field is selected for Y-axis, show direct value option first
+                                      <>
+                                        <option value="direct">Direct Value (No Aggregation)</option>
+                                        <option value="avg">Average</option>
+                                        <option value="sum">Sum</option>
+                                        <option value="count">Count</option>
+                                      </>
+                                    ) : (
+                                      // Otherwise show standard options
+                                      <>
+                                        <option value="count">Count Records</option>
+                                        <option value="sum">Sum Field</option>
+                                        <option value="avg">Average Field</option>
+                                      </>
+                                    )}
+                                  </select>
+
+                                  {chart.aggregation === 'direct' && (
+                                    <div className="mt-1 text-xs text-blue-600">
+                                      <i>Using raw formula values without aggregation</i>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           )}
 
@@ -1143,14 +1332,76 @@ export function ReportBuilder({ onClose, onSave, editingReport }: Props) {
                               <option value="">None</option>
                               {getFieldOptions().map(field => (
                                 <option key={field.column_name} value={field.column_name}>
-                                  {field.display_name}
+                                  {field.display_name || field.column_name}
                                 </option>
                               ))}
                             </select>
                           </div>
                         </div>
+
+                        {/* Suggested configurations based on selected fields */}
+                        {chart.y_field && formData.formula_fields?.some(f => f.id === chart.y_field &&
+                          (f.name.toLowerCase().includes('time') || f.result_type === 'duration')) && (
+                            <div className="mt-4 bg-blue-50 p-3 rounded-lg text-sm">
+                              <p className="text-blue-800 font-medium">Suggested Configuration:</p>
+                              <ul className="list-disc list-inside mt-1 text-blue-700">
+                                <li>For time-based metrics, Line and Bar charts work best</li>
+                                <li>Consider using 'Average' aggregation for time duration fields</li>
+                                <li>Time values will be automatically formatted in hours/days</li>
+                              </ul>
+                            </div>
+                          )}
                       </div>
                     ))}
+
+                    {/* Suggestions based on available formula fields */}
+                    {formData.formula_fields && formData.formula_fields.length > 0 && formData.charts?.length === 0 && (
+                      <div className="bg-blue-50 p-4 rounded-lg mb-6">
+                        <h4 className="font-medium text-blue-900 mb-2">Suggested Charts</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {formData.formula_fields.filter(f =>
+                            f.name.toLowerCase().includes('time') ||
+                            f.name.toLowerCase().includes('duration') ||
+                            f.result_type === 'duration'
+                          ).length > 0 && (
+                              <div className="bg-white p-3 rounded-md shadow-sm">
+                                <h5 className="font-medium text-gray-900 mb-1">Time to Conversion by Stage</h5>
+                                <p className="text-xs text-gray-600 mb-2">
+                                  Bar chart showing average conversion time across different stages
+                                </p>
+                                <button
+                                  className="text-blue-600 text-xs font-medium"
+                                  onClick={() => {
+                                    // Find first time-related formula field
+                                    const timeFormula = formData.formula_fields?.find(f =>
+                                      f.name.toLowerCase().includes('time') ||
+                                      f.result_type === 'duration'
+                                    );
+
+                                    if (timeFormula) {
+                                      // Add pre-configured chart
+                                      setFormData(prev => ({
+                                        ...prev,
+                                        charts: [...(prev.charts || []), {
+                                          type: 'bar',
+                                          title: `Average ${timeFormula.name} by Stage`,
+                                          x_field: 'stage', // Assuming 'stage' field exists
+                                          y_field: timeFormula.id,
+                                          aggregation: 'avg'
+                                        }]
+                                      }));
+                                    }
+                                  }}
+                                >
+                                  Add This Chart
+                                </button>
+                              </div>
+                            )}
+
+                          {/* Other suggested charts based on formula fields */}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -1284,10 +1535,15 @@ export function ReportBuilder({ onClose, onSave, editingReport }: Props) {
                                         key={j}
                                         className="px-6 py-4 whitespace-nowrap text-sm text-gray-900"
                                       >
-                                        {typeof row[field.column_name] === 'object'
-                                          ? JSON.stringify(row[field.column_name])
-                                          : row[field.column_name] ?? ''}
+                                        {formData.formula_fields?.some(f => f.id === field.column_name)
+                                          ? (field.column_name === 'time_to_conversion' || field.column_name.includes('time') || field.column_name.includes('duration'))
+                                            ? formatTimeDifference(row[field.column_name])
+                                            : row[field.column_name]
+                                          : typeof row[field.column_name] === 'object'
+                                            ? JSON.stringify(row[field.column_name])
+                                            : row[field.column_name] ?? ''}
                                       </td>
+
                                     ))}
                                   </tr>
                                 ))
@@ -1360,3 +1616,7 @@ export function ReportBuilder({ onClose, onSave, editingReport }: Props) {
     </motion.div>
   );
 }
+
+
+
+// Import the utility functions from formulaUtils
