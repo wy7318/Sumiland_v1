@@ -23,11 +23,11 @@ type Props<T extends BaseItem> = {
   renderCard: (item: T) => React.ReactNode;
 };
 
-export function KanbanBoard<T extends BaseItem>({ 
-  items, 
-  statuses, 
+export function KanbanBoard<T extends BaseItem>({
+  items,
+  statuses,
   onStatusChange,
-  renderCard 
+  renderCard
 }: Props<T>) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const activeItem = items.find(item => item.id === activeId);
@@ -52,7 +52,7 @@ export function KanbanBoard<T extends BaseItem>({
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
-    
+
     if (!over) {
       setActiveId(null);
       return;
@@ -78,7 +78,7 @@ export function KanbanBoard<T extends BaseItem>({
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 p-6">
+      <div className="flex flex-nowrap gap-6 overflow-x-auto p-6">
         {statuses.map(status => (
           <KanbanColumn
             key={status.value}
