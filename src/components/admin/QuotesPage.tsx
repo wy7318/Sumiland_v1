@@ -327,6 +327,12 @@ export function QuotesPage() {
     statusFilter === 'all' || quote.status === statusFilter
   );
 
+  // 2. Add a wrapper function for the kanban board status change
+  const handleKanbanStatusChange = async (itemId: string, newStatus: string) => {
+    // itemId is the quote_id in this case
+    await handleStatusChange(itemId, newStatus);
+  };
+
   const sortedQuotes = [...filteredQuotes].sort((a, b) => {
     const aValue = a[sortConfig.key];
     const bValue = b[sortConfig.key];
@@ -337,7 +343,7 @@ export function QuotesPage() {
 
   const kanbanQuotes: KanbanQuote[] = sortedQuotes.map(quote => ({
     ...quote,
-    id: `${quote.status}-${quote.quote_id}`
+    id: quote.quote_id // Use quote_id directly as the id instead of a composite id
   }));
 
   const totalPages = Math.ceil(filteredQuotes.length / itemsPerPage);

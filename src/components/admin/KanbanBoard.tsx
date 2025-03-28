@@ -1,4 +1,18 @@
-import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, MouseSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core';
+import {
+  DndContext,
+  DragEndEvent,
+  DragOverlay,
+  DragStartEvent,
+  MouseSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  // Import better collision detection
+  rectIntersection,
+  closestCenter,
+  pointerWithin,
+  getFirstCollision
+} from '@dnd-kit/core';
 import { useState } from 'react';
 import { KanbanColumn } from './KanbanColumn';
 import { KanbanCard } from './KanbanCard';
@@ -46,6 +60,27 @@ export function KanbanBoard<T extends BaseItem>({
     })
   );
 
+  // Custom collision detection that prioritizes columns
+  const collisionDetection = (args) => {
+    // First, check for collisions with columns
+    const columnCollisions = pointerWithin(args);
+
+    if (columnCollisions.length > 0) {
+      // Filter to only column droppables (status values)
+      const columnIds = statuses.map(s => s.value);
+      const columnTargets = columnCollisions.filter(
+        collision => columnIds.includes(String(collision.id))
+      );
+
+      if (columnTargets.length > 0) {
+        return columnTargets;
+      }
+    }
+
+    // Fall back to closest center
+    return closestCenter(args);
+  };
+
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as string);
   };
@@ -77,6 +112,7 @@ export function KanbanBoard<T extends BaseItem>({
       sensors={sensors}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
+      collisionDetection={collisionDetection}
     >
       <div className="flex flex-nowrap gap-6 overflow-x-auto p-6">
         {statuses.map(status => (

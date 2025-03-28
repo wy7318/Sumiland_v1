@@ -20,7 +20,11 @@ type Props<T extends BaseItem> = {
   renderCard: (item: T) => React.ReactNode;
 };
 
-export function KanbanColumn<T extends BaseItem>({ status, items, renderCard }: Props<T>) {
+export function KanbanColumn<T extends BaseItem>({
+  status,
+  items,
+  renderCard
+}: Props<T>) {
   const { setNodeRef, isOver } = useDroppable({
     id: status.value,
   });
@@ -28,18 +32,19 @@ export function KanbanColumn<T extends BaseItem>({ status, items, renderCard }: 
   return (
     <div
       ref={setNodeRef}
-      className="bg-gray-50 rounded-lg p-4 flex flex-col h-[calc(100vh-16rem)] min-w-[300px] relative"
+      className="bg-gray-50 rounded-lg p-4 flex flex-col h-[calc(100vh-16rem)] w-[280px] flex-shrink-0"
       style={{
+        boxShadow: isOver ? 'inset 0 0 0 2px rgba(99, 102, 241, 0.8)' : undefined,
         background: isOver ? '#F3F4F6' : undefined,
-        transition: 'background-color 0.2s ease'
+        transition: 'all 0.2s ease',
       }}
     >
       {/* Header */}
-      <div 
+      <div
         className="flex items-center justify-between mb-4 pb-2 border-b"
         style={{ borderColor: status.color || '#E5E7EB' }}
       >
-        <h3 
+        <h3
           className="font-medium"
           style={{ color: status.color || '#374151' }}
         >
@@ -51,29 +56,20 @@ export function KanbanColumn<T extends BaseItem>({ status, items, renderCard }: 
       </div>
 
       {/* Scrollable Content Area */}
-      <div className="flex-1 overflow-y-auto">
-        <SortableContext 
+      <div className="flex-1 overflow-y-auto pr-1">
+        <SortableContext
           items={items.map(item => item.id)}
           strategy={verticalListSortingStrategy}
         >
-          <div className="space-y-4 min-h-full">
+          <div className="space-y-4 min-h-[120px] pb-4">
             {items.map((item) => (
-              <div key={`${status.value}-${item.id}`} className="relative">
+              <div key={`${status.value}-${item.id}`}>
                 {renderCard(item)}
               </div>
             ))}
           </div>
         </SortableContext>
       </div>
-
-      {/* Droppable Overlay - Covers entire column */}
-      <div 
-        className="absolute inset-0 rounded-lg pointer-events-none"
-        style={{
-          backgroundColor: isOver ? 'rgba(99, 102, 241, 0.1)' : undefined,
-          transition: 'background-color 0.2s ease'
-        }}
-      />
     </div>
   );
 }
