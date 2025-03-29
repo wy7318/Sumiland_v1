@@ -1,207 +1,215 @@
-import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  BarChart2, Users, LineChart, Zap, 
-  ArrowRight, X, Check, Database, 
-  MessageSquare, Gauge
-} from 'lucide-react';
-import { cn } from '../lib/utils';
+import { useRef } from 'react';
+import { motion, useInView } from 'framer-motion';
+import { ChevronRight, BarChart3, Users, PieChart, Mail, Shield, Database, Smartphone, Code, Workflow } from 'lucide-react';
 
-const services = [
-  {
-    id: 'analytics',
-    icon: <BarChart2 className="w-8 h-8" />,
-    title: 'Advanced Analytics',
-    shortDesc: 'Data-driven insights for growth',
-    description: 'Turn your customer data into actionable insights with our powerful analytics tools.',
-    benefits: [
-      'Real-time data visualization',
-      'Custom report generation',
-      'Predictive analytics',
-      'Performance tracking'
-    ],
-    features: ['Dashboards', 'Reports', 'Forecasting']
-  },
-  {
-    id: 'customer-management',
-    icon: <Users className="w-8 h-8" />,
-    title: 'Customer Management',
-    shortDesc: 'Centralized customer information',
-    description: 'Keep all your customer information organized and accessible in one place.',
-    benefits: [
-      'Contact management',
-      'Interaction history',
-      'Customer segmentation',
-      'Communication tracking'
-    ],
-    features: ['Profiles', 'History', 'Notes']
-  },
-  {
-    id: 'automation',
-    icon: <Zap className="w-8 h-8" />,
-    title: 'Sales Automation',
-    shortDesc: 'Streamline your sales process',
-    description: 'Automate repetitive tasks and focus on what matters - closing deals.',
-    benefits: [
-      'Workflow automation',
-      'Lead scoring',
-      'Email sequences',
-      'Task management'
-    ],
-    features: ['Workflows', 'Triggers', 'Actions']
-  },
-  {
-    id: 'reporting',
-    icon: <LineChart className="w-8 h-8" />,
-    title: 'Performance Reporting',
-    shortDesc: 'Comprehensive business insights',
-    description: 'Get detailed reports and insights about your business performance.',
-    benefits: [
-      'Custom report builder',
-      'KPI tracking',
-      'Goal monitoring',
-      'Export capabilities'
-    ],
-    features: ['Reports', 'Analytics', 'Exports']
-  }
-];
+export function ServicesSection() {
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true, amount: 0.2 });
 
-type ServiceCardProps = {
-  service: typeof services[0];
-  isExpanded: boolean;
-  onClick: (id?: string) => void;
-  onClose: () => void;
-};
+  const services = [
+    {
+      title: "Customer Relationship Management",
+      description: "Our core CRM platform unifies all your customer data into one powerful, easy-to-use solution.",
+      image: "/api/placeholder/600/400",
+      features: [
+        "360° customer view across departments",
+        "Intuitive interface with minimal learning curve",
+        "Customizable without coding",
+        "Automation of repetitive tasks",
+        "Real-time collaboration tools"
+      ],
+      benefits: "Get your entire team up and running in hours, not weeks. Our simplified workflow reduces onboarding costs by 60% compared to enterprise CRM systems, while increasing adoption rates across all team members."
+    },
+    {
+      title: "Advanced Analytics & Insights",
+      description: "Transform your customer data into actionable business intelligence with our comprehensive analytics tools.",
+      image: "/api/placeholder/600/400",
+      features: [
+        "Predictive analytics with 42% better accuracy",
+        "Custom reporting and dashboard builder",
+        "Sales forecasting and trend identification",
+        "Marketing campaign performance metrics",
+        "Customer behavior analysis"
+      ],
+      benefits: "Make confident decisions based on data-driven insights. Our customers report 37% faster identification of market opportunities and 31% improvement in customer retention by surfacing trends that would otherwise remain hidden."
+    },
+    {
+      title: "AI-Powered Automation",
+      description: "Leverage cutting-edge artificial intelligence to streamline operations and enhance customer interactions.",
+      image: "/api/placeholder/600/400",
+      features: [
+        "Visual workflow builder for process automation",
+        "Intelligent lead scoring and prioritization",
+        "Automated insight generation",
+        "AI-assisted communication tools",
+        "Time-saving task automation"
+      ],
+      benefits: "Free your team from mundane administrative work to focus on high-value customer interactions. Teams using our automation tools report handling 40% more customer inquiries without adding staff and reducing response times by 72%."
+    },
+    {
+      title: "Mobile & Remote Workspace",
+      description: "Keep your team productive anywhere with our fully-featured mobile solutions.",
+      image: "/api/placeholder/600/400",
+      features: [
+        "Complete functionality on iOS and Android",
+        "Real-time data synchronization",
+        "Offline access to critical information",
+        "Location-based tools for field sales",
+        "Mobile document management"
+      ],
+      benefits: "Access your CRM from anywhere, ensuring your team stays productive whether in the office, working remotely, or meeting clients in the field. Field sales teams report 35% higher data entry compliance and 28% faster deal progression with our mobile tools."
+    }
+  ];
 
-function ServiceCard({ service, isExpanded, onClick, onClose }: ServiceCardProps) {
   return (
-    <motion.div
-      layout
-      className={cn(
-        "relative bg-white rounded-2xl shadow-lg overflow-hidden transition-all duration-500",
-        isExpanded ? "col-span-full row-span-2" : "hover:shadow-xl cursor-pointer"
-      )}
-      onClick={() => !isExpanded && onClick()}
-      initial={false}
-      animate={{
-        height: isExpanded ? 'auto' : '100%',
-        transition: { duration: 0.5, ease: 'easeInOut' }
-      }}
-    >
-      <AnimatePresence mode="wait">
-        {!isExpanded ? (
-          <motion.div
+    <section id="services" ref={ref} className="py-24 relative overflow-hidden">
+      {/* Background Gradient */}
+      <div className="absolute inset-0 bg-gradient-to-r from-gray-900 via-primary-900/30 to-gray-900"></div>
+
+      {/* Animated Dots Pattern */}
+      <div className="absolute inset-0 opacity-20">
+        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary-500 to-transparent"></div>
+        <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary-500 to-transparent"></div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+        <div className="text-center mb-16">
+          <motion.span
             initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="p-8 h-full flex flex-col"
+            animate={isInView ? { opacity: 1 } : {}}
+            transition={{ duration: 0.6 }}
+            className="inline-block px-3 py-1 text-sm font-medium bg-primary-900/50 rounded-full text-primary-400 mb-4"
           >
-            <div className="text-primary-500 mb-4">{service.icon}</div>
-            <h3 className="text-xl font-semibold mb-2">{service.title}</h3>
-            <p className="text-gray-600">{service.shortDesc}</p>
-          </motion.div>
-        ) : (
-          <motion.div
+            Our Solutions
+          </motion.span>
+
+          <motion.h2
+            initial={{ opacity: 0, y: -20 }}
+            animate={isInView ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 0.6, delay: 0.2 }}
+            className="text-4xl md:text-5xl font-bold mb-6"
+          >
+            Comprehensive <span className="text-primary-400">Services</span>
+          </motion.h2>
+
+          <motion.p
             initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="p-8"
+            animate={isInView ? { opacity: 1 } : {}}
+            transition={{ duration: 0.6, delay: 0.3 }}
+            className="text-xl text-gray-300 max-w-3xl mx-auto"
           >
-            <div className="flex justify-between items-start mb-8">
-              <div className="flex items-center space-x-4">
-                <div className="text-primary-500">{service.icon}</div>
-                <h3 className="text-2xl font-bold">{service.title}</h3>
+            Tailored solutions designed to streamline your operations, enhance customer relationships, and drive growth.
+          </motion.p>
+        </div>
+
+        <div className="space-y-24">
+          {services.map((service, index) => (
+            <motion.div
+              key={index}
+              initial={{ opacity: 0, y: 40 }}
+              animate={isInView ? { opacity: 1, y: 0 } : {}}
+              transition={{ duration: 0.8, delay: 0.2 + index * 0.2 }}
+              className={`flex flex-col ${index % 2 === 0 ? 'lg:flex-row' : 'lg:flex-row-reverse'} gap-12 items-center`}
+            >
+              <div className="w-full lg:w-1/2">
+                <div className="relative rounded-2xl overflow-hidden border border-gray-700/50 shadow-xl shadow-primary-900/20">
+                  <div className="aspect-[4/3] relative">
+                    <img
+                      src={service.image}
+                      alt={service.title}
+                      className="absolute inset-0 w-full h-full object-cover z-10"
+                    />
+                    {/* Gradient overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-tr from-primary-900 to-transparent opacity-60 z-20"></div>
+
+                    {/* Service Icon */}
+                    <div className="absolute top-6 left-6 z-30 bg-primary-900/70 backdrop-blur-sm rounded-full p-3 border border-primary-500/50">
+                      {index === 0 ? <Users className="w-8 h-8 text-primary-400" /> :
+                        index === 1 ? <BarChart3 className="w-8 h-8 text-primary-400" /> :
+                          index === 2 ? <Workflow className="w-8 h-8 text-primary-400" /> :
+                            <Smartphone className="w-8 h-8 text-primary-400" />}
+                    </div>
+                  </div>
+                </div>
               </div>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onClose();
-                }}
-                className="text-gray-500 hover:text-gray-700 transition-colors"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <div>
-                <h4 className="text-lg font-semibold mb-4">About This Feature</h4>
-                <p className="text-gray-600 mb-6">{service.description}</p>
+              <div className="w-full lg:w-1/2">
+                <h3 className="text-3xl font-bold mb-4 text-white">{service.title}</h3>
+                <p className="text-xl text-gray-300 mb-6">{service.description}</p>
 
-                <h4 className="text-lg font-semibold mb-4">Key Benefits</h4>
-                <ul className="space-y-3 mb-6">
-                  {service.benefits.map((benefit: string, index: number) => (
-                    <li key={index} className="flex items-start space-x-2">
-                      <Check className="w-5 h-5 text-primary-500 flex-shrink-0 mt-0.5" />
-                      <span className="text-gray-600">{benefit}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <div>
-                <h4 className="text-lg font-semibold mb-4">Core Features</h4>
-                <div className="grid grid-cols-1 gap-4">
-                  {service.features.map((feature: string, index: number) => (
-                    <div
-                      key={index}
-                      className="p-4 rounded-lg border border-gray-200 hover:border-primary-500 hover:shadow-md transition-all duration-300"
-                    >
-                      <h5 className="font-medium text-gray-900">{feature}</h5>
+                <div className="space-y-4 mb-6">
+                  {service.features.map((feature, i) => (
+                    <div key={i} className="flex items-center gap-3">
+                      <div className="flex-shrink-0 rounded-full bg-primary-900/40 p-1">
+                        <ChevronRight className="w-5 h-5 text-primary-400" />
+                      </div>
+                      <span className="text-lg text-gray-200">{feature}</span>
                     </div>
                   ))}
                 </div>
 
-                <div className="mt-8">
-                  <h4 className="text-lg font-semibold mb-4">Get Started</h4>
-                  <a
-                    href="#contact"
-                    className="inline-flex items-center px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-                  >
-                    Try It Now
-                    <ArrowRight className="w-4 h-4 ml-2" />
-                  </a>
-                </div>
+                <p className="text-gray-400 italic border-l-4 border-primary-500/50 pl-4 py-2 mb-8">
+                  {service.benefits}
+                </p>
+
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="px-6 py-3 bg-primary-500 hover:bg-primary-600 text-white rounded-lg font-medium transition-colors"
+                >
+                  Learn More
+                </motion.button>
               </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
-  );
-}
-
-export function ServicesSection() {
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-
-  return (
-    <section className="py-20 px-4" id="features">
-      <div className="max-w-7xl mx-auto">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="text-center mb-16"
-        >
-          <h2 className="text-4xl font-bold mb-4">Powerful Features</h2>
-          <p className="text-xl text-gray-600">
-            Everything you need to manage and grow your business
-          </p>
-        </motion.div>
-
-        <motion.div 
-          layout 
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 auto-rows-fr"
-        >
-          {services.map((service) => (
-            <ServiceCard
-              key={service.id}
-              service={service}
-              isExpanded={expandedId === service.id}
-              onClick={(id) => setExpandedId(id || service.id)}
-              onClose={() => setExpandedId(null)}
-            />
+            </motion.div>
           ))}
+        </div>
+
+        {/* Additional Services Overview Grid */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={isInView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.8, delay: 0.8 }}
+          className="mt-24"
+        >
+          <h3 className="text-3xl font-bold text-center mb-12">Additional Services</h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50 hover:border-primary-500/50 transition-all duration-300 group">
+              <Mail className="w-12 h-12 text-primary-400 mb-4 group-hover:scale-110 transition-transform" />
+              <h4 className="text-xl font-bold mb-3">Email Integration</h4>
+              <p className="text-gray-300">Seamless email synchronization with engagement analytics. Never lose track of important communications.</p>
+            </div>
+
+            <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50 hover:border-primary-500/50 transition-all duration-300 group">
+              <Shield className="w-12 h-12 text-primary-400 mb-4 group-hover:scale-110 transition-transform" />
+              <h4 className="text-xl font-bold mb-3">Data Security</h4>
+              <p className="text-gray-300">Enterprise-grade security protocols with daily backups and compliance with GDPR, CCPA, and HIPAA.</p>
+            </div>
+
+            <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50 hover:border-primary-500/50 transition-all duration-300 group">
+              <Code className="w-12 h-12 text-primary-400 mb-4 group-hover:scale-110 transition-transform" />
+              <h4 className="text-xl font-bold mb-3">Custom Development</h4>
+              <p className="text-gray-300">Need something unique? Our team can build custom solutions that perfectly align with your business requirements.</p>
+            </div>
+
+            <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50 hover:border-primary-500/50 transition-all duration-300 group">
+              <Database className="w-12 h-12 text-primary-400 mb-4 group-hover:scale-110 transition-transform" />
+              <h4 className="text-xl font-bold mb-3">Data Migration</h4>
+              <p className="text-gray-300">Seamless transition from your existing CRM with our guided data migration assistance and data cleaning services.</p>
+            </div>
+
+            <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50 hover:border-primary-500/50 transition-all duration-300 group">
+              <Users className="w-12 h-12 text-primary-400 mb-4 group-hover:scale-110 transition-transform" />
+              <h4 className="text-xl font-bold mb-3">Training & Onboarding</h4>
+              <p className="text-gray-300">Personalized onboarding sessions and ongoing training to ensure your team gets the most out of Xelytic CRM.</p>
+            </div>
+
+            <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50 hover:border-primary-500/50 transition-all duration-300 group">
+              <PieChart className="w-12 h-12 text-primary-400 mb-4 group-hover:scale-110 transition-transform" />
+              <h4 className="text-xl font-bold mb-3">Business Intelligence</h4>
+              <p className="text-gray-300">Advanced reporting and analytics that go beyond basic CRM data to provide strategic business insights.</p>
+            </div>
+          </div>
         </motion.div>
       </div>
     </section>

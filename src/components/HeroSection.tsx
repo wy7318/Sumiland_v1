@@ -5,7 +5,7 @@ export function HeroSection() {
   const { scrollYProgress } = useScroll();
   const opacity = useTransform(scrollYProgress, [0, 0.2], [1, 0]);
   const scale = useTransform(scrollYProgress, [0, 0.2], [1, 0.95]);
-  
+
   return (
     <motion.section
       style={{ opacity, scale }}
@@ -22,11 +22,13 @@ export function HeroSection() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
-            className="flex items-center justify-center mb-6"
+            className="flex items-center justify-center mb-10"
           >
-            <span className="px-4 py-2 rounded-full bg-white/10 backdrop-blur-sm text-sm font-medium">
-              Introducing Xelytic CRM
-            </span>
+            <img
+              src="https://jaytpfztifhtzcruxguj.supabase.co/storage/v1/object/public/organization-logos/logos/white_logoOnly.png"
+              alt="Xelytic CRM Logo"
+              className="h-20 md:h-24 mb-4"
+            />
           </motion.div>
 
           <motion.h1
