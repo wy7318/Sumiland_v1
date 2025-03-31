@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Save, X, Plus, Trash2, Search, Building2, Package, Scale,
   AlertCircle, Calendar, DollarSign, User, Mail, Phone } from 'lucide-react';
@@ -91,6 +91,7 @@ export function QuoteForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState<FormData>(initialFormData);
+  const location = useLocation();
   
   // Search states
   const [customerSearch, setCustomerSearch] = useState('');
@@ -114,6 +115,10 @@ export function QuoteForm() {
   const customerSearchRef = useRef<HTMLDivElement>(null);
   const vendorSearchRef = useRef<HTMLDivElement>(null);
   const productSearchRef = useRef<HTMLDivElement>(null);
+  // Add state to track if this is from an opportunity conversion
+  const [convertedFromOpportunity, setConvertedFromOpportunity] = useState(false);
+  const [opportunityId, setOpportunityId] = useState<string | null>(null);
+
 
   useEffect(() => {
     const updatedTotal = calculateTotal();
@@ -204,6 +209,76 @@ export function QuoteForm() {
       fetchProducts();
     }
   }, []);
+
+  // Handle prefilled data from opportunity conversion
+  useEffect(() => {
+    if (location.state?.convertedFromOpportunity && location.state?.quoteData) {
+      setConvertedFromOpportunity(true);
+      setOpportunityId(location.state.opportunityId);
+
+      const quoteData = location.state.quoteData;
+
+      // Set form data from converted opportunity
+      setFormData({
+        ...formData,
+        customer_id: quoteData.customer_id || '',
+        vendor_id: quoteData.vendor_id || null,
+        status: quoteData.status || '',
+        notes: quoteData.notes || '',
+        items: quoteData.items || [],
+        organization_id: quoteData.organization_id || selectedOrganization?.id,
+        tax_percent: quoteData.tax_percent || null,
+        tax_amount: quoteData.tax_amount || null,
+        discount_percent: quoteData.discount_percent || null,
+        discount_amount: quoteData.discount_amount || null,
+        subtotal: quoteData.subtotal || 0,
+      });
+
+      // Fetch customer and vendor data to display
+      if (quoteData.customer_id) {
+        fetchCustomerById(quoteData.customer_id);
+      }
+
+      if (quoteData.vendor_id) {
+        fetchVendorById(quoteData.vendor_id);
+      }
+    }
+  }, [location.state]);
+
+  // Add functions to fetch customer and vendor by ID
+  const fetchCustomerById = async (customerId) => {
+    try {
+      const { data, error } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('customer_id', customerId)
+        .single();
+
+      if (error) throw error;
+      if (data) {
+        setSelectedCustomer(data);
+      }
+    } catch (err) {
+      console.error('Error fetching customer:', err);
+    }
+  };
+
+  const fetchVendorById = async (vendorId) => {
+    try {
+      const { data, error } = await supabase
+        .from('vendors')
+        .select('*')
+        .eq('id', vendorId)
+        .single();
+
+      if (error) throw error;
+      if (data) {
+        setSelectedVendor(data);
+      }
+    } catch (err) {
+      console.error('Error fetching vendor:', err);
+    }
+  };
 
   const fetchPicklists = async () => {
     try {
@@ -609,6 +684,169 @@ export function QuoteForm() {
   // };
   // handleSubmit -- end
 
+  // const handleSubmit = async (e: React.FormEvent) => {
+  //   e.preventDefault();
+  //   if (!formData.customer_id) {
+  //     setError('Please select a customer');
+  //     return;
+  //   }
+  //   if (formData.items.length === 0) {
+  //     setError('Please add at least one item');
+  //     return;
+  //   }
+  
+  //   setLoading(true);
+  //   setError(null);
+  
+  //   try {
+  //     const { data: userData } = await supabase.auth.getUser();
+  //     if (!userData.user) throw new Error('Not authenticated');
+  
+  //     // ✅ Explicitly calculate values before saving
+  //     const subtotal = calculateSubtotal();
+  //     const discountAmount = formData.discount_amount ?? 0;
+  //     const taxAmount = formData.tax_amount ?? 0;
+  //     const total = subtotal + taxAmount - discountAmount;
+  
+  //     console.log("🟢 Debug - Calculated Values Before Saving");
+  //     console.log("Subtotal:", subtotal);
+  //     console.log("Discount Amount:", discountAmount);
+  //     console.log("Tax Amount:", taxAmount);
+  //     console.log("Total (Expected Total Amount):", total);
+  
+  //     let quoteId = id;
+  
+  //     if (id) {
+  //       console.log("🟢 Debug - Updating Existing Quote");
+  //       const { error: updateError } = await supabase
+  //         .from('quote_hdr')
+  //         .update({
+  //           customer_id: formData.customer_id,
+  //           vendor_id: formData.vendor_id,
+  //           status: formData.status,
+  //           notes: formData.notes || null,
+  //           subtotal,
+  //           tax_percent: formData.tax_percent,
+  //           tax_amount: taxAmount,
+  //           discount_amount: discountAmount,
+  //           total_amount: total,  // ✅ Ensure the correct total is saved
+  //           updated_at: new Date().toISOString(),
+  //           updated_by: userData.user.id,
+  //         })
+  //         .eq('quote_id', id);
+  
+  //       if (updateError) throw updateError;
+
+  //       // Delete existing items
+  //       const { error: deleteError } = await supabase
+  //         .from('quote_dtl')
+  //         .delete()
+  //         .eq('quote_id', id);
+
+  //       if (deleteError) throw deleteError;
+
+  //       // Insert new items
+  //       const itemsToInsert = [];
+  //       for (const item of formData.items) {
+  //         itemsToInsert.push({
+  //           quote_id: id,
+  //           item_name: item.item_name,
+  //           item_desc: item.item_desc,
+  //           quantity: item.quantity,
+  //           unit_price: item.unit_price,
+  //           organization_id: formData.organization_id
+  //         });
+  //       }
+  //       console.log('itemsToInsert:', itemsToInsert);
+
+  //       const { error: itemsError } = await supabase
+  //         .from('quote_dtl')
+  //         .insert(itemsToInsert);
+
+  //       if (itemsError) throw itemsError;
+        
+  //     } else {
+  //       console.log("🟢 Debug - Creating New Quote");
+  //       const { data: newQuote, error: insertError } = await supabase
+  //         .from('quote_hdr')
+  //         .insert([{
+  //           customer_id: formData.customer_id,
+  //           vendor_id: formData.vendor_id,
+  //           status: formData.status,
+  //           notes: formData.notes || null,
+  //           subtotal,
+  //           tax_percent: formData.tax_percent,
+  //           tax_amount: taxAmount,
+  //           discount_amount: discountAmount,
+  //           total_amount: total,  // ✅ Ensure the correct total is saved
+  //           organization_id: formData.organization_id,
+  //           created_by: userData.user.id,
+  //           created_at: new Date().toISOString(),
+  //           updated_by: userData.user.id,
+  //           updated_at: new Date().toISOString(),
+  //         }])
+  //         .select()
+  //         .single();
+  
+  //       if (insertError) throw insertError;
+  //       quoteId = newQuote.quote_id;
+
+  //       // Insert new items for the new quote
+  //       const itemsToInsert = [];
+  //       for (const item of formData.items) {
+  //         itemsToInsert.push({
+  //           quote_id: quoteId,
+  //           item_name: item.item_name,
+  //           item_desc: item.item_desc,
+  //           quantity: item.quantity,
+  //           unit_price: item.unit_price,
+  //           organization_id: formData.organization_id
+  //         });
+  //       }
+  //       console.log('itemsToInsert:', itemsToInsert);
+
+  //       const { error: itemsError } = await supabase
+  //         .from('quote_dtl')
+  //         .insert(itemsToInsert);
+
+  //       if (itemsError) throw itemsError;
+  //     }
+
+  //     // Save custom field values
+  //     if (userData.user) {
+  //       for (const [fieldId, value] of Object.entries(customFields)) {
+  //         const { error: valueError } = await supabase
+  //           .from('custom_field_values')
+  //           .upsert({
+  //             organization_id: formData.organization_id,
+  //             entity_id: quoteId,
+  //             field_id: fieldId,
+  //             value,
+  //             created_by: userData.user.id,
+  //             updated_by: userData.user.id,
+  //             updated_at: new Date().toISOString()
+  //           }, {
+  //             onConflict: 'organization_id,field_id,entity_id'
+  //           });
+
+  //         if (valueError) {
+  //           console.error('Error saving custom field value:', valueError);
+  //         }
+  //       }
+  //     }
+  
+  //     navigate('/admin/quotes');
+  //   } catch (err) {
+  //     console.error('❌ Error saving quote:', err);
+  //     setError(err instanceof Error ? err.message : 'Failed to save quote');
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
+
+
+
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.customer_id) {
@@ -619,28 +857,28 @@ export function QuoteForm() {
       setError('Please add at least one item');
       return;
     }
-  
+
     setLoading(true);
     setError(null);
-  
+
     try {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error('Not authenticated');
-  
+
       // ✅ Explicitly calculate values before saving
       const subtotal = calculateSubtotal();
       const discountAmount = formData.discount_amount ?? 0;
       const taxAmount = formData.tax_amount ?? 0;
       const total = subtotal + taxAmount - discountAmount;
-  
+
       console.log("🟢 Debug - Calculated Values Before Saving");
       console.log("Subtotal:", subtotal);
       console.log("Discount Amount:", discountAmount);
       console.log("Tax Amount:", taxAmount);
       console.log("Total (Expected Total Amount):", total);
-  
+
       let quoteId = id;
-  
+
       if (id) {
         console.log("🟢 Debug - Updating Existing Quote");
         const { error: updateError } = await supabase
@@ -659,7 +897,7 @@ export function QuoteForm() {
             updated_by: userData.user.id,
           })
           .eq('quote_id', id);
-  
+
         if (updateError) throw updateError;
 
         // Delete existing items
@@ -671,25 +909,21 @@ export function QuoteForm() {
         if (deleteError) throw deleteError;
 
         // Insert new items
-        const itemsToInsert = [];
-        for (const item of formData.items) {
-          itemsToInsert.push({
-            quote_id: id,
-            item_name: item.item_name,
-            item_desc: item.item_desc,
-            quantity: item.quantity,
-            unit_price: item.unit_price,
-            organization_id: formData.organization_id
-          });
-        }
-        console.log('itemsToInsert:', itemsToInsert);
+        const itemsToInsert = formData.items.map(item => ({
+          quote_id: id,
+          item_name: item.item_name,
+          item_desc: item.item_desc,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          organization_id: formData.organization_id
+        }));
 
         const { error: itemsError } = await supabase
           .from('quote_dtl')
           .insert(itemsToInsert);
 
         if (itemsError) throw itemsError;
-        
+
       } else {
         console.log("🟢 Debug - Creating New Quote");
         const { data: newQuote, error: insertError } = await supabase
@@ -712,29 +946,47 @@ export function QuoteForm() {
           }])
           .select()
           .single();
-  
+
         if (insertError) throw insertError;
         quoteId = newQuote.quote_id;
 
         // Insert new items for the new quote
-        const itemsToInsert = [];
-        for (const item of formData.items) {
-          itemsToInsert.push({
-            quote_id: quoteId,
-            item_name: item.item_name,
-            item_desc: item.item_desc,
-            quantity: item.quantity,
-            unit_price: item.unit_price,
-            organization_id: formData.organization_id
-          });
-        }
-        console.log('itemsToInsert:', itemsToInsert);
+        const itemsToInsert = formData.items.map(item => ({
+          quote_id: quoteId,
+          item_name: item.item_name,
+          item_desc: item.item_desc,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          organization_id: formData.organization_id
+        }));
 
         const { error: itemsError } = await supabase
           .from('quote_dtl')
           .insert(itemsToInsert);
 
         if (itemsError) throw itemsError;
+
+        // ✅ NEW CODE: If this quote was converted from an opportunity, update the opportunity
+        if (convertedFromOpportunity && opportunityId) {
+          console.log("🟢 Debug - Updating Opportunity as Converted");
+          const { error: opportunityError } = await supabase
+            .from('opportunities')
+            .update({
+              is_converted: true,
+              converted_to_id: quoteId,
+              converted_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              updated_by: userData.user.id
+            })
+            .eq('id', opportunityId);
+
+          if (opportunityError) {
+            console.error('Warning: Failed to update opportunity conversion status:', opportunityError);
+            // Continue with the flow even if this update fails - we don't want to fail the whole transaction
+          } else {
+            console.log(`Successfully marked opportunity ${opportunityId} as converted to quote ${quoteId}`);
+          }
+        }
       }
 
       // Save custom field values
@@ -759,7 +1011,7 @@ export function QuoteForm() {
           }
         }
       }
-  
+
       navigate('/admin/quotes');
     } catch (err) {
       console.error('❌ Error saving quote:', err);
@@ -768,7 +1020,6 @@ export function QuoteForm() {
       setLoading(false);
     }
   };
-
 
 
   if (organizations.length === 0) {
@@ -787,8 +1038,14 @@ export function QuoteForm() {
     >
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">
-          {id ? 'Edit Quote' : 'Create New Quote'}
+          {id ? 'Edit Quote' : (convertedFromOpportunity ? 'Convert Opportunity to Quote' : 'Create New Quote')}
         </h1>
+        {/* Show a badge if this is from an opportunity conversion */}
+        {convertedFromOpportunity && (
+          <div className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm">
+            Converted from Opportunity
+          </div>
+        )}
         <button
           onClick={() => navigate('/admin/quotes')}
           className="p-2 text-gray-500 hover:text-gray-700 rounded-full hover:bg-gray-100"

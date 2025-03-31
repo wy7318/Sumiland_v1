@@ -15,6 +15,7 @@ import { useOrganization } from '../../contexts/OrganizationContext';
 import { DateTime } from 'luxon';
 
 
+
 type Opportunity = {
   id: string;
   name: string;
@@ -208,6 +209,62 @@ export function OpportunityDetailPage() {
     } catch (err) {
       console.error('Error fetching picklists:', err);
       setError('Failed to load picklist values');
+    }
+  };
+
+  // Add this function to handle the conversion
+  const handleConvertToQuote = async () => {
+    if (!opportunity) return;
+
+    try {
+      setLoading(true);
+
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error('Not authenticated');
+
+      // Prepare the quote data based on the mapping
+      const quoteData = {
+        organization_id: opportunity.organization_id,
+        notes: `Converted from Opportunity ${opportunity.opportunity_number} ${opportunity.name}`,
+        vendor_id: opportunity.account_id,
+        customer_id: opportunity.contact_id,
+        status: 'New', // Default to New
+        tax_percent: 0,
+        tax_amount: 0,
+        discount_amount: 0,
+        currency: 'USD',
+
+        // Map products from opportunity to quote items
+        items: opportunity.products.map(product => ({
+          item_name: product.product.name,
+          item_desc: product.product.description || null,
+          quantity: product.quantity,
+          unit_price: product.unit_price
+        })),
+
+        // Calculate subtotal based on products
+        subtotal: opportunity.products.reduce((sum, product) =>
+          sum + (product.quantity * product.unit_price), 0),
+
+        // Set total amount equal to subtotal since tax and discount are 0
+        total_amount: opportunity.products.reduce((sum, product) =>
+          sum + (product.quantity * product.unit_price), 0)
+      };
+
+      // Navigate to the QuoteForm with the data as state
+      navigate('/admin/quotes/new', {
+        state: {
+          convertedFromOpportunity: true,
+          opportunityId: id,
+          quoteData: quoteData
+        }
+      });
+
+    } catch (err) {
+      console.error('Error converting opportunity to quote:', err);
+      setError(err instanceof Error ? err.message : 'Failed to convert opportunity to quote');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -558,6 +615,14 @@ export function OpportunityDetailPage() {
             <Edit className="w-4 h-4 mr-2" />
             Edit Opportunity
           </Link>
+          {/* Add the Convert to Quote button */}
+          <button
+            onClick={handleConvertToQuote}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+          >
+            <FileText className="w-4 h-4 mr-2" />
+            Convert to Quote
+          </button>
           <Link
             to={`/admin/tasks/new?module=opportunities&recordId=${id}`}
             className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700"
