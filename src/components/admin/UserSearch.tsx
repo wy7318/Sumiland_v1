@@ -135,7 +135,7 @@ export function UserSearch({ organizationId, selectedUserId, onSelect, className
   return (
     <div ref={searchRef} className={cn("relative", className)}>
       <label className="block text-sm font-medium text-gray-700 mb-1">
-        Assigned To
+        
       </label>
       {selectedUser ? (
         <div className="flex items-center justify-between p-2 border rounded-lg">

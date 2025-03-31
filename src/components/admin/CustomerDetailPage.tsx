@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { 
+import {
   ArrowLeft, Building2, Mail, Phone, Calendar,
   Edit, AlertCircle, Send, Reply, X, User,
   Globe, CheckCircle, ChevronDown, ChevronUp,
-  FileText, ShoppingBag, UserCheck, MessageSquare, Target
+  FileText, ShoppingBag, UserCheck, MessageSquare, Target,
+  Users // Import Users icon for gender
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { cn, formatCurrency } from '../../lib/utils';
+import { cn, formatCurrency, formatDate } from '../../lib/utils'; // Add formatDate if not already exists
 import { CustomFieldsSection } from './CustomFieldsSection';
 import { useOrganization } from '../../contexts/OrganizationContext';
 
@@ -29,11 +30,19 @@ type Customer = {
   created_at: string;
   organization_id: string;
   vendor_id: string | null;
+  owner_id: string | null;
+  birthdate: string | null;
+  gender: string | null;
   vendor: {
     id: string;
     name: string;
     type: string;
     status: string;
+  } | null;
+  owner: {
+    id: string;
+    name: string;
+    email: string;
   } | null;
 };
 
@@ -148,6 +157,10 @@ export function CustomerDetailPage() {
             name,
             type,
             status
+          ),
+          owner:profiles!customers_owner_id_fkey(
+            id,
+            name
           )
         `)
         .eq('customer_id', id)
@@ -197,7 +210,7 @@ export function CustomerDetailPage() {
         .eq('contact_id', customer.customer_id)
         .eq('organization_id', selectedOrganization?.id)
         .order('created_at', { ascending: false });
-      
+
       if (opportunitiesError) throw opportunitiesError;
       console.log('Related Opportunities:', opportunities); // Debugging line
       setRelatedOpportunities(opportunities || []);
@@ -326,8 +339,8 @@ export function CustomerDetailPage() {
   };
 
   const toggleTab = (tabId: string) => {
-    setExpandedTabs(prev => 
-      prev.includes(tabId) 
+    setExpandedTabs(prev =>
+      prev.includes(tabId)
         ? prev.filter(id => id !== tabId)
         : [...prev, tabId]
     );
@@ -461,6 +474,13 @@ export function CustomerDetailPage() {
     );
   }
 
+  // Function to format date for display
+  const formatBirthdate = (dateString: string | null) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleDateString();
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -523,6 +543,27 @@ export function CustomerDetailPage() {
                     )}
                   </div>
                 </div>
+
+                {/* New Field: Gender */}
+                {customer.gender && (
+                  <div className="flex items-center">
+                    <Users className="w-5 h-5 text-gray-400 mr-3" />
+                    <div className="text-gray-700">
+                      {customer.gender}
+                    </div>
+                  </div>
+                )}
+
+                {/* New Field: Birthdate */}
+                {customer.birthdate && (
+                  <div className="flex items-center">
+                    <Calendar className="w-5 h-5 text-gray-400 mr-3" />
+                    <div className="text-gray-700">
+                      {formatBirthdate(customer.birthdate)}
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex items-center">
                   <Mail className="w-5 h-5 text-gray-400 mr-3" />
                   <a
@@ -532,6 +573,7 @@ export function CustomerDetailPage() {
                     {customer.email}
                   </a>
                 </div>
+
                 {customer.phone && (
                   <div className="flex items-center">
                     <Phone className="w-5 h-5 text-gray-400 mr-3" />
@@ -541,6 +583,19 @@ export function CustomerDetailPage() {
                     >
                       {customer.phone}
                     </a>
+                  </div>
+                )}
+
+                {/* New Field: Owner */}
+                {customer.owner && (
+                  <div className="flex items-center">
+                    <UserCheck className="w-5 h-5 text-gray-400 mr-3" />
+                    <div>
+                      <div className="font-medium">Owner:</div>
+                      <div className="text-primary-600">
+                        {customer.owner.name}
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
