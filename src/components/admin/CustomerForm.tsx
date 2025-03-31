@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Save, X, AlertCircle, Mail, Phone, Building2, User, Search } from 'lucide-react';
+import { Save, X, AlertCircle, Mail, Phone, Building2, User, Search, Calendar, Users } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { CustomFieldsForm } from './CustomFieldsForm';
+import { UserSearch } from './UserSearch'; // Import UserSearch component
 import { cn } from '../../lib/utils';
 import { useOrganization } from '../../contexts/OrganizationContext';
 
@@ -23,6 +24,9 @@ type CustomerFormData = {
   vendor_id: string | null;
   organization_id?: string;
   lead_id?: string | null;
+  owner_id?: string | null;
+  birthdate?: string | null;
+  gender?: string | null;
 };
 
 const initialFormData: CustomerFormData = {
@@ -39,7 +43,10 @@ const initialFormData: CustomerFormData = {
   company: '',
   vendor_id: null,
   organization_id: '',
-  lead_id: null
+  lead_id: null,
+  owner_id: null,
+  birthdate: '',
+  gender: '',
 };
 
 type Vendor = {
@@ -59,14 +66,14 @@ export function CustomerForm() {
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState<CustomerFormData>(initialFormData);
   const [customFields, setCustomFields] = useState<Record<string, any>>({});
-  
+
   // Search states
   const [vendorSearch, setVendorSearch] = useState('');
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [filteredVendors, setFilteredVendors] = useState<Vendor[]>([]);
   const [showVendorDropdown, setShowVendorDropdown] = useState(false);
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
-  
+
   const vendorSearchRef = useRef<HTMLDivElement>(null);
 
   // Get lead data from navigation state if available
@@ -83,6 +90,9 @@ export function CustomerForm() {
         phone: leadData.phone || '',
         company: leadData.company || '',
         lead_id: leadData.lead_id,
+        owner_id: leadData.owner_id,
+        birthdate: leadData.birthdate,
+        gender: leadData.gender,
         organization_id: selectedOrganization?.id || ''
       }));
     } else if (id) {
@@ -98,7 +108,7 @@ export function CustomerForm() {
   useEffect(() => {
     if (vendorSearch) {
       const searchTerm = vendorSearch.toLowerCase();
-      const filtered = vendors.filter(vendor => 
+      const filtered = vendors.filter(vendor =>
         vendor.name.toLowerCase().includes(searchTerm) ||
         vendor.type.toLowerCase().includes(searchTerm)
       );
@@ -169,7 +179,10 @@ export function CustomerForm() {
           company: customer.company || '',
           vendor_id: customer.vendor_id,
           organization_id: selectedOrganization?.id,
-          lead_id: customer.lead_id
+          lead_id: customer.lead_id,
+          owner_id: customer.owner_id,
+          birthdate: customer.birthdate,
+          gender: customer.gender
         });
         if (customer.vendor) {
           setSelectedVendor(customer.vendor);
@@ -230,6 +243,12 @@ export function CustomerForm() {
       return false;
     }
 
+    // Validate birthdate is in correct format if provided
+    if (formData.birthdate && !/^\d{4}-\d{2}-\d{2}$/.test(formData.birthdate)) {
+      setError('Invalid birthdate format. Use YYYY-MM-DD');
+      return false;
+    }
+
     return true;
   };
 
@@ -279,7 +298,7 @@ export function CustomerForm() {
               converted_by: user?.id
             })
             .eq('id', leadData.lead_id);
-  
+
           if (leadUpdateError) throw leadUpdateError;
         }
       }
@@ -414,7 +433,7 @@ export function CustomerForm() {
             </div>
           </div>
 
-          <div className="md:col-span-2">
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Company
             </label>
@@ -427,6 +446,55 @@ export function CustomerForm() {
                 className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
               />
             </div>
+          </div>
+
+          {/* New field: Birthdate */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Birthdate
+            </label>
+            <div className="relative">
+              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <input
+                type="date"
+                value={formData.birthdate || ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, birthdate: e.target.value }))}
+                className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+              />
+            </div>
+          </div>
+
+          {/* New field: Gender */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Gender
+            </label>
+            <div className="relative">
+              <Users className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <select
+                value={formData.gender || ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, gender: e.target.value }))}
+                className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+              >
+                <option value="">Select Gender</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Non-Binary">Non-Binary</option>
+                <option value="Prefer not to say">Prefer not to say</option>
+              </select>
+            </div>
+          </div>
+
+          {/* New field: Owner ID */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Customer Owner
+            </label>
+            <UserSearch
+              organizationId={selectedOrganization?.id}
+              selectedUserId={formData.owner_id}
+              onSelect={(userId) => setFormData(prev => ({ ...prev, owner_id: userId }))}
+            />
           </div>
 
           <div ref={vendorSearchRef} className="md:col-span-2 relative">

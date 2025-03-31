@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { 
-  Plus, Search, Download, Edit, Trash2, ChevronDown, ChevronUp, 
-  Check, X, FileSpreadsheet, AlertCircle, Eye, Building2
+import {
+  Plus, Search, Download, Edit, Trash2, ChevronDown, ChevronUp,
+  Check, X, FileSpreadsheet, AlertCircle, Eye, Building2, UserCheck
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
@@ -27,9 +27,16 @@ type Customer = {
   created_at: string;
   updated_at: string;
   vendor_id: string | null;
+  owner_id: string | null;
+  birthdate: string | null;
+  gender: string | null;
   vendor: {
     name: string;
     type: string;
+  } | null;
+  owner: {
+    id: string;
+    name: string;
   } | null;
 };
 
@@ -58,11 +65,15 @@ export function CustomersPage() {
           vendor:vendors!customers_vendor_id_fkey(
             name,
             type
+          ),
+          owner:profiles!customers_owner_id_fkey(
+            id,
+            name
           )
         `)
         .eq('organization_id', selectedOrganization?.id)
         .order('created_at', { ascending: false });
-  
+
       if (error) throw error;
       setCustomers(data || []);
     } catch (err) {
@@ -108,6 +119,7 @@ export function CustomersPage() {
       'Company',
       'Account',
       'Account Type',
+      'Owner',
       'Address',
       'City',
       'State',
@@ -124,6 +136,7 @@ export function CustomersPage() {
       customer.company || '',
       customer.vendor?.name || '',
       customer.vendor?.type || '',
+      customer.owner?.name || '',
       `${customer.address_line1 || ''} ${customer.address_line2 || ''}`,
       customer.city || '',
       customer.state || '',
@@ -152,7 +165,9 @@ export function CustomersPage() {
       customer.email.toLowerCase().includes(searchString) ||
       customer.company?.toLowerCase().includes(searchString) ||
       customer.phone?.toLowerCase().includes(searchString) ||
-      customer.vendor?.name.toLowerCase().includes(searchString)
+      customer.vendor?.name.toLowerCase().includes(searchString) ||
+      // Add owner name to search criteria
+      customer.owner?.name.toLowerCase().includes(searchString)
     );
   });
 
@@ -208,7 +223,7 @@ export function CustomersPage() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <input
                   type="text"
-                  placeholder="Search customers..."
+                  placeholder="Search customers by name, email, company, owner..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
@@ -233,6 +248,9 @@ export function CustomersPage() {
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Account
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Owner
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Location
@@ -281,9 +299,22 @@ export function CustomersPage() {
                       <span className="text-gray-400">-</span>
                     )}
                   </td>
+                  {/* New Owner Column */}
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {customer.owner ? (
+                      <div className="flex items-center space-x-2">
+                        <UserCheck className="w-4 h-4 text-gray-400" />
+                        <div className="text-sm font-medium text-gray-900">
+                          {customer.owner.name}
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-500">
-                      {customer.city}, {customer.state}
+                      {customer.city && customer.state ? `${customer.city}, ${customer.state}` : '-'}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -385,9 +416,9 @@ export function CustomersPage() {
                     Previous
                   </button>
                   {Array.from({ length: totalPages }, (_, i) => i + 1)
-                    .filter(page => 
-                      page === 1 || 
-                      page === totalPages || 
+                    .filter(page =>
+                      page === 1 ||
+                      page === totalPages ||
                       Math.abs(page - currentPage) <= 1
                     )
                     .map((page, index, array) => {
