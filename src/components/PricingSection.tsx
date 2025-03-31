@@ -145,7 +145,9 @@ export function PricingSection() {
             </div>
 
             <p className="text-gray-300 text-lg mb-8">
-              Get 12 months for the price of 10 with annual billing. No per-user fees, no feature limitations, no surprises.
+              {annual
+                ? "$6 per user/month. Enjoy 12 months for the price of 10 with annual billing. No hidden fees, no per-user restrictions, and no feature limitations — just simple, transparent pricing."
+                : "Only $7.50 per user — more affordable than any other CRM solution, while delivering all the essentials your business needs to operate efficiently."}
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 mb-10">

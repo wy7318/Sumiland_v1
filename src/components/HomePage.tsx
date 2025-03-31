@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { SEO } from './SEO';
 import { HeroSection } from './HeroSection';
@@ -12,10 +13,27 @@ import { ContactSection } from './ContactSection';
 import { FooterSection } from './FooterSection';
 
 export function HomePage() {
-  // Scroll to top on page load
+  const location = useLocation();
+  const navigate = useNavigate();
+
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
+
+  useEffect(() => {
+    if (location.state?.scrollTo) {
+      const sectionId = location.state.scrollTo;
+      const element = document.getElementById(sectionId);
+      if (element) {
+        const offset = 80;
+        const elementPosition = element.getBoundingClientRect().top + window.scrollY - offset;
+        window.scrollTo({ top: elementPosition, behavior: 'smooth' });
+
+        // Clear scrollTo state from history so it doesn’t re-scroll again
+        navigate(location.pathname, { replace: true, state: {} });
+      }
+    }
+  }, [location, navigate]);
 
   return (
     <>
@@ -29,9 +47,9 @@ export function HomePage() {
         <HeroSection />
         <FeaturesHubSection />
         <ServicesSection />
-        <TestimonialsSection />
+        {/* <TestimonialsSection /> */}
         <PricingSection />
-        <IntegrationsSection />
+        {/* <IntegrationsSection /> */}
         <FAQSection />
         <ContactSection />
         <FooterSection />

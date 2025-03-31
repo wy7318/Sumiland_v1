@@ -328,10 +328,11 @@
 //   );
 // }
 
+
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X, LogIn, UserPlus, LogOut, LayoutDashboard, User } from 'lucide-react';
+import { Menu, X, LogIn, UserPlus, LogOut, LayoutDashboard, User, ChevronDown } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { signOut } from '../lib/auth';
@@ -341,8 +342,11 @@ export function Navigation() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const profileButtonRef = useRef<HTMLButtonElement>(null);
+  const dropdownRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const { user, loading } = useAuth();
   const location = useLocation();
@@ -390,9 +394,10 @@ export function Navigation() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Handle clicks outside of profile menu
+  // Handle clicks outside of menus
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
+      // Handle profile menu
       if (
         profileMenuRef.current &&
         profileButtonRef.current &&
@@ -401,15 +406,28 @@ export function Navigation() {
       ) {
         setIsProfileMenuOpen(false);
       }
+
+      // Handle dropdowns
+      if (activeDropdown) {
+        const activeRef = dropdownRefs.current[activeDropdown];
+        const isClickInside = activeRef?.contains(event.target as Node);
+        const triggerElement = document.getElementById(`${activeDropdown}-trigger`);
+        const isClickOnTrigger = triggerElement?.contains(event.target as Node);
+
+        if (!isClickInside && !isClickOnTrigger) {
+          setActiveDropdown(null);
+        }
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [activeDropdown]);
 
-  // Close profile menu on route change
+  // Close menus on route change
   useEffect(() => {
     setIsProfileMenuOpen(false);
+    setActiveDropdown(null);
   }, [location.pathname]);
 
   // Handle sign out with error prevention
@@ -446,7 +464,32 @@ export function Navigation() {
       });
     }
     setIsMobileMenuOpen(false);
+    setActiveDropdown(null);
   }, []);
+
+  // Update reference to integration and testimonial section IDs
+  useEffect(() => {
+    // Check if old navigation links are used
+    const urlParams = new URLSearchParams(window.location.hash.slice(1));
+    const redirectMap: Record<string, string> = {
+      'integrations': 'features',
+      'testimonials': 'features'
+    };
+
+    const hash = window.location.hash.slice(1);
+    if (redirectMap[hash]) {
+      // Redirect to appropriate section if old links are used
+      setTimeout(() => {
+        scrollToSection(redirectMap[hash]);
+        // Update URL without redirecting
+        window.history.replaceState(
+          null,
+          document.title,
+          window.location.pathname + (redirectMap[hash] ? `#${redirectMap[hash]}` : '')
+        );
+      }, 100);
+    }
+  }, [location.pathname, scrollToSection]);
 
   // Skip rendering on admin pages
   if (location.pathname.startsWith('/admin')) {
@@ -459,20 +502,63 @@ export function Navigation() {
   // Determine if user is authenticated (must be both: has user AND not signed out)
   const isAuthenticated = !!user && !isSignedOut;
 
-  // Updated navItems to include all sections
-  const navItems = [
-    { href: '/', label: 'Home', action: () => window.scrollTo({ top: 0, behavior: 'smooth' }) },
-    { href: '/#features', label: 'Features', action: () => scrollToSection('features') },
-    { href: '/#services', label: 'Services', action: () => scrollToSection('services') },
-    { href: '/#testimonials', label: 'Testimonials', action: () => scrollToSection('testimonials') },
-    { href: '/#pricing', label: 'Pricing', action: () => scrollToSection('pricing') },
-    { href: '/#integrations', label: 'Integrations', action: () => scrollToSection('integrations') },
-    { href: '/#faq', label: 'FAQ', action: () => scrollToSection('faq') },
-    { href: '/blog', label: 'Blog' },
-    { href: '/#contact', label: 'Contact', action: () => scrollToSection('contact') },
+  // Define menu structure with groups
+  const menuGroups = {
+    product: {
+      label: 'Product',
+      items: [
+        { href: '/#features', label: 'Features', action: () => scrollToSection('features') },
+        { href: '/#services', label: 'Services', action: () => scrollToSection('services') }
+      ]
+    },
+    resources: {
+      label: 'Resources',
+      items: [
+        { href: '/#faq', label: 'FAQ', action: () => scrollToSection('faq') },
+        { href: '/blog', label: 'Blog' }
+      ]
+    },
+    company: {
+      label: 'Company',
+      items: [
+        { href: '/#contact', label: 'Contact', action: () => scrollToSection('contact') }
+      ]
+    }
+  };
+
+  // Define standalone menu items
+  const standaloneItems = [
+    { href: '/#pricing', label: 'Pricing', action: () => scrollToSection('pricing') }
   ];
 
-  const handleNavClick = (item: typeof navItems[0], e: React.MouseEvent) => {
+  // Dropdown variants for animation
+  const dropdownVariants = {
+    hidden: {
+      opacity: 0,
+      y: -5,
+      transition: { duration: 0.2 }
+    },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: 0.3,
+        staggerChildren: 0.1
+      }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, x: -10 },
+    visible: { opacity: 1, x: 0 }
+  };
+
+  const handleDropdownToggle = (key: string) => {
+    setActiveDropdown(prev => prev === key ? null : key);
+  };
+
+  // Handle all navigation clicks
+  const handleNavClick = (item: { href: string; action?: () => void }, e: React.MouseEvent) => {
     e.preventDefault();
     if (location.pathname !== '/' && item.href.startsWith('/#')) {
       navigate('/', { state: { scrollTo: item.href.substring(2) } });
@@ -505,13 +591,63 @@ export function Navigation() {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-4">
-            {navItems.map((item) => (
+            {/* Dropdown Menu Groups */}
+            {Object.entries(menuGroups).map(([key, group]) => (
+              <div key={key} className="relative">
+                <button
+                  id={`${key}-trigger`}
+                  className={cn(
+                    'flex items-center text-sm px-2 py-1 rounded-md transition-colors',
+                    activeDropdown === key
+                      ? 'text-primary-600 bg-primary-50'
+                      : 'text-gray-600 hover:text-primary-500'
+                  )}
+                  onClick={() => handleDropdownToggle(key)}
+                >
+                  {group.label}
+                  <ChevronDown
+                    className={cn(
+                      'ml-1 w-4 h-4 transition-transform duration-200',
+                      activeDropdown === key ? 'rotate-180' : ''
+                    )}
+                  />
+                </button>
+
+                <AnimatePresence>
+                  {activeDropdown === key && (
+                    <motion.div
+                      ref={el => dropdownRefs.current[key] = el}
+                      className="absolute left-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-2 z-50 overflow-hidden"
+                      variants={dropdownVariants}
+                      initial="hidden"
+                      animate="visible"
+                      exit="hidden"
+                    >
+                      {group.items.map((item) => (
+                        <motion.a
+                          key={item.href}
+                          href={item.href}
+                          onClick={(e) => handleNavClick(item, e)}
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary-600 transition-colors"
+                          variants={itemVariants}
+                        >
+                          {item.label}
+                        </motion.a>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            ))}
+
+            {/* Standalone Menu Items */}
+            {standaloneItems.map((item) => (
               <a
                 key={item.href}
                 href={item.href}
                 onClick={(e) => handleNavClick(item, e)}
                 className={cn(
-                  'text-gray-600 hover:text-primary-500 transition-colors text-sm',
+                  'text-gray-600 hover:text-primary-500 transition-colors text-sm px-2 py-1',
                   location.pathname === item.href && 'text-primary-500'
                 )}
               >
@@ -520,7 +656,7 @@ export function Navigation() {
             ))}
 
             {/* Auth Buttons */}
-            <div className="relative">
+            <div className="relative ml-4">
               {loading ? (
                 <div className="w-8 h-8 animate-pulse bg-gray-200 rounded-full" />
               ) : isAuthenticated ? (
@@ -603,61 +739,108 @@ export function Navigation() {
               exit={{ opacity: 0, height: 0 }}
               className="md:hidden py-4"
             >
-              <div className="flex flex-col space-y-4">
-                {navItems.map((item) => (
+              <div className="flex flex-col space-y-1">
+                {/* Mobile Dropdown Menu Groups */}
+                {Object.entries(menuGroups).map(([key, group]) => (
+                  <div key={key} className="border-b border-gray-100 pb-2">
+                    <button
+                      className={cn(
+                        'flex items-center justify-between w-full text-left px-4 py-2',
+                        activeDropdown === `mobile-${key}`
+                          ? 'text-primary-600 bg-primary-50'
+                          : 'text-gray-700'
+                      )}
+                      onClick={() => handleDropdownToggle(`mobile-${key}`)}
+                    >
+                      {group.label}
+                      <ChevronDown
+                        className={cn(
+                          'w-4 h-4 transition-transform duration-200',
+                          activeDropdown === `mobile-${key}` ? 'rotate-180' : ''
+                        )}
+                      />
+                    </button>
+
+                    <AnimatePresence>
+                      {activeDropdown === `mobile-${key}` && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          className="overflow-hidden"
+                        >
+                          {group.items.map((item) => (
+                            <a
+                              key={item.href}
+                              href={item.href}
+                              onClick={(e) => handleNavClick(item, e)}
+                              className="block pl-8 pr-4 py-2 text-sm text-gray-600 hover:text-primary-500"
+                            >
+                              {item.label}
+                            </a>
+                          ))}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                ))}
+
+                {/* Mobile Standalone Menu Items */}
+                {standaloneItems.map((item) => (
                   <a
                     key={item.href}
                     href={item.href}
                     onClick={(e) => handleNavClick(item, e)}
-                    className={cn(
-                      'text-gray-600 hover:text-primary-500 transition-colors px-4 py-2',
-                      location.pathname === item.href && 'text-primary-500 bg-primary-50'
-                    )}
+                    className="px-4 py-2 text-gray-700 hover:text-primary-500 transition-colors border-b border-gray-100"
                   >
                     {item.label}
                   </a>
                 ))}
 
                 {/* Mobile Auth Buttons */}
-                {loading ? (
-                  <div className="w-full h-12 animate-pulse bg-gray-200 rounded-md" />
-                ) : isAuthenticated ? (
-                  <>
-                    <Link
-                      to="/admin"
-                      className="flex items-center px-4 py-2 text-gray-600 hover:text-primary-500"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                      <LayoutDashboard className="w-4 h-4 mr-2" />
-                      Dashboard
-                    </Link>
-                    <button
-                      onClick={handleSignOut}
-                      className="flex items-center px-4 py-2 text-gray-600 hover:text-primary-500"
-                      disabled={isSigningOut}
-                    >
-                      <LogOut className="w-4 h-4 mr-2" />
-                      {isSigningOut ? 'Signing Out...' : 'Sign Out'}
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <Link
-                      to="/signup"
-                      className="flex items-center px-4 py-2 text-gray-600 hover:text-primary-500"
-                    >
-                      <UserPlus className="w-4 h-4 mr-2" />
-                      Sign Up
-                    </Link>
-                    <Link
-                      to="/login"
-                      className="flex items-center px-4 py-2 text-gray-600 hover:text-primary-500"
-                    >
-                      <LogIn className="w-4 h-4 mr-2" />
-                      Sign In
-                    </Link>
-                  </>
-                )}
+                <div className="pt-2">
+                  {loading ? (
+                    <div className="w-full h-12 animate-pulse bg-gray-200 rounded-md" />
+                  ) : isAuthenticated ? (
+                    <>
+                      <Link
+                        to="/admin"
+                        className="flex items-center px-4 py-2 text-gray-600 hover:text-primary-500"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                      >
+                        <LayoutDashboard className="w-4 h-4 mr-2" />
+                        Dashboard
+                      </Link>
+                      <button
+                        onClick={handleSignOut}
+                        className="flex items-center px-4 py-2 text-gray-600 hover:text-primary-500 w-full text-left"
+                        disabled={isSigningOut}
+                      >
+                        <LogOut className="w-4 h-4 mr-2" />
+                        {isSigningOut ? 'Signing Out...' : 'Sign Out'}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <Link
+                        to="/signup"
+                        className="flex items-center px-4 py-2 text-gray-600 hover:text-primary-500"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                      >
+                        <UserPlus className="w-4 h-4 mr-2" />
+                        Sign Up
+                      </Link>
+                      <Link
+                        to="/login"
+                        className="flex items-center px-4 py-2 text-gray-600 hover:text-primary-500"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                      >
+                        <LogIn className="w-4 h-4 mr-2" />
+                        Sign In
+                      </Link>
+                    </>
+                  )}
+                </div>
               </div>
             </motion.div>
           )}

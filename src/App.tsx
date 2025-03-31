@@ -58,6 +58,8 @@ import { ReportFolderList } from './components/admin/reports/ReportFolderList';
 import { TasksPage } from './components/admin/TasksPage';
 import { TaskFormPage } from './components/admin/TaskFormPage';
 import { FullTaskCalendar } from './components/admin/FullTaskCalendar';
+import FAQPage from './components/FAQPage';
+
 
 
 
@@ -112,6 +114,7 @@ function App() {
                             <Route path="/blog" element={<BlogPage />} />
                             <Route path="/blog/:slug" element={<BlogPost />} />
                             <Route path="/portfolio" element={<PortfolioPage />} />
+                            <Route path="/faq" element={<FAQPage />} />
 
                             {/* Public Routes */}
                             <Route path="/login" element={
