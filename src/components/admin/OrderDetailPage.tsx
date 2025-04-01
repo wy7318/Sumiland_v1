@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { 
+import {
   ArrowLeft, Building2, Mail, Phone, Calendar,
   Edit, AlertCircle, FileText, DollarSign, User,
-  CheckCircle, X, Send, Package
+  CheckCircle, X, Send, Package, Truck, MapPin,
+  ClipboardList, Clock, FileBarChart2
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { cn, formatCurrency } from '../../lib/utils';
+import { cn, formatCurrency, formatDateTime } from '../../lib/utils';
 import { AccountDetailsModal } from './AccountDetailsModal';
 import { CustomFieldsSection } from './CustomFieldsSection';
 import { useAuth } from '../../contexts/AuthContext';
@@ -28,15 +29,55 @@ type Order = {
   payment_status: 'Pending' | 'Partial Received' | 'Fully Received';
   payment_amount: number;
   total_amount: number;
-  tax_percent: number | null; // ✅ Added
-  tax_amount: number | null; // ✅ Added
-  discount_amount: number | null; // ✅ Added
-  subtotal: number; // ✅ Added
+  tax_percent: number | null;
+  tax_amount: number | null;
+  discount_amount: number | null;
+  subtotal: number;
   notes: string | null;
   quote_id: string | null;
   quote_number: string | null;
   created_at: string;
   organization_id: string;
+  // New fields
+  owner_id: string | null;
+  owner: {
+    id: string;
+    name: string;
+  } | null;
+  po_number: string | null;
+  po_date: string | null;
+  bill_to_customer_id: string | null;
+  bill_to_customer: {
+    customer_id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone: string | null;
+    company: string | null;
+  } | null;
+  ship_to_customer_id: string | null;
+  ship_to_customer: {
+    customer_id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone: string | null;
+    company: string | null;
+  } | null;
+  shipping_address_line1: string | null;
+  shipping_address_line2: string | null;
+  shipping_city: string | null;
+  shipping_state: string | null;
+  shipping_country: string | null;
+  billing_address_line1: string | null;
+  billing_address_line2: string | null;
+  billing_city: string | null;
+  billing_state: string | null;
+  billing_country: string | null;
+  tracking_carrier: string | null;
+  tracking_number: string | null;
+  order_start_at: string | null;
+  order_end_at: string | null;
   vendor: {
     id: string;
     name: string;
@@ -167,7 +208,9 @@ export function OrderDetailPage() {
             billing_state,
             billing_country
           ),
-          customer:customers(*)
+          customer:customers(*),
+          ship_to_customer:customers(customer_id, first_name, last_name, email, phone, company),
+          bill_to_customer:customers(customer_id, first_name, last_name, email, phone, company)
         `)
         .eq('order_id', id)
         .single();
@@ -289,6 +332,39 @@ export function OrderDetailPage() {
     return orderStatuses.find(s => s.value === status)?.label || status;
   };
 
+  // Format date for display
+  const formatDate = (date: string | null) => {
+    if (!date) return 'N/A';
+    return new Date(date).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  // Helper to display address
+  const renderAddress = (
+    line1: string | null,
+    line2: string | null,
+    city: string | null,
+    state: string | null,
+    country: string | null
+  ) => {
+    if (!line1 && !city && !state && !country) return 'No address provided';
+
+    return (
+      <div className="text-sm text-gray-600">
+        {line1 && <div>{line1}</div>}
+        {line2 && <div>{line2}</div>}
+        <div>
+          {[city, state].filter(Boolean).join(', ')} {country && ` ${country}`}
+        </div>
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -358,6 +434,12 @@ export function OrderDetailPage() {
                         From Quote: {order.quote_number}
                       </Link>
                     )}
+                    {order.po_number && (
+                      <div className="inline-flex items-center text-sm text-gray-600">
+                        <FileBarChart2 className="w-4 h-4 mr-1" />
+                        PO: {order.po_number}
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center gap-4 text-sm text-gray-500">
                     <span className="flex items-center">
@@ -380,7 +462,55 @@ export function OrderDetailPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                {/* Order Owner & Timeline */}
+                <div>
+                  <h2 className="text-lg font-semibold mb-4">Order Details</h2>
+                  <div className="bg-gray-50 rounded-lg p-4 space-y-4">
+                    {order.owner && (
+                      <div className="flex items-center">
+                        <User className="w-5 h-5 text-gray-400 mr-3" />
+                        <div>
+                          <div className="text-sm text-gray-500">Owner:</div>
+                          <div className="font-medium">{order.owner.name}</div>
+                        </div>
+                      </div>
+                    )}
+
+                    {(order.po_date || order.po_number) && (
+                      <div className="flex items-start">
+                        <FileBarChart2 className="w-5 h-5 text-gray-400 mr-3 mt-1" />
+                        <div>
+                          <div className="text-sm text-gray-500">Purchase Order:</div>
+                          <div className="font-medium">{order.po_number || 'N/A'}</div>
+                          {order.po_date && (
+                            <div className="text-sm text-gray-600">Date: {formatDate(order.po_date)}</div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {(order.order_start_at || order.order_end_at) && (
+                      <div className="flex items-start">
+                        <Clock className="w-5 h-5 text-gray-400 mr-3 mt-1" />
+                        <div>
+                          <div className="text-sm text-gray-500">Timeline:</div>
+                          {order.order_start_at && (
+                            <div className="text-sm">
+                              <span className="font-medium">Start:</span> {formatDate(order.order_start_at)}
+                            </div>
+                          )}
+                          {order.order_end_at && (
+                            <div className="text-sm">
+                              <span className="font-medium">End:</span> {formatDate(order.order_end_at)}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 {/* Account Information */}
                 {order.vendor && (
                   <div>
@@ -465,7 +595,7 @@ export function OrderDetailPage() {
                         </a>
                         <button
                           onClick={handleEmailClick}
-                          className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
+                          className="ml-3 inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
                         >
                           <Send className="w-4 h-4 mr-2" />
                           Send Email
@@ -489,8 +619,8 @@ export function OrderDetailPage() {
                 {/* Payment Information */}
                 <div>
                   <h2 className="text-lg font-semibold mb-4">Payment Information</h2>
-                    <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-                      <div className="flex justify-between items-center">
+                  <div className="bg-gray-50 rounded-lg p-4 space-y-4">
+                    <div className="flex justify-between items-center">
                       <span className="text-gray-600">Subtotal:</span>
                       <span className="font-medium">{formatCurrency(order.subtotal)}</span>
                     </div>
@@ -532,9 +662,89 @@ export function OrderDetailPage() {
                   </div>
                 </div>
 
+                {/* Shipping Information */}
+                <div className="md:col-span-2">
+                  <h2 className="text-lg font-semibold mb-4">Shipping Information</h2>
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <h3 className="font-medium mb-2 flex items-center">
+                          <MapPin className="w-4 h-4 mr-2 text-gray-500" />
+                          Shipping Address
+                        </h3>
+                        {order.ship_to_customer && (
+                          <div className="mb-2">
+                            <div className="font-medium">
+                              {order.ship_to_customer.first_name} {order.ship_to_customer.last_name}
+                            </div>
+                            {order.ship_to_customer.company && (
+                              <div className="text-sm text-gray-500">{order.ship_to_customer.company}</div>
+                            )}
+                          </div>
+                        )}
+                        {renderAddress(
+                          order.shipping_address_line1,
+                          order.shipping_address_line2,
+                          order.shipping_city,
+                          order.shipping_state,
+                          order.shipping_country
+                        )}
+                      </div>
+
+                      <div>
+                        <h3 className="font-medium mb-2 flex items-center">
+                          <Building2 className="w-4 h-4 mr-2 text-gray-500" />
+                          Billing Address
+                        </h3>
+                        {order.bill_to_customer && (
+                          <div className="mb-2">
+                            <div className="font-medium">
+                              {order.bill_to_customer.first_name} {order.bill_to_customer.last_name}
+                            </div>
+                            {order.bill_to_customer.company && (
+                              <div className="text-sm text-gray-500">{order.bill_to_customer.company}</div>
+                            )}
+                          </div>
+                        )}
+                        {renderAddress(
+                          order.billing_address_line1,
+                          order.billing_address_line2,
+                          order.billing_city,
+                          order.billing_state,
+                          order.billing_country
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Tracking Information */}
+                    {(order.tracking_number || order.tracking_carrier) && (
+                      <div className="mt-4 pt-4 border-t border-gray-200">
+                        <h3 className="font-medium mb-2 flex items-center">
+                          <Truck className="w-4 h-4 mr-2 text-gray-500" />
+                          Tracking Information
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {order.tracking_carrier && (
+                            <div>
+                              <div className="text-sm text-gray-500">Carrier:</div>
+                              <div>{order.tracking_carrier}</div>
+                            </div>
+                          )}
+                          {order.tracking_number && (
+                            <div>
+                              <div className="text-sm text-gray-500">Tracking Number:</div>
+                              <div>{order.tracking_number}</div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 {/* Notes */}
                 {order.notes && (
-                  <div>
+                  <div className="md:col-span-2">
                     <h2 className="text-lg font-semibold mb-4">Notes</h2>
                     <div className="bg-gray-50 rounded-lg p-4">
                       <p className="text-gray-600 whitespace-pre-wrap">{order.notes}</p>
