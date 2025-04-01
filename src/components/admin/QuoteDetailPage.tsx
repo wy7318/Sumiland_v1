@@ -450,6 +450,23 @@ export function QuoteDetailPage() {
         throw new Error(data.error);
       }
 
+      const createdOrderId = data.order_id;
+
+      // ✅ Step 2: Update the quote_hdr table to mark the quote as converted
+      const { error: updateError } = await supabase
+        .from('quote_hdr')
+        .update({
+          is_converted: true,
+          converted_at: new Date().toISOString(),
+          converted_to_id: createdOrderId
+        })
+        .eq('quote_id', quote.quote_id);
+
+      if (updateError) {
+        console.error('Error updating quote_hdr after order creation:', updateError);
+        throw updateError;
+      }
+
       alert(`Order created successfully! Order ID: ${data.order_id}`);
 
       // Navigate to the orders page after successfully creating the order
