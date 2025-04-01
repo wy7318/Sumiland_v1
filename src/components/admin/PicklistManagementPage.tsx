@@ -38,7 +38,8 @@ const PICKLIST_FIELDS = {
   Quote: {
     label: 'Quote',
     fields: {
-      status: 'Status'
+      status: 'Status',
+      quote_approval_status: 'Approval Status'
     }
   },
   Order: {
@@ -95,6 +96,7 @@ const PICKLIST_TYPE_MAPPING = {
   'Case.type': 'case_type',
   'Case.status': 'case_status',
   'Quote.status': 'quote_status',
+  'Quote.quote_approval_status': 'quote_approval_status',
   'Order.status': 'order_status',
   'Product.status': 'product_status',
   'Product.category': 'product_category',
