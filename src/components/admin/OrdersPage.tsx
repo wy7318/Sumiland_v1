@@ -25,6 +25,11 @@ type Order = {
   quote_id: string | null;
   created_at: string;
   organization_id: string;
+  owner_id: string | null;
+  owner: {
+    id: string;
+    name: string;
+  } | null;
   customer: {
     first_name: string;
     last_name: string;
@@ -147,7 +152,11 @@ export function OrdersPage() {
         .select(`
           *,
           customer:customers(*),
-          items:order_dtl(*)
+          items:order_dtl(*),
+          owner:profiles!order_owner_id_fkey(
+            id,
+            name
+          )
         `)
         .eq('organization_id', selectedOrganization?.id)
         .order('created_at', { ascending: false });
@@ -363,6 +372,9 @@ export function OrdersPage() {
                     Status
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Owner
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Payment Status
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -413,6 +425,14 @@ export function OrdersPage() {
                         <option value="Completed">Completed</option>
                         <option value="Cancelled">Cancelled</option>
                       </select>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <User className="w-4 h-4 text-gray-400 mr-2" />
+                        <span className="text-sm text-gray-800">
+                          {order.owner ? order.owner.name : 'Not assigned'}
+                        </span>
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={cn(

@@ -27,6 +27,11 @@ type Quote = {
   created_at: string;
   updated_at: string;
   organization_id: string;
+  owner_id: string | null; // Add owner_id field
+  owner: {
+    id: string;
+    name: string;
+  } | null; // Add owner object
   customer: {
     first_name: string;
     last_name: string;
@@ -67,7 +72,7 @@ function QuoteCard({ quote }: { quote: KanbanQuote }) {
     <KanbanCard id={quote.id}>
       <div className="space-y-2">
         <h4 className="font-medium">{quote.quote_number}</h4>
-        
+
         <div className="flex items-center text-sm text-gray-500">
           <DollarSign className="w-4 h-4 mr-1" />
           {formatCurrency(quote.total_amount)}
@@ -82,6 +87,13 @@ function QuoteCard({ quote }: { quote: KanbanQuote }) {
           <div className="flex items-center text-sm text-gray-500">
             <Building2 className="w-4 h-4 mr-1" />
             {quote.customer.company}
+          </div>
+        )}
+
+        {quote.owner && (
+          <div className="flex items-center text-sm text-gray-500">
+            <User className="w-4 h-4 mr-1" />
+            Owner: {quote.owner.name}
           </div>
         )}
 
@@ -155,20 +167,65 @@ export function QuotesPage() {
   const fetchQuotes = async () => {
     try {
       setLoading(true);
-      
+
+      // Step 1: Fetch quotes without owner profiles
       const { data, error } = await supabase
         .from('quote_hdr')
         .select(`
-          *,
-          customer:customers(*),
-          vendor:vendors(*),
-          items:quote_dtl(*)
-        `)
+        *,
+        customer:customers!quote_hdr_customer_id_fkey(*),
+        vendor:vendors(*),
+        items:quote_dtl(*)
+      `)
         .eq('organization_id', selectedOrganization?.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setQuotes(data || []);
+
+      // Early return if no data
+      if (!data || data.length === 0) {
+        setQuotes([]);
+        setLoading(false);
+        return;
+      }
+
+      // Step 2: Get all unique owner IDs
+      const ownerIds = data
+        .map(quote => quote.owner_id)
+        .filter(id => id !== null)
+        .filter((id, index, self) => self.indexOf(id) === index);
+
+      // Step 3: Fetch owner profiles if there are any
+      let ownerProfiles = {};
+      if (ownerIds.length > 0) {
+        const { data: profilesData, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, name')
+          .in('id', ownerIds);
+
+        if (profilesError) throw profilesError;
+
+        ownerProfiles = (profilesData || []).reduce((acc, profile) => {
+          acc[profile.id] = profile;
+          return acc;
+        }, {});
+      }
+
+      // Step 4: Combine quotes with owner data
+      const quotesWithOwners = data.map(quote => {
+        return {
+          ...quote,
+          owner: quote.owner_id && ownerProfiles[quote.owner_id]
+            ? {
+              id: ownerProfiles[quote.owner_id].id,
+              name: ownerProfiles[quote.owner_id].name
+            }
+            : null
+        };
+      });
+
+      setQuotes(quotesWithOwners);
+
     } catch (err) {
       console.error('Error fetching quotes:', err);
       setError(err instanceof Error ? err.message : 'Failed to load quotes');
@@ -322,8 +379,9 @@ export function QuotesPage() {
   const filteredQuotes = quotes.filter(quote =>
     quote.quote_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
     `${quote.customer.first_name} ${quote.customer.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    quote.customer.company?.toLowerCase().includes(searchTerm.toLowerCase())
-  ).filter(quote => 
+    quote.customer.company?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (quote.owner?.name && quote.owner.name.toLowerCase().includes(searchTerm.toLowerCase()))
+  ).filter(quote =>
     statusFilter === 'all' || quote.status === statusFilter
   );
 
@@ -454,6 +512,9 @@ export function QuotesPage() {
                             Date
                           </th>
                           <th scope="col" className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
+                            Owner
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
                             Total
                           </th>
                           <th scope="col" className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
@@ -475,6 +536,14 @@ export function QuotesPage() {
                             </td>
                             <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
                               {new Date(quote.created_at).toLocaleDateString()}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex items-center">
+                                <User className="w-4 h-4 text-gray-400 mr-2" />
+                                <span className="text-sm text-gray-800">
+                                  {quote.owner ? quote.owner.name : 'Not assigned'}
+                                </span>
+                              </div>
                             </td>
                             <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
                               {formatCurrency(quote.total_amount)}

@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { 
+import {
   ArrowLeft, Building2, Mail, Phone, Calendar,
   Edit, AlertCircle, FileText, DollarSign, User,
-  CheckCircle, X, Send, Package, ShoppingBag
+  CheckCircle, X, Send, Package, ShoppingBag,
+  MapPin, Clock, Award, Repeat
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { cn, formatCurrency } from '../../lib/utils';
+import { cn, formatCurrency, formatDate } from '../../lib/utils';
 import { AccountDetailsModal } from './AccountDetailsModal';
 import { CustomFieldsSection } from './CustomFieldsSection';
 import { useAuth } from '../../contexts/AuthContext';
@@ -26,28 +27,73 @@ type Quote = {
   quote_date: string;
   status: string;
   total_amount: number;
-  subtotal: number; // Add subtotal
-  tax_percent: number | null; // Add tax percentage
-  tax_amount: number | null; // Add tax amount
-  discount_percent: number | null; // Add discount percentage
-  discount_amount: number | null; // Add discount amount
+  subtotal: number;
+  tax_percent: number | null;
+  tax_amount: number | null;
+  discount_percent: number | null;
+  discount_amount: number | null;
   notes: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
   organization_id: string;
+  // New fields
+  owner_id: string | null;
+  bill_to_customer_id: string | null;
+  ship_to_customer_id: string | null;
+  shipping_address_line1: string | null;
+  shipping_address_line2: string | null;
+  shipping_city: string | null;
+  shipping_state: string | null;
+  shipping_country: string | null;
+  billing_address_line1: string | null;
+  billing_address_line2: string | null;
+  billing_city: string | null;
+  billing_state: string | null;
+  billing_country: string | null;
+  expire_at: string | null;
+  is_converted: boolean;
+  converted_at: string | null;
+  converted_to_id: string | null;
+  approved_by: string | null;
+  approved_at: string | null;
+  approval_status: string | null;
   customer: {
     first_name: string;
     last_name: string;
     email: string;
     company: string | null;
   };
+  owner: {
+    id: string;
+    name: string;
+  } | null;
+  approver: {
+    id: string;
+    name: string;
+    email: string;
+  } | null;
+  ship_to_customer: {
+    customer_id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    company: string | null;
+  } | null;
+  bill_to_customer: {
+    customer_id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    company: string | null;
+  } | null;
   items: {
     quote_dtl_id: string;
     item_name: string;
     item_desc: string | null;
     quantity: number;
     unit_price: number;
+    line_total: number;
   }[];
 };
 
@@ -71,6 +117,7 @@ export function QuoteDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [quoteStatuses, setQuoteStatuses] = useState<PicklistValue[]>([]);
+  const [approvalStatuses, setApprovalStatuses] = useState<PicklistValue[]>([]);
   const [creatingOrder, setCreatingOrder] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [showEmailConfigModal, setShowEmailConfigModal] = useState(false);
@@ -96,54 +143,205 @@ export function QuoteDetailPage() {
 
       if (statusError) throw statusError;
       setQuoteStatuses(statusData || []);
+
+      // Fetch approval statuses
+      const { data: approvalData, error: approvalError } = await supabase
+        .from('picklist_values')
+        .select('id, value, label, is_default, is_active, color, text_color')
+        .eq('type', 'quote_approval_status')
+        .eq('is_active', true)
+        .eq('organization_id', selectedOrganization?.id)
+        .order('display_order', { ascending: true });
+
+      if (approvalError) throw approvalError;
+      setApprovalStatuses(approvalData || []);
     } catch (err) {
       console.error('Error fetching picklists:', err);
       setError('Failed to load picklist values');
     }
   };
 
+  // const fetchQuote = async () => {
+  //   try {
+  //     if (!id) return;
+
+  //     const { data: quoteData, error: quoteError } = await supabase
+  //       .from('quote_hdr')
+  //       .select(`
+  //       *,
+  //       vendor:vendors(
+  //         id,
+  //         name,
+  //         type,
+  //         status,
+  //         payment_terms,
+  //         customer:customers!vendors_customer_id_fkey(
+  //           first_name,
+  //           last_name,
+  //           email,
+  //           phone,
+  //           company
+  //         )
+  //       ),
+  //       customer:customers!quote_hdr_customer_id_fkey(*),
+  //       ship_to_customer:customers!quote_hdr_customer_id_fkey(customer_id, first_name, last_name, email, company),
+  //       bill_to_customer:customers!quote_hdr_customer_id_fkey(customer_id, first_name, last_name, email, company),
+  //       items:quote_dtl(*)
+  //     `)
+  //       .eq('quote_id', id)
+  //       .single();
+
+  //     if (quoteError) throw quoteError;
+
+  //     if (quoteData) {
+  //       // Calculate discount_percent dynamically
+  //       const subtotal = quoteData.subtotal || 0;
+  //       const discountAmount = quoteData.discount_amount || 0;
+  //       const discountPercent = subtotal > 0 ? (discountAmount / subtotal) * 100 : 0;
+
+  //       // Set the quote data with calculated discount_percent
+  //       setQuote({
+  //         ...quoteData,
+  //         discount_percent: discountPercent,
+  //       });
+  //     }
+  //   } catch (err) {
+  //     console.error('Error fetching quote:', err);
+  //     setError(err instanceof Error ? err.message : 'Failed to load quote');
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
+
+  // Add console.log statements to debug the issue
   const fetchQuote = async () => {
     try {
       if (!id) return;
-  
+      setLoading(true);
+
+      // Step 1: Fetch the main quote data with vendor and items
       const { data: quoteData, error: quoteError } = await supabase
         .from('quote_hdr')
         .select(`
-          *,
-          vendor:vendors(
-            id,
-            name,
-            type,
-            status,
-            payment_terms,
-            customer:customers!vendors_customer_id_fkey(
-              first_name,
-              last_name,
-              email,
-              phone,
-              company
-            )
-          ),
-          customer:customers(*),
-          items:quote_dtl(*)
-        `)
+        *,
+        vendor:vendors(
+          id,
+          name,
+          type,
+          status,
+          payment_terms,
+          customer:customers!vendors_customer_id_fkey(
+            first_name,
+            last_name,
+            email,
+            phone,
+            company
+          )
+        ),
+        items:quote_dtl(*)
+      `)
         .eq('quote_id', id)
         .single();
-  
+
       if (quoteError) throw quoteError;
-  
-      if (quoteData) {
-        // Calculate discount_percent dynamically
-        const subtotal = quoteData.subtotal || 0;
-        const discountAmount = quoteData.discount_amount || 0;
-        const discountPercent = subtotal > 0 ? (discountAmount / subtotal) * 100 : 0;
-  
-        // Set the quote data with calculated discount_percent
-        setQuote({
-          ...quoteData,
-          discount_percent: discountPercent,
-        });
+      if (!quoteData) {
+        setError('Quote not found');
+        setLoading(false);
+        return;
       }
+
+      console.log("Quote data:", quoteData);
+      console.log("Ship to customer ID:", quoteData.ship_to_customer_id);
+      console.log("Bill to customer ID:", quoteData.bill_to_customer_id);
+
+      // Step 2: Fetch related data separately
+      // Customer
+      const { data: customerData, error: customerError } = await supabase
+        .from('customers')
+        .select('first_name, last_name, email, company')
+        .eq('customer_id', quoteData.customer_id)
+        .single();
+
+      if (customerError) throw customerError;
+
+      // Owner
+      let ownerData = null;
+      if (quoteData.owner_id) {
+        const { data: owner, error: ownerError } = await supabase
+          .from('profiles')
+          .select('id, name')
+          .eq('id', quoteData.owner_id)
+          .single();
+
+        if (ownerError) throw ownerError;
+        ownerData = owner;
+      }
+
+      // Approver
+      let approverData = null;
+      if (quoteData.approved_by) {
+        const { data: approver, error: approverError } = await supabase
+          .from('profiles')
+          .select('id, name')
+          .eq('id', quoteData.approved_by)
+          .single();
+
+        if (approverError) throw approverError;
+        approverData = approver;
+      }
+
+      // Ship To Customer
+      let shipToCustomerData = null;
+      if (quoteData.ship_to_customer_id) {
+        const { data: shipTo, error: shipToError } = await supabase
+          .from('customers')
+          .select('customer_id, first_name, last_name, email, company')
+          .eq('customer_id', quoteData.ship_to_customer_id)
+          .single();
+
+        if (shipToError) {
+          console.error("Error fetching ship_to_customer:", shipToError);
+        } else {
+          shipToCustomerData = shipTo;
+          console.log("Ship to customer data:", shipToCustomerData);
+        }
+      }
+
+      // Bill To Customer
+      let billToCustomerData = null;
+      if (quoteData.bill_to_customer_id) {
+        const { data: billTo, error: billToError } = await supabase
+          .from('customers')
+          .select('customer_id, first_name, last_name, email, company')
+          .eq('customer_id', quoteData.bill_to_customer_id)
+          .single();
+
+        if (billToError) {
+          console.error("Error fetching bill_to_customer:", billToError);
+        } else {
+          billToCustomerData = billTo;
+          console.log("Bill to customer data:", billToCustomerData);
+        }
+      }
+
+      // Calculate discount_percent dynamically
+      const subtotal = quoteData.subtotal || 0;
+      const discountAmount = quoteData.discount_amount || 0;
+      const discountPercent = subtotal > 0 ? (discountAmount / subtotal) * 100 : 0;
+
+      // Combine all data
+      const combinedQuoteData = {
+        ...quoteData,
+        discount_percent: discountPercent,
+        customer: customerData,
+        owner: ownerData,
+        approver: approverData,
+        ship_to_customer: shipToCustomerData,
+        bill_to_customer: billToCustomerData
+      };
+
+      console.log("Final combined quote data:", combinedQuoteData);
+      setQuote(combinedQuoteData);
     } catch (err) {
       console.error('Error fetching quote:', err);
       setError(err instanceof Error ? err.message : 'Failed to load quote');
@@ -151,6 +349,7 @@ export function QuoteDetailPage() {
       setLoading(false);
     }
   };
+  
 
   const handleEmailClick = async () => {
     if (!user) return;
@@ -174,7 +373,7 @@ export function QuoteDetailPage() {
 
       const { error } = await supabase
         .from('quote_hdr')
-        .update({ 
+        .update({
           status: newStatus,
           updated_at: new Date().toISOString()
         })
@@ -188,43 +387,71 @@ export function QuoteDetailPage() {
     }
   };
 
+  const handleApprovalStatusChange = async (newStatus: string) => {
+    try {
+      if (!id || !quote || !user) return;
+
+      const updates: any = {
+        approval_status: newStatus,
+        updated_at: new Date().toISOString()
+      };
+
+      // If status is being changed to Approved, update approved_by and approved_at
+      if (newStatus === 'Approved' && quote.approval_status !== 'Approved') {
+        updates.approved_by = user.id;
+        updates.approved_at = new Date().toISOString();
+      }
+
+      const { error } = await supabase
+        .from('quote_hdr')
+        .update(updates)
+        .eq('quote_id', id);
+
+      if (error) throw error;
+      await fetchQuote();
+    } catch (err) {
+      console.error('Error updating approval status:', err);
+      setError(err instanceof Error ? err.message : 'Failed to update approval status');
+    }
+  };
+
   const handleCreateOrder = async () => {
     try {
       if (!quote) {
         setError("Quote data is missing.");
         return;
       }
-  
+
       setCreatingOrder(true);
       setError(null);
-  
+
       // Get the authenticated user
       const { data: userData, error: userError } = await supabase.auth.getUser();
       if (userError || !userData?.user?.id) {
         throw new Error('User not authenticated.');
       }
-  
+
       const userId = userData.user.id;
-  
+
       // Call the Supabase function to create an order
       const { data, error } = await supabase
-        .rpc('create_order_from_quote', { 
-          quote_id_param: quote.quote_id, 
-          user_id_param: userId 
+        .rpc('create_order_from_quote', {
+          quote_id_param: quote.quote_id,
+          user_id_param: userId
         });
-  
+
       if (error) {
         console.error('Supabase RPC Error:', error);
         throw error;
       }
-  
+
       if (data?.error) {
         console.error('Supabase Function Error:', data.error);
         throw new Error(data.error);
       }
-  
+
       alert(`Order created successfully! Order ID: ${data.order_id}`);
-  
+
       // Navigate to the orders page after successfully creating the order
       navigate('/admin/orders');
     } catch (err) {
@@ -234,6 +461,22 @@ export function QuoteDetailPage() {
     } finally {
       setCreatingOrder(false);
     }
+  };
+
+  // Format a full address from components
+  const formatAddress = (line1: string | null, line2: string | null, city: string | null, state: string | null, country: string | null) => {
+    const parts = [];
+    if (line1) parts.push(line1);
+    if (line2) parts.push(line2);
+
+    const cityStateCountry = [];
+    if (city) cityStateCountry.push(city);
+    if (state) cityStateCountry.push(state);
+    if (cityStateCountry.length > 0) parts.push(cityStateCountry.join(', '));
+
+    if (country) parts.push(country);
+
+    return parts.length > 0 ? parts.join(', ') : 'No address provided';
   };
 
   // Get style for status badge
@@ -246,9 +489,30 @@ export function QuoteDetailPage() {
     };
   };
 
+  // Get approval status style
+  const getApprovalStatusStyle = (status: string) => {
+    const statusValue = approvalStatuses.find(s => s.value === status);
+    if (!statusValue?.color) {
+      // Default colors if not found in picklist
+      if (status === 'Approved') return { backgroundColor: '#10B981', color: '#FFFFFF' };
+      if (status === 'Rejected') return { backgroundColor: '#EF4444', color: '#FFFFFF' };
+      if (status === 'Pending') return { backgroundColor: '#F59E0B', color: '#FFFFFF' };
+      return {};
+    }
+    return {
+      backgroundColor: statusValue.color,
+      color: statusValue.text_color || '#FFFFFF'
+    };
+  };
+
   // Get label for status
   const getStatusLabel = (status: string) => {
     return quoteStatuses.find(s => s.value === status)?.label || status;
+  };
+
+  // Get label for approval status
+  const getApprovalStatusLabel = (status: string) => {
+    return approvalStatuses.find(s => s.value === status)?.label || status;
   };
 
   if (loading) {
@@ -281,14 +545,24 @@ export function QuoteDetailPage() {
               Back to Quotes
             </button>
             <div className="flex items-center gap-4">
-              <button
-                onClick={handleCreateOrder}
-                disabled={creatingOrder}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 disabled:opacity-50"
-              >
-                <ShoppingBag className="w-4 h-4 mr-2" />
-                {creatingOrder ? 'Creating Order...' : 'Create Order'}
-              </button>
+              {!quote.is_converted ? (
+                <button
+                  onClick={handleCreateOrder}
+                  disabled={creatingOrder}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 disabled:opacity-50"
+                >
+                  <ShoppingBag className="w-4 h-4 mr-2" />
+                  {creatingOrder ? 'Creating Order...' : 'Create Order'}
+                </button>
+              ) : (
+                <Link
+                  to={`/admin/orders/${quote.converted_to_id}`}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+                >
+                  <ShoppingBag className="w-4 h-4 mr-2" />
+                  View Order
+                </Link>
+              )}
               <div className="flex space-x-3">
                 <Link
                   to={`/admin/quotes/${id}/edit`}
@@ -339,7 +613,93 @@ export function QuoteDetailPage() {
                     </select>
                   </div>
                 </div>
+
+                {/* Approval Status */}
+                <div className="mt-4 md:mt-0">
+                  <div className="flex flex-col items-end">
+                    <div className="text-sm text-gray-500 mb-2">Approval Status</div>
+                    <select
+                      value={quote.approval_status || 'Pending'}
+                      onChange={(e) => handleApprovalStatusChange(e.target.value)}
+                      className="text-sm font-medium rounded-full px-3 py-1"
+                      style={getApprovalStatusStyle(quote.approval_status || 'Pending')}
+                    >
+                      {approvalStatuses.length > 0 ? (
+                        approvalStatuses.map(status => (
+                          <option key={status.id} value={status.value}>
+                            {status.label}
+                          </option>
+                        ))
+                      ) : (
+                        <>
+                          <option value="Pending">Pending</option>
+                          <option value="Approved">Approved</option>
+                          <option value="Rejected">Rejected</option>
+                        </>
+                      )}
+                    </select>
+                  </div>
+                </div>
               </div>
+
+              {/* Approval Information Section */}
+              {quote.approval_status === 'Approved' && quote.approved_at && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+                  <div className="flex items-center">
+                    <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
+                    <span className="font-medium text-green-700">Approved</span>
+                    {quote.approver && (
+                      <span className="text-green-700 ml-2">
+                        by {quote.approver.name} on {new Date(quote.approved_at).toLocaleDateString()}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Conversion Information Section */}
+              {quote.is_converted && quote.converted_at && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                  <div className="flex items-center">
+                    <Repeat className="w-5 h-5 text-blue-500 mr-2" />
+                    <span className="font-medium text-blue-700">
+                      Converted to Order on {new Date(quote.converted_at).toLocaleDateString()}
+                    </span>
+                    {quote.converted_to_id && (
+                      <Link
+                        to={`/admin/orders/${quote.converted_to_id}`}
+                        className="ml-2 text-blue-600 hover:text-blue-800 underline"
+                      >
+                        View Order
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Expiration Information */}
+              {quote.expire_at && (
+                <div className={`border rounded-lg p-4 mb-6 ${new Date(quote.expire_at) < new Date()
+                    ? 'bg-red-50 border-red-200'
+                    : 'bg-yellow-50 border-yellow-200'
+                  }`}>
+                  <div className="flex items-center">
+                    <Clock className={`w-5 h-5 mr-2 ${new Date(quote.expire_at) < new Date()
+                        ? 'text-red-500'
+                        : 'text-yellow-500'
+                      }`} />
+                    <span className={`font-medium ${new Date(quote.expire_at) < new Date()
+                        ? 'text-red-700'
+                        : 'text-yellow-700'
+                      }`}>
+                      {new Date(quote.expire_at) < new Date()
+                        ? 'Expired on '
+                        : 'Expires on '}
+                      {new Date(quote.expire_at).toLocaleDateString()}
+                    </span>
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {/* Account Information */}
@@ -398,7 +758,6 @@ export function QuoteDetailPage() {
                                 {quote.vendor.customer.phone}
                               </a>
                             </div>
-                            
                           )}
                         </div>
                       )}
@@ -437,6 +796,26 @@ export function QuoteDetailPage() {
                   </div>
                 </div>
 
+                {/* Owner Information */}
+                {quote.owner && (
+                  <div>
+                    <h2 className="text-lg font-semibold mb-4">Owner Information</h2>
+                    <div className="bg-gray-50 rounded-lg p-4 space-y-4">
+                      <div className="flex items-center">
+                        <User className="w-5 h-5 text-gray-400 mr-3" />
+                        <div>
+                          <div className="font-medium">{quote.owner.name}</div>
+                          {quote.owner.name && (
+                            <div className="text-sm text-gray-500">
+                              {quote.owner.name}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Notes */}
                 {quote.notes && (
                   <div>
@@ -446,6 +825,129 @@ export function QuoteDetailPage() {
                     </div>
                   </div>
                 )}
+
+                {/* Shipping & Billing Information */}
+                <div className="md:col-span-2">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Shipping Information */}
+                    <div>
+                      <h2 className="text-lg font-semibold mb-4 flex items-center">
+                        <MapPin className="w-5 h-5 mr-2 text-gray-500" />
+                        Shipping Information
+                      </h2>
+                      <div className="bg-gray-50 rounded-lg p-4 space-y-4">
+                        {quote.ship_to_customer && (
+                          <div className="flex items-center">
+                            <User className="w-5 h-5 text-gray-400 mr-3" />
+                            <div>
+                              <div className="font-medium">
+                                {quote.ship_to_customer.first_name} {quote.ship_to_customer.last_name}
+                              </div>
+                              {quote.ship_to_customer.company && (
+                                <div className="text-sm text-gray-500">
+                                  {quote.ship_to_customer.company}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        {(quote.shipping_address_line1 ||
+                          quote.shipping_city ||
+                          quote.shipping_state ||
+                          quote.shipping_country) && (
+                            <div className="flex items-start">
+                              <MapPin className="w-5 h-5 text-gray-400 mr-3 mt-0.5" />
+                              <div className="text-gray-600">
+                                {quote.shipping_address_line1 && (
+                                  <div>{quote.shipping_address_line1}</div>
+                                )}
+                                {quote.shipping_address_line2 && (
+                                  <div>{quote.shipping_address_line2}</div>
+                                )}
+                                <div>
+                                  {[
+                                    quote.shipping_city,
+                                    quote.shipping_state
+                                  ].filter(Boolean).join(', ')}
+                                </div>
+                                {quote.shipping_country && (
+                                  <div>{quote.shipping_country}</div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        {!quote.shipping_address_line1 &&
+                          !quote.shipping_city &&
+                          !quote.shipping_state &&
+                          !quote.shipping_country &&
+                          !quote.ship_to_customer && (
+                            <div className="text-sm text-gray-500 italic">
+                              No shipping information provided
+                            </div>
+                          )}
+                      </div>
+                    </div>
+
+                    {/* Billing Information */}
+                    <div>
+                      <h2 className="text-lg font-semibold mb-4 flex items-center">
+                        <Building2 className="w-5 h-5 mr-2 text-gray-500" />
+                        Billing Information
+                      </h2>
+                      <div className="bg-gray-50 rounded-lg p-4 space-y-4">
+                        {quote.bill_to_customer && (
+                          <div className="flex items-center">
+                            <User className="w-5 h-5 text-gray-400 mr-3" />
+                            <div>
+                              <div className="font-medium">
+                                {quote.bill_to_customer.first_name} {quote.bill_to_customer.last_name}
+                              </div>
+                              {quote.bill_to_customer.company && (
+                                <div className="text-sm text-gray-500">
+                                  {quote.bill_to_customer.company}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        {(quote.billing_address_line1 ||
+                          quote.billing_city ||
+                          quote.billing_state ||
+                          quote.billing_country) && (
+                            <div className="flex items-start">
+                              <MapPin className="w-5 h-5 text-gray-400 mr-3 mt-0.5" />
+                              <div className="text-gray-600">
+                                {quote.billing_address_line1 && (
+                                  <div>{quote.billing_address_line1}</div>
+                                )}
+                                {quote.billing_address_line2 && (
+                                  <div>{quote.billing_address_line2}</div>
+                                )}
+                                <div>
+                                  {[
+                                    quote.billing_city,
+                                    quote.billing_state
+                                  ].filter(Boolean).join(', ')}
+                                </div>
+                                {quote.billing_country && (
+                                  <div>{quote.billing_country}</div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        {!quote.billing_address_line1 &&
+                          !quote.billing_city &&
+                          !quote.billing_state &&
+                          !quote.billing_country &&
+                          !quote.bill_to_customer && (
+                            <div className="text-sm text-gray-500 italic">
+                              No billing information provided
+                            </div>
+                          )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
 
                 {/* Add Custom Fields section */}
                 <div className="md:col-span-2">
@@ -503,7 +1005,7 @@ export function QuoteDetailPage() {
                           </td>
                           <td className="px-6 py-4 text-right whitespace-nowrap">
                             <div className="text-sm font-medium text-gray-900">
-                              {formatCurrency(item.quantity * item.unit_price)}
+                              {formatCurrency(item.line_total)}
                             </div>
                           </td>
                         </tr>
@@ -511,7 +1013,7 @@ export function QuoteDetailPage() {
                     </tbody>
                   </table>
                 </div>
-              
+
                 {/* Tax and Discount Section */}
                 <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="bg-gray-50 rounded-lg p-4">
@@ -531,14 +1033,14 @@ export function QuoteDetailPage() {
                       </div>
                     </div>
                   </div>
-              
+
                   <div className="bg-gray-50 rounded-lg p-4">
                     <h3 className="text-lg font-semibold mb-4">Discount Details</h3>
                     <div className="space-y-2">
                       <div className="flex justify-between">
                         <span className="text-sm text-gray-600">Discount Percentage:</span>
                         <span className="text-sm text-gray-900">
-                          {quote.discount_percent !== null ? `${quote.discount_percent}%` : 'N/A'}
+                          {quote.discount_percent !== null ? `${quote.discount_percent.toFixed(2)}%` : 'N/A'}
                         </span>
                       </div>
                       <div className="flex justify-between">
@@ -550,7 +1052,7 @@ export function QuoteDetailPage() {
                     </div>
                   </div>
                 </div>
-              
+
                 {/* Total Amount Section */}
                 <div className="mt-6 bg-gray-50 rounded-lg p-4">
                   <div className="flex justify-between items-center">
