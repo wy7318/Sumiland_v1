@@ -118,6 +118,7 @@ export function DashboardPage() {
   const { user } = useAuth();
   const { selectedOrganization } = useOrganization();
   const [orgTimezone, setOrgTimezone] = useState<string>('UTC');
+  const [timezoneLoaded, setTimezoneLoaded] = useState(false);
 
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
@@ -153,37 +154,46 @@ export function DashboardPage() {
     const fetchOrgTimezone = async () => {
       if (!selectedOrganization?.id) return;
 
-      const { data, error } = await supabase
-        .from('organizations')
-        .select('timezone')
-        .eq('id', selectedOrganization.id)
-        .single();
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('organizations')
+          .select('timezone')
+          .eq('id', selectedOrganization.id)
+          .single();
 
-      if (error) {
-        console.error('Error fetching organization timezone:', error);
-        return;
-      }
+        if (error) {
+          console.error('Error fetching organization timezone:', error);
+          return;
+        }
 
-      if (data?.timezone) {
-        setOrgTimezone(data.timezone);
+        if (data?.timezone) {
+          setOrgTimezone(data.timezone);
+        }
+      } catch (err) {
+        console.error('Error in fetchOrgTimezone:', err);
+      } finally {
+        setTimezoneLoaded(true);
       }
     };
 
     fetchOrgTimezone();
-  }, [selectedOrganization]);
+  }, [selectedOrganization?.id]);
 
 
 
   useEffect(() => {
-    console.log("Organization :", selectedOrganization?.id);
-    console.log("Organization timezone:", selectedOrganization?.timezone);
-    console.log("Using timezone:", orgTimezone);
-    fetchReports();
-  }, [selectedOrganization]);
+    if (timezoneLoaded) {
+      console.log("Organization timezone loaded:", orgTimezone);
+      fetchData(rangeType);
+      fetchReports();
+    }
+  }, [timezoneLoaded, orgTimezone]);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  // Remove the initial fetchData call that ran immediately
+  // useEffect(() => {
+  //   fetchData();
+  // }, []);
 
   const fetchData = async (range: 'daily' | 'monthly' | 'yearly' | 'custom' = 'daily') => {
     setLoading(true);

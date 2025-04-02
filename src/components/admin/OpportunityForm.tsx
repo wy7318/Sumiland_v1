@@ -1,12 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Save, X, Plus, Trash2, Search, Building2, Package, Scale,
-  AlertCircle, Calendar, DollarSign, User, Mail, Phone, Percent  } from 'lucide-react';
+import {
+  Save, X, Plus, Trash2, Search, Building2, Package, Scale,
+  AlertCircle, Calendar, DollarSign, User, Mail, Phone, Percent
+} from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
 import { CustomFieldsForm } from './CustomFieldsForm';
+import { UserSearch } from './UserSearch'; // Import UserSearch
 import { useOrganization } from '../../contexts/OrganizationContext';
 
 
@@ -26,6 +29,13 @@ type Vendor = {
   email: string | null;
   phone: string | null;
   contact_person: string | null;
+};
+
+type Opportunity = {
+  id: string;
+  name: string;
+  stage: string;
+  status: string;
 };
 
 type Product = {
@@ -65,6 +75,9 @@ type FormData = {
   amount: string;
   probability: string;
   expected_close_date: string;
+  close_date: string; // New field
+  competitor: string; // New field
+  parent_id: string | null; // New field
   lead_source: string;
   type: string;
   description: string;
@@ -84,6 +97,9 @@ const initialFormData: FormData = {
   amount: '0',
   probability: '0',
   expected_close_date: '',
+  close_date: '', // New field
+  competitor: '', // New field
+  parent_id: null, // New field
   lead_source: '',
   type: '',
   description: '',
@@ -102,22 +118,27 @@ export function OpportunityForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState<FormData>(initialFormData);
-  
+
   // Search states
   const [customerSearch, setCustomerSearch] = useState('');
   const [vendorSearch, setVendorSearch] = useState('');
   const [productSearch, setProductSearch] = useState('');
+  const [opportunitySearch, setOpportunitySearch] = useState(''); // New state for opportunity search
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [opportunities, setOpportunities] = useState<Opportunity[]>([]); // New state for opportunities
   const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
   const [filteredVendors, setFilteredVendors] = useState<Vendor[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
+  const [filteredOpportunities, setFilteredOpportunities] = useState<Opportunity[]>([]); // New state for filtered opportunities
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const [showVendorDropdown, setShowVendorDropdown] = useState(false);
   const [showProductDropdown, setShowProductDropdown] = useState(false);
+  const [showOpportunityDropdown, setShowOpportunityDropdown] = useState(false); // New state for opportunity dropdown
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
+  const [selectedParentOpportunity, setSelectedParentOpportunity] = useState<Opportunity | null>(null); // New state for selected parent opportunity
   const [selectedProductIndex, setSelectedProductIndex] = useState<number | null>(null);
   const [opportunityStages, setOpportunityStages] = useState<PicklistValue[]>([]);
   const [opportunityTypes, setOpportunityTypes] = useState<PicklistValue[]>([]);
@@ -125,10 +146,11 @@ export function OpportunityForm() {
   const [productStatuses, setProductStatuses] = useState<PicklistValue[]>([]);
   const [leadSources, setLeadSources] = useState<PicklistValue[]>([]);
   const [customFields, setCustomFields] = useState<Record<string, any>>({});
-  
+
   const customerSearchRef = useRef<HTMLDivElement>(null);
   const vendorSearchRef = useRef<HTMLDivElement>(null);
   const productSearchRef = useRef<HTMLDivElement>(null);
+  const opportunitySearchRef = useRef<HTMLDivElement>(null); // New ref for opportunity search
 
   // Get lead data from navigation state if available
   const leadData = location.state?.leadData;
@@ -160,7 +182,7 @@ export function OpportunityForm() {
   useEffect(() => {
     if (customerSearch) {
       const searchTerm = customerSearch.toLowerCase();
-      const filtered = customers.filter(customer => 
+      const filtered = customers.filter(customer =>
         customer.first_name.toLowerCase().includes(searchTerm) ||
         customer.last_name.toLowerCase().includes(searchTerm) ||
         customer.email.toLowerCase().includes(searchTerm) ||
@@ -175,7 +197,7 @@ export function OpportunityForm() {
   useEffect(() => {
     if (vendorSearch) {
       const searchTerm = vendorSearch.toLowerCase();
-      const filtered = vendors.filter(vendor => 
+      const filtered = vendors.filter(vendor =>
         vendor.name.toLowerCase().includes(searchTerm) ||
         vendor.email?.toLowerCase().includes(searchTerm) ||
         vendor.contact_person?.toLowerCase().includes(searchTerm)
@@ -199,6 +221,20 @@ export function OpportunityForm() {
     }
   }, [productSearch, products]);
 
+  // New effect for filtering opportunities
+  useEffect(() => {
+    if (opportunitySearch) {
+      const searchTerm = opportunitySearch.toLowerCase();
+      const filtered = opportunities.filter(opportunity =>
+        opportunity.name.toLowerCase().includes(searchTerm) &&
+        opportunity.id !== id // Exclude current opportunity
+      );
+      setFilteredOpportunities(filtered);
+    } else {
+      setFilteredOpportunities([]);
+    }
+  }, [opportunitySearch, opportunities, id]);
+
   // Click outside handlers
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -210,6 +246,9 @@ export function OpportunityForm() {
       }
       if (productSearchRef.current && !productSearchRef.current.contains(event.target as Node)) {
         setShowProductDropdown(false);
+      }
+      if (opportunitySearchRef.current && !opportunitySearchRef.current.contains(event.target as Node)) {
+        setShowOpportunityDropdown(false);
       }
     };
 
@@ -315,15 +354,30 @@ export function OpportunityForm() {
 
       if (error) throw error;
       if (opportunity) {
+        // Format the date fields properly for the form
+        let formattedCloseDate = '';
+        if (opportunity.close_date) {
+          // Parse the datetime and format as YYYY-MM-DD for the date input
+          try {
+            const dateObj = new Date(opportunity.close_date);
+            formattedCloseDate = dateObj.toISOString().split('T')[0];
+          } catch (e) {
+            console.error('Error parsing close_date:', e);
+          }
+        }
+
         setFormData({
           name: opportunity.name,
           account_id: opportunity.account_id,
           contact_id: opportunity.contact_id,
-          owner_id: opportunity.owner_id,
+          owner_id: opportunity.owner_id || null,
           stage: opportunity.stage,
           amount: opportunity.amount.toString(),
           probability: opportunity.probability.toString(),
-          expected_close_date: opportunity.expected_close_date || '',
+          expected_close_date: opportunity.expected_close_date ? new Date(opportunity.expected_close_date).toISOString().split('T')[0] : '',
+          close_date: formattedCloseDate, // Properly formatted date
+          competitor: opportunity.competitor || '',
+          parent_id: opportunity.parent_id,
           lead_source: opportunity.lead_source || '',
           type: opportunity.type || '',
           description: opportunity.description || '',
@@ -340,11 +394,26 @@ export function OpportunityForm() {
           }))
         });
 
+        console.log('opportunity.owner_id  : ' + opportunity.owner_id);
+
         if (opportunity.account) {
           setSelectedVendor(opportunity.account);
         }
         if (opportunity.contact) {
           setSelectedCustomer(opportunity.contact);
+        }
+
+        // Fetch parent opportunity if it exists
+        if (opportunity.parent_id) {
+          const { data: parentOpportunity, error: parentError } = await supabase
+            .from('opportunities')
+            .select('id, name, stage, status')
+            .eq('id', opportunity.parent_id)
+            .single();
+
+          if (!parentError && parentOpportunity) {
+            setSelectedParentOpportunity(parentOpportunity);
+          }
         }
 
         // Fetch custom fields
@@ -401,6 +470,23 @@ export function OpportunityForm() {
     }
   };
 
+  // New function to fetch opportunities
+  const fetchOpportunities = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('opportunities')
+        .select('id, name, stage, status')
+        .eq('organization_id', selectedOrganization?.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setOpportunities(data || []);
+    } catch (err) {
+      console.error('Error fetching opportunities:', err);
+      setError('Failed to load opportunities');
+    }
+  };
+
   const fetchProducts = async () => {
     try {
       const { data, error } = await supabase
@@ -432,20 +518,28 @@ export function OpportunityForm() {
     setShowVendorDropdown(false);
   };
 
+  // New function to handle parent opportunity selection
+  const handleOpportunitySelect = (opportunity: Opportunity) => {
+    setSelectedParentOpportunity(opportunity);
+    setFormData(prev => ({ ...prev, parent_id: opportunity.id }));
+    setOpportunitySearch('');
+    setShowOpportunityDropdown(false);
+  };
+
   const handleProductSelect = (product: Product) => {
     if (selectedProductIndex !== null) {
       // Update existing product
       setFormData(prev => ({
         ...prev,
-        products: prev.products.map((item, index) => 
+        products: prev.products.map((item, index) =>
           index === selectedProductIndex
             ? {
-                product_id: product.id,
-                product_name: product.name,
-                quantity: 1,
-                unit_price: product.price,
-                status: productStatuses[0]?.value || 'pending'
-              }
+              product_id: product.id,
+              product_name: product.name,
+              quantity: 1,
+              unit_price: product.price,
+              status: productStatuses[0]?.value || 'pending'
+            }
             : item
         )
       }));
@@ -473,7 +567,7 @@ export function OpportunityForm() {
   const updateProduct = (index: number, field: keyof OpportunityProduct, value: any) => {
     setFormData(prev => ({
       ...prev,
-      products: prev.products.map((item, i) => 
+      products: prev.products.map((item, i) =>
         i === index ? { ...item, [field]: value } : item
       )
     }));
@@ -495,37 +589,46 @@ export function OpportunityForm() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-  
+
     try {
       const total = calculateTotal();
+
+      // Format dates for database submission
+      let closeDateForDb = null;
+      if (formData.close_date) {
+        // Add time component to make it a valid datetime
+        closeDateForDb = new Date(`${formData.close_date}T00:00:00.000Z`).toISOString();
+      }
+
       const opportunityData = {
         ...formData,
         amount: parseFloat(formData.amount) || total,
         probability: parseInt(formData.probability) || 0,
+        close_date: closeDateForDb, // Properly formatted for database
         updated_at: new Date().toISOString(),
         updated_by: user?.id
       };
-  
+
       // Remove products from the opportunity data
       const { products, ...opportunityDataWithoutProducts } = opportunityData;
-  
+
       let opportunityId = id;
-  
+
       if (id) {
         // Update existing opportunity
         const { error: updateError } = await supabase
           .from('opportunities')
           .update(opportunityDataWithoutProducts)
           .eq('id', id);
-  
+
         if (updateError) throw updateError;
-  
+
         // Delete existing products
         const { error: deleteError } = await supabase
           .from('opportunity_products')
           .delete()
           .eq('opportunity_id', id);
-  
+
         if (deleteError) throw deleteError;
       } else {
         // Create new opportunity
@@ -538,7 +641,7 @@ export function OpportunityForm() {
           }])
           .select()
           .single();
-  
+
         if (insertError) throw insertError;
         opportunityId = newOpportunity.id;
       }
@@ -559,8 +662,8 @@ export function OpportunityForm() {
 
         if (leadUpdateError) throw leadUpdateError;
       }
-    
-  
+
+
       // Insert products
       if (formData.products.length > 0) {
         const { error: productsError } = await supabase
@@ -577,10 +680,10 @@ export function OpportunityForm() {
               organization_id: formData.organization_id
             }))
           );
-  
+
         if (productsError) throw productsError;
       }
-  
+
       // Save custom field values
       if (user) {
         for (const [fieldId, value] of Object.entries(customFields)) {
@@ -597,13 +700,13 @@ export function OpportunityForm() {
             }, {
               onConflict: 'organization_id,field_id,entity_id'
             });
-  
+
           if (valueError) {
             console.error('Error saving custom field value:', valueError);
           }
         }
       }
-  
+
       navigate('/admin/opportunities');
     } catch (err) {
       console.error('Error saving opportunity:', err);
@@ -857,7 +960,7 @@ export function OpportunityForm() {
             >
               <option value="">Select Stage</option>
               {opportunityStages.map(stage => (
-                <option key={stage.id} value={ stage.value}>
+                <option key={stage.id} value={stage.value}>
                   {stage.label}
                 </option>
               ))}
@@ -913,6 +1016,22 @@ export function OpportunityForm() {
             </div>
           </div>
 
+          {/* New field: Close Date */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Close Date
+            </label>
+            <div className="relative">
+              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <input
+                type="date"
+                value={formData.close_date}
+                onChange={(e) => setFormData(prev => ({ ...prev, close_date: e.target.value }))}
+                className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+              />
+            </div>
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Lead Source
@@ -929,6 +1048,19 @@ export function OpportunityForm() {
                 </option>
               ))}
             </select>
+          </div>
+
+          {/* New field: Competitor */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Competitor
+            </label>
+            <input
+              type="text"
+              value={formData.competitor}
+              onChange={(e) => setFormData(prev => ({ ...prev, competitor: e.target.value }))}
+              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+            />
           </div>
 
           <div>
@@ -951,6 +1083,18 @@ export function OpportunityForm() {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
+              Owner
+            </label>
+            <UserSearch
+              organizationId={selectedOrganization?.id}
+              selectedUserId={formData.owner_id}
+              onSelect={(userId) => setFormData(prev => ({ ...prev, owner_id: userId }))}
+              className="w-full"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               Status
             </label>
             <select
@@ -966,6 +1110,94 @@ export function OpportunityForm() {
                 </option>
               ))}
             </select>
+          </div>
+
+          {/* New field: Parent Opportunity */}
+          <div ref={opportunitySearchRef} className="relative">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Parent Opportunity
+            </label>
+            {selectedParentOpportunity ? (
+              <div className="flex items-center justify-between p-2 border rounded-lg">
+                <div>
+                  <p className="font-medium">{selectedParentOpportunity.name}</p>
+                  <p className="text-sm text-gray-500">
+                    Stage: {opportunityStages.find(s => s.value === selectedParentOpportunity.stage)?.label || selectedParentOpportunity.stage}
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    Status: {opportunityStatuses.find(s => s.value === selectedParentOpportunity.status)?.label || selectedParentOpportunity.status}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedParentOpportunity(null);
+                    setFormData(prev => ({ ...prev, parent_id: null }));
+                  }}
+                  className="p-1 hover:bg-gray-100 rounded-full"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="text"
+                  value={opportunitySearch}
+                  onChange={(e) => {
+                    setOpportunitySearch(e.target.value);
+                    setShowOpportunityDropdown(true);
+                    if (!opportunities.length) {
+                      fetchOpportunities();
+                    }
+                  }}
+                  onFocus={() => {
+                    setShowOpportunityDropdown(true);
+                    if (!opportunities.length) {
+                      fetchOpportunities();
+                    }
+                  }}
+                  placeholder="Search for parent opportunity..."
+                  className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                />
+              </div>
+            )}
+
+            <AnimatePresence>
+              {showOpportunityDropdown && opportunitySearch && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="absolute z-10 w-full mt-1 bg-white rounded-lg shadow-lg border border-gray-200"
+                >
+                  {filteredOpportunities.length > 0 ? (
+                    <ul className="py-1 max-h-60 overflow-auto">
+                      {filteredOpportunities.map(opportunity => (
+                        <li
+                          key={opportunity.id}
+                          onClick={() => handleOpportunitySelect(opportunity)}
+                          className="px-4 py-2 hover:bg-gray-50 cursor-pointer"
+                        >
+                          <div className="font-medium">{opportunity.name}</div>
+                          <div className="text-sm text-gray-500">
+                            Stage: {opportunityStages.find(s => s.value === opportunity.stage)?.label || opportunity.stage}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            Status: {opportunityStatuses.find(s => s.value === opportunity.status)?.label || opportunity.status}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="p-4 text-gray-500">
+                      No opportunities found
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           <div className="md:col-span-2">
@@ -1196,4 +1428,3 @@ export function OpportunityForm() {
     </motion.div>
   );
 }
-

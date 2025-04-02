@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { 
-  Plus, Search, Filter, ChevronDown, ChevronUp, Edit, Trash2, 
+import {
+  Plus, Search, Filter, ChevronDown, ChevronUp, Edit, Trash2,
   Eye, Package, Calendar, DollarSign, Building2, AlertCircle,
   FileDown, Send, User, Mail, Phone, LayoutGrid, LayoutList
 } from 'lucide-react';
@@ -62,12 +62,17 @@ type PicklistValue = {
 
 type ViewMode = 'list' | 'kanban';
 
+type SortConfig = {
+  key: keyof Opportunity | 'owner.name';
+  direction: 'asc' | 'desc';
+};
+
 function OpportunityCard({ opportunity }: { opportunity: KanbanOpportunity }) {
   return (
     <KanbanCard id={opportunity.id}>
       <div className="space-y-2">
         <h4 className="font-medium">{opportunity.name}</h4>
-        
+
         <div className="flex items-center text-sm text-gray-500">
           <DollarSign className="w-4 h-4 mr-1" />
           {formatCurrency(opportunity.amount)}
@@ -125,8 +130,10 @@ export function OpportunitiesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [stageFilter, setStageFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<'created_at' | 'name' | 'amount'>('created_at');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [sortConfig, setSortConfig] = useState<SortConfig>({
+    key: 'created_at',
+    direction: 'desc'
+  });
   const [selectedOpportunities, setSelectedOpportunities] = useState<string[]>([]);
   const [opportunityStages, setOpportunityStages] = useState<PicklistValue[]>([]);
   const [opportunityTypes, setOpportunityTypes] = useState<PicklistValue[]>([]);
@@ -248,7 +255,7 @@ export function OpportunitiesPage() {
     try {
       const { error } = await supabase
         .from('opportunities')
-        .update({ 
+        .update({
           stage: newStage,
           updated_at: new Date().toISOString()
         })
@@ -297,7 +304,7 @@ export function OpportunitiesPage() {
       } else {
         const { error } = await supabase
           .from('opportunities')
-          .update({ 
+          .update({
             stage: action,
             updated_at: new Date().toISOString()
           })
@@ -315,10 +322,12 @@ export function OpportunitiesPage() {
   };
 
   const filteredOpportunities = opportunities.filter(opp => {
-    const matchesSearch = 
+    const matchesSearch =
       opp.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       opp.account?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      `${opp.contact?.first_name} ${opp.contact?.last_name}`.toLowerCase().includes(searchQuery.toLowerCase());
+      `${opp.contact?.first_name} ${opp.contact?.last_name}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      // Add owner name to search
+      opp.owner?.name?.toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesStage = stageFilter === 'all' || opp.stage === stageFilter;
     const matchesType = typeFilter === 'all' || opp.type === typeFilter;
@@ -327,10 +336,17 @@ export function OpportunitiesPage() {
   });
 
   const sortedOpportunities = [...filteredOpportunities].sort((a, b) => {
-    const aValue = a[sortBy];
-    const bValue = b[sortBy];
-    const multiplier = sortOrder === 'asc' ? 1 : -1;
-    return (aValue < bValue ? -1 : 1) * multiplier;
+    if (sortConfig.key === 'owner.name') {
+      const aValue = a.owner?.name || '';
+      const bValue = b.owner?.name || '';
+      const multiplier = sortConfig.direction === 'asc' ? 1 : -1;
+      return (aValue < bValue ? -1 : aValue > bValue ? 1 : 0) * multiplier;
+    } else {
+      const aValue = a[sortConfig.key as keyof Opportunity];
+      const bValue = b[sortConfig.key as keyof Opportunity];
+      const multiplier = sortConfig.direction === 'asc' ? 1 : -1;
+      return (aValue < bValue ? -1 : 1) * multiplier;
+    }
   });
 
   const kanbanOpportunities: KanbanOpportunity[] = sortedOpportunities.map(opp => ({
@@ -495,6 +511,32 @@ export function OpportunitiesPage() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Contact
                   </th>
+                  {/* Add Owner column header */}
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                    onClick={() => {
+                      if (sortConfig.key === 'owner.name') {
+                        setSortConfig({
+                          key: 'owner.name',
+                          direction: sortConfig.direction === 'asc' ? 'desc' : 'asc'
+                        });
+                      } else {
+                        setSortConfig({
+                          key: 'owner.name',
+                          direction: 'asc'
+                        });
+                      }
+                    }}
+                  >
+                    <div className="flex items-center">
+                      <span>Owner</span>
+                      {sortConfig.key === 'owner.name' && (
+                        sortConfig.direction === 'asc' ?
+                          <ChevronUp className="w-4 h-4 ml-1" /> :
+                          <ChevronDown className="w-4 h-4 ml-1" />
+                      )}
+                    </div>
+                  </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Stage
                   </th>
@@ -589,6 +631,17 @@ export function OpportunitiesPage() {
                         </div>
                       ) : (
                         <span className="text-gray-400">No Contact</span>
+                      )}
+                    </td>
+                    {/* Add Owner cell content */}
+                    <td className="px-6 py-4">
+                      {opp.owner ? (
+                        <div className="flex items-center text-sm">
+                          <User className="w-4 h-4 text-gray-400 mr-1" />
+                          {opp.owner.name}
+                        </div>
+                      ) : (
+                        <span className="text-gray-400">No owner assigned</span>
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
