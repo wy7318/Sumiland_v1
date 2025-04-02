@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { 
+import {
   ArrowLeft, Building2, Mail, Phone, Calendar,
   Edit, AlertCircle, Send, Reply, X, User,
-  Globe, CheckCircle
+  Globe, CheckCircle, DollarSign, Users
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { cn } from '../../lib/utils';
+import { cn, formatCurrency } from '../../lib/utils';
 import { CustomFieldsSection } from './CustomFieldsSection';
 import { useOrganization } from '../../contexts/OrganizationContext';
 
@@ -38,6 +38,20 @@ type Vendor = {
   organization_id: string;
   notes: string | null;
   created_at: string;
+  // New fields
+  owner_id: string | null;
+  parent_id: string | null;
+  annual_revenue: number | null;
+  website: string | null;
+  // Related entities
+  owner: {
+    id: string;
+    name: string;
+  } | null;
+  parent: {
+    id: string;
+    name: string;
+  } | null;
 };
 
 type Feed = {
@@ -129,7 +143,8 @@ export function VendorDetailPage() {
     try {
       if (!id) return;
 
-      const { data: vendor, error } = await supabase
+      // Fetch vendor with related customer data
+      const { data: vendorData, error } = await supabase
         .from('vendors')
         .select(`
           *,
@@ -145,7 +160,47 @@ export function VendorDetailPage() {
         .single();
 
       if (error) throw error;
-      setVendor(vendor);
+
+      // Now fetch the owner profile data
+      let ownerData = null;
+      if (vendorData.owner_id) {
+        const { data: owner, error: ownerError } = await supabase
+          .from('profiles')
+          .select('id, name')
+          .eq('id', vendorData.owner_id)
+          .single();
+
+        if (ownerError) {
+          console.error("Error fetching owner:", ownerError);
+        } else {
+          ownerData = owner;
+        }
+      }
+
+      // Fetch parent vendor data if present
+      let parentData = null;
+      if (vendorData.parent_id) {
+        const { data: parent, error: parentError } = await supabase
+          .from('vendors')
+          .select('id, name')
+          .eq('id', vendorData.parent_id)
+          .single();
+
+        if (parentError) {
+          console.error("Error fetching parent vendor:", parentError);
+        } else {
+          parentData = parent;
+        }
+      }
+
+      // Combine all data
+      const enrichedVendorData = {
+        ...vendorData,
+        owner: ownerData,
+        parent: parentData
+      };
+
+      setVendor(enrichedVendorData);
     } catch (err) {
       console.error('Error fetching vendor:', err);
       setError(err instanceof Error ? err.message : 'Failed to load vendor');
@@ -288,6 +343,12 @@ export function VendorDetailPage() {
       backgroundColor: typeValue.color,
       color: typeValue.text_color || '#FFFFFF'
     };
+  };
+
+  // Format currency with proper formatting
+  const formatRevenueValue = (value: number | null) => {
+    if (value === null) return 'Not specified';
+    return formatCurrency(value);
   };
 
   const renderFeedItem = (feed: Feed, isReply = false) => {
@@ -523,6 +584,31 @@ export function VendorDetailPage() {
                     <div className="text-gray-700">{vendor.payment_terms}</div>
                   </div>
                 )}
+                {/* Annual Revenue - New Field */}
+                <div>
+                  <div className="text-sm font-medium text-gray-500 mb-1">Annual Revenue</div>
+                  <div className="text-gray-700 flex items-center">
+                    <DollarSign className="w-4 h-4 text-gray-400 mr-1" />
+                    {formatRevenueValue(vendor.annual_revenue)}
+                  </div>
+                </div>
+                {/* Website - New Field */}
+                {vendor.website && (
+                  <div>
+                    <div className="text-sm font-medium text-gray-500 mb-1">Website</div>
+                    <div className="text-gray-700 flex items-center">
+                      <Globe className="w-4 h-4 text-gray-400 mr-1" />
+                      <a
+                        href={vendor.website.startsWith('http') ? vendor.website : `https://${vendor.website}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary-600 hover:text-primary-700 hover:underline"
+                      >
+                        {vendor.website}
+                      </a>
+                    </div>
+                  </div>
+                )}
                 <div>
                   <div className="text-sm font-medium text-gray-500 mb-1">Created</div>
                   <div className="text-gray-700">
@@ -531,6 +617,42 @@ export function VendorDetailPage() {
                 </div>
               </div>
             </div>
+
+            {/* Owner Information - New Section */}
+            {vendor.owner && (
+              <div>
+                <h2 className="text-lg font-semibold mb-4">Account Owner</h2>
+                <div className="bg-gray-50 rounded-lg p-4 space-y-4">
+                  <div className="flex items-center">
+                    <User className="w-5 h-5 text-gray-400 mr-3" />
+                    <div>
+                      <div className="font-medium">{vendor.owner.name}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Parent Account - New Section */}
+            {vendor.parent && (
+              <div>
+                <h2 className="text-lg font-semibold mb-4">Parent Account</h2>
+                <div className="bg-gray-50 rounded-lg p-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <Users className="w-5 h-5 text-gray-400 mr-3" />
+                      <div className="font-medium">{vendor.parent.name}</div>
+                    </div>
+                    <Link
+                      to={`/admin/vendors/${vendor.parent.id}`}
+                      className="text-primary-600 hover:text-primary-700 text-sm"
+                    >
+                      View
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Shipping Address */}
             {(vendor.shipping_address_line1 || vendor.shipping_city || vendor.shipping_state || vendor.shipping_country) && (

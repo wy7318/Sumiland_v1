@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
-    Plus, Search, Building2, Mail, Phone, User, Edit,
-    Trash2, AlertCircle, FileDown, Filter, ChevronDown, ChevronUp,
-    Eye
+    Plus, Search, Building2, Mail, Phone, User,
+    Edit, Trash2, AlertCircle, FileDown, Filter,
+    ChevronDown, ChevronUp, Eye, Users
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
@@ -31,12 +31,21 @@ type Vendor = {
     notes: string | null;
     created_at: string;
     organization_id: string;
+    // New fields
+    owner_id: string | null;
+    parent_id: string | null;
+    annual_revenue: number | null;
+    website: string | null;
     customer: {
         first_name: string;
         last_name: string;
         email: string;
         phone: string | null;
         company: string | null;
+    } | null;
+    owner: {
+        id: string;
+        name: string;
     } | null;
     shipping_address_line1: string | null;
     shipping_city: string | null;
@@ -45,7 +54,7 @@ type Vendor = {
 };
 
 type SortConfig = {
-    key: keyof Vendor | 'customer.name';
+    key: keyof Vendor | 'customer.name' | 'owner.name';
     direction: 'asc' | 'desc';
 };
 
@@ -106,7 +115,9 @@ export function VendorsPage() {
     const fetchVendors = async () => {
         try {
             setLoading(true);
-            const { data, error } = await supabase
+
+            // First fetch vendors with customer data
+            const { data: vendorsData, error: vendorsError } = await supabase
                 .from('vendors')
                 .select(`
                     *,
@@ -121,8 +132,33 @@ export function VendorsPage() {
                 .eq('organization_id', selectedOrganization?.id)
                 .order('created_at', { ascending: false });
 
-            if (error) throw error;
-            setVendors(data || []);
+            if (vendorsError) throw vendorsError;
+
+            // Now get the owner information for each vendor that has an owner_id
+            const vendorsWithOwners = await Promise.all(vendorsData.map(async (vendor) => {
+                if (vendor.owner_id) {
+                    try {
+                        const { data: ownerData, error: ownerError } = await supabase
+                            .from('profiles')
+                            .select('id, name')
+                            .eq('id', vendor.owner_id)
+                            .single();
+
+                        if (ownerError) {
+                            console.error('Error fetching owner for vendor:', vendor.id, ownerError);
+                            return { ...vendor, owner: null };
+                        }
+
+                        return { ...vendor, owner: ownerData };
+                    } catch (err) {
+                        console.error('Error processing owner for vendor:', vendor.id, err);
+                        return { ...vendor, owner: null };
+                    }
+                }
+                return { ...vendor, owner: null };
+            }));
+
+            setVendors(vendorsWithOwners || []);
         } catch (err) {
             console.error('Error fetching accounts:', err);
             setError(err instanceof Error ? err.message : 'Failed to load accounts');
@@ -234,6 +270,7 @@ export function VendorsPage() {
         const headers = [
             'Name',
             'Type',
+            'Owner',
             'Contact Name',
             'Email',
             'Phone',
@@ -247,6 +284,7 @@ export function VendorsPage() {
         const csvData = vendors.map(vendor => [
             vendor.name,
             vendor.type || '',
+            vendor.owner ? vendor.owner.name : '',
             vendor.customer ? `${vendor.customer.first_name} ${vendor.customer.last_name}` : '',
             vendor.customer?.email || '',
             vendor.customer?.phone || '',
@@ -275,11 +313,13 @@ export function VendorsPage() {
     };
 
     const filteredVendors = vendors.filter(vendor => {
+        // Extended search to include owner name
         const matchesSearch =
             vendor.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
             vendor.customer?.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
             `${vendor.customer?.first_name} ${vendor.customer?.last_name}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            vendor.customer?.company?.toLowerCase().includes(searchQuery.toLowerCase());
+            vendor.customer?.company?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            vendor.owner?.name?.toLowerCase().includes(searchQuery.toLowerCase());
 
         const matchesStatus = statusFilter === 'all' || vendor.status === statusFilter;
         const matchesType = typeFilter === 'all' || vendor.type === typeFilter;
@@ -294,6 +334,9 @@ export function VendorsPage() {
         if (sortConfig.key === 'customer.name') {
             aValue = a.customer ? `${a.customer.first_name} ${a.customer.last_name}` : '';
             bValue = b.customer ? `${b.customer.first_name} ${b.customer.last_name}` : '';
+        } else if (sortConfig.key === 'owner.name') {
+            aValue = a.owner ? a.owner.name : '';
+            bValue = b.owner ? b.owner.name : '';
         } else {
             aValue = a[sortConfig.key];
             bValue = b[sortConfig.key];
@@ -349,7 +392,7 @@ export function VendorsPage() {
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
                                 <input
                                     type="text"
-                                    placeholder="Search accounts..."
+                                    placeholder="Search accounts by name, contact, owner..."
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                     className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
@@ -470,6 +513,32 @@ export function VendorsPage() {
                                         )}
                                     </div>
                                 </th>
+                                {/* New Owner Column */}
+                                <th
+                                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                                    onClick={() => {
+                                        if (sortConfig.key === 'owner.name') {
+                                            setSortConfig({
+                                                key: 'owner.name',
+                                                direction: sortConfig.direction === 'asc' ? 'desc' : 'asc'
+                                            });
+                                        } else {
+                                            setSortConfig({
+                                                key: 'owner.name',
+                                                direction: 'asc'
+                                            });
+                                        }
+                                    }}
+                                >
+                                    <div className="flex items-center">
+                                        <span>Owner</span>
+                                        {sortConfig.key === 'owner.name' && (
+                                            sortConfig.direction === 'asc' ?
+                                                <ChevronUp className="w-4 h-4 ml-1" /> :
+                                                <ChevronDown className="w-4 h-4 ml-1" />
+                                        )}
+                                    </div>
+                                </th>
                                 <th
                                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                                     onClick={() => {
@@ -572,6 +641,17 @@ export function VendorsPage() {
                                         >
                                             {accountTypes.find((type) => type.value === vendor.type)?.label || vendor.type || 'N/A'}
                                         </span>
+                                    </td>
+                                    {/* New Owner Cell */}
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        {vendor.owner ? (
+                                            <div className="flex items-center text-sm">
+                                                <User className="w-4 h-4 text-gray-400 mr-1" />
+                                                <span>{vendor.owner.name}</span>
+                                            </div>
+                                        ) : (
+                                            <span className="text-gray-400">No owner assigned</span>
+                                        )}
                                     </td>
                                     <td className="px-6 py-4">
                                         {vendor.customer ? (
