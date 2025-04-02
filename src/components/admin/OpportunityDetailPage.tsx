@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { 
+import {
   ArrowLeft, Building2, Mail, Phone, Calendar,
   Edit, AlertCircle, Send, Reply, X, User,
-  DollarSign, Percent, Package, FileText, ShoppingBag
+  DollarSign, Percent, Package, FileText, ShoppingBag, LinkIcon
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { cn, formatCurrency } from '../../lib/utils';
@@ -13,8 +13,6 @@ import { AccountDetailsModal } from './AccountDetailsModal';
 import { useAuth } from '../../contexts/AuthContext';
 import { useOrganization } from '../../contexts/OrganizationContext';
 import { DateTime } from 'luxon';
-
-
 
 type Opportunity = {
   id: string;
@@ -26,6 +24,9 @@ type Opportunity = {
   amount: number;
   probability: number;
   expected_close_date: string | null;
+  close_date: string | null; // New field
+  competitor: string | null; // New field
+  parent_id: string | null; // New field
   lead_source: string | null;
   lead_id: string | null;
   type: string | null;
@@ -33,6 +34,7 @@ type Opportunity = {
   status: string;
   created_at: string;
   organization_id: string;
+  opportunity_number: string; // Added this from the render code
   account: {
     name: string;
     type: string;
@@ -46,6 +48,12 @@ type Opportunity = {
   } | null;
   owner: {
     name: string;
+  } | null;
+  parent: { // New field for parent opportunity data
+    id: string;
+    name: string;
+    stage: string;
+    status: string;
   } | null;
   products: {
     id: string;
@@ -212,66 +220,10 @@ export function OpportunityDetailPage() {
     }
   };
 
-  // Add this function to handle the conversion
-  const handleConvertToQuote = async () => {
-    if (!opportunity) return;
-
-    try {
-      setLoading(true);
-
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) throw new Error('Not authenticated');
-
-      // Prepare the quote data based on the mapping
-      const quoteData = {
-        organization_id: opportunity.organization_id,
-        notes: `Converted from Opportunity ${opportunity.opportunity_number} ${opportunity.name}`,
-        vendor_id: opportunity.account_id,
-        customer_id: opportunity.contact_id,
-        status: 'New', // Default to New
-        tax_percent: 0,
-        tax_amount: 0,
-        discount_amount: 0,
-        currency: 'USD',
-
-        // Map products from opportunity to quote items
-        items: opportunity.products.map(product => ({
-          item_name: product.product.name,
-          item_desc: product.product.description || null,
-          quantity: product.quantity,
-          unit_price: product.unit_price
-        })),
-
-        // Calculate subtotal based on products
-        subtotal: opportunity.products.reduce((sum, product) =>
-          sum + (product.quantity * product.unit_price), 0),
-
-        // Set total amount equal to subtotal since tax and discount are 0
-        total_amount: opportunity.products.reduce((sum, product) =>
-          sum + (product.quantity * product.unit_price), 0)
-      };
-
-      // Navigate to the QuoteForm with the data as state
-      navigate('/admin/quotes/new', {
-        state: {
-          convertedFromOpportunity: true,
-          opportunityId: id,
-          quoteData: quoteData
-        }
-      });
-
-    } catch (err) {
-      console.error('Error converting opportunity to quote:', err);
-      setError(err instanceof Error ? err.message : 'Failed to convert opportunity to quote');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const fetchOpportunity = async () => {
     try {
       if (!id) return;
-  
+
       const { data: opportunity, error } = await supabase
         .from('opportunities')
         .select(`
@@ -300,8 +252,23 @@ export function OpportunityDetailPage() {
         `)
         .eq('id', id)
         .single();
-  
+
       if (error) throw error;
+
+      // If opportunity has a parent_id, fetch the parent opportunity in a separate query
+      if (opportunity && opportunity.parent_id) {
+        const { data: parentOpportunity, error: parentError } = await supabase
+          .from('opportunities')
+          .select('id, name, stage, status')
+          .eq('id', opportunity.parent_id)
+          .single();
+
+        if (!parentError && parentOpportunity) {
+          // Add the parent data to the opportunity object
+          opportunity.parent = parentOpportunity;
+        }
+      }
+
       setOpportunity(opportunity);
     } catch (err) {
       console.error('Error fetching opportunity:', err);
@@ -476,6 +443,61 @@ export function OpportunityDetailPage() {
     };
   };
 
+  const handleConvertToQuote = async () => {
+    if (!opportunity) return;
+
+    try {
+      setLoading(true);
+
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error('Not authenticated');
+
+      // Prepare the quote data based on the mapping
+      const quoteData = {
+        organization_id: opportunity.organization_id,
+        notes: `Converted from Opportunity ${opportunity.opportunity_number} ${opportunity.name}`,
+        vendor_id: opportunity.account_id,
+        customer_id: opportunity.contact_id,
+        status: 'New', // Default to New
+        tax_percent: 0,
+        tax_amount: 0,
+        discount_amount: 0,
+        currency: 'USD',
+
+        // Map products from opportunity to quote items
+        items: opportunity.products.map(product => ({
+          item_name: product.product.name,
+          item_desc: product.product.description || null,
+          quantity: product.quantity,
+          unit_price: product.unit_price
+        })),
+
+        // Calculate subtotal based on products
+        subtotal: opportunity.products.reduce((sum, product) =>
+          sum + (product.quantity * product.unit_price), 0),
+
+        // Set total amount equal to subtotal since tax and discount are 0
+        total_amount: opportunity.products.reduce((sum, product) =>
+          sum + (product.quantity * product.unit_price), 0)
+      };
+
+      // Navigate to the QuoteForm with the data as state
+      navigate('/admin/quotes/new', {
+        state: {
+          convertedFromOpportunity: true,
+          opportunityId: id,
+          quoteData: quoteData
+        }
+      });
+
+    } catch (err) {
+      console.error('Error converting opportunity to quote:', err);
+      setError(err instanceof Error ? err.message : 'Failed to convert opportunity to quote');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const renderFeedItem = (feed: Feed, isReply = false) => {
     const isEditing = editingFeed?.id === feed.id;
     const replies = feeds.filter(f => f.parent_id === feed.id);
@@ -499,7 +521,6 @@ export function OpportunityDetailPage() {
             </div>
             <div>
               <div className="font-medium">{feed.profile.name}</div>
-              {/* // REPLACE THE FEED CREATED_AT DISPLAY WITH THIS: */}
               <div className="text-sm text-gray-500">
                 {formatDateTime(feed.created_at)}
                 {feed.updated_at && (
@@ -615,7 +636,6 @@ export function OpportunityDetailPage() {
             <Edit className="w-4 h-4 mr-2" />
             Edit Opportunity
           </Link>
-          {/* Add the Convert to Quote button */}
           <button
             onClick={handleConvertToQuote}
             className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
@@ -669,14 +689,44 @@ export function OpportunityDetailPage() {
               <div className="text-sm text-gray-500">
                 Probability: {opportunity.probability}%
               </div>
-              {/* // REPLACE THE EXPECTED CLOSE DATE DISPLAY WITH THIS: */}
               {opportunity.expected_close_date && (
                 <div className="text-sm text-gray-500">
                   Expected Close: {formatDate(opportunity.expected_close_date)}
                 </div>
               )}
+              {opportunity.close_date && (
+                <div className="text-sm text-gray-500 font-medium">
+                  Closed On: {formatDate(opportunity.close_date)}
+                </div>
+              )}
             </div>
           </div>
+
+          {/* Parent Opportunity Section - NEW */}
+          {opportunity.parent && (
+            <div className="mb-6 bg-blue-50 rounded-lg p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-blue-800">Parent Opportunity</h3>
+                  <div className="flex items-center mt-1">
+                    <LinkIcon className="w-4 h-4 text-blue-600 mr-2" />
+                    <Link
+                      to={`/admin/opportunities/${opportunity.parent.id}`}
+                      className="text-blue-600 hover:text-blue-800 font-medium"
+                    >
+                      {opportunity.parent.name}
+                    </Link>
+                    <span
+                      className="ml-2 px-2 py-1 text-xs font-medium rounded-full"
+                      style={getStageStyle(opportunity.parent.stage)}
+                    >
+                      {opportunityStages.find(s => s.value === opportunity.parent.stage)?.label || opportunity.parent.stage}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {/* Account Information */}
@@ -755,6 +805,21 @@ export function OpportunityDetailPage() {
                   <p className="text-gray-600 whitespace-pre-wrap">
                     {opportunity.description}
                   </p>
+                </div>
+              </div>
+            )}
+
+            {/* Competitor Information - NEW */}
+            {opportunity.competitor && (
+              <div className="md:col-span-2">
+                <h2 className="text-lg font-semibold mb-4">Competition</h2>
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="flex items-start">
+                    <ShoppingBag className="w-5 h-5 text-gray-400 mr-3 mt-1" />
+                    <p className="text-gray-600 whitespace-pre-wrap">
+                      {opportunity.competitor}
+                    </p>
+                  </div>
                 </div>
               </div>
             )}
