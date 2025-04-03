@@ -480,6 +480,8 @@ export function OpportunityDetailPage() {
         total_amount: opportunity.products.reduce((sum, product) =>
           sum + (product.quantity * product.unit_price), 0)
       };
+      console.log('quoteData ; ' + quoteData);
+
 
       // Navigate to the QuoteForm with the data as state
       navigate('/admin/quotes/new', {
