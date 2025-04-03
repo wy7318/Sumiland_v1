@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
+import type { Database } from './database.types'; // Make sure this import exists
 
-// Get environment variables
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
@@ -8,39 +8,41 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables');
 }
 
-// Create Supabase client
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
-    storageKey: 'xelytic_auth',
     autoRefreshToken: true,
-    detectSessionInUrl: true
-  }
+    detectSessionInUrl: false,
+    storage: window.localStorage,
+    flowType: 'pkce',
+    // Added from your working version to prevent console spam
+    debug: false // This disables verbose logging
+  },
+  global: {
+    headers: {
+      'X-Client-Info': 'sumiland-studio@1.0.0',
+    },
+  },
 });
 
-// Function to update headers with organization ID
+// Simplified header update function
 export const updateSupabaseHeaders = async (organizationId: string | null) => {
   try {
     if (organizationId) {
-      console.log('[Supabase] Updating headers with org:', organizationId);
-      supabase.functions.setAuth(organizationId);
-      // Also set organization ID as a custom header for database requests
-      const { data } = await supabase.auth.getSession();
-      if (data.session) {
-        supabase.headers = {
-          ...supabase.headers,
-          'x-organization-id': organizationId
-        };
-        console.log('[Supabase] Headers updated successfully' + organizationId);
-      } else {
-        console.error('[Supabase] No active session found when updating headers');
-        // Check if user is signed out and update flag if needed
-        if (localStorage.getItem('is_signed_out') !== 'true') {
-          localStorage.setItem('is_signed_out', 'true');
-        }
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        console.error('No active session when updating headers');
+        return false;
       }
+
+      // Set headers for all future requests
+      supabase.headers = {
+        ...supabase.headers,
+        'x-organization-id': organizationId
+      };
     } else {
-      console.log('[Supabase] Clearing organization headers');
+      // Clear organization header while preserving others
       if (supabase.headers && 'x-organization-id' in supabase.headers) {
         const { 'x-organization-id': _, ...restHeaders } = supabase.headers;
         supabase.headers = restHeaders;
@@ -48,7 +50,7 @@ export const updateSupabaseHeaders = async (organizationId: string | null) => {
     }
     return true;
   } catch (error) {
-    console.error('[Supabase] Error updating headers:', error);
+    console.error('Error updating headers:', error);
     return false;
   }
 };
