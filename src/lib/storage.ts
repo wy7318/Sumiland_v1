@@ -7,6 +7,18 @@ export async function uploadImage(file: File, bucket: string = 'Sumiland Design'
     const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
     const filePath = `${fileName}`;
 
+    const session = await supabase.auth.getSession();
+
+    if (!session.data.session) {
+      throw new Error('User is not authenticated');
+    } else {
+      console.log('ausjssjssj');
+    }
+
+    const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
+    console.log('Available Buckets:', buckets);
+
+
     // Upload the file to Supabase Storage
     const { data, error } = await supabase.storage
       .from(bucket)

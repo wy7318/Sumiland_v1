@@ -7,6 +7,8 @@ import { getCurrentUser } from '../../lib/auth';
 import { ImageUpload } from './ImageUpload';
 import { useAuth } from '../../contexts/AuthContext';
 import type { Database } from '../../lib/database.types';
+import { useOrganization } from '../../contexts/OrganizationContext';
+
 
 type Post = Database['public']['Tables']['posts']['Row'];
 
@@ -16,6 +18,7 @@ export function EditPostPage() {
   const { organizations } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { selectedOrganization } = useOrganization();
   const [formData, setFormData] = useState<Partial<Post>>({
     title: '',
     content: '',
@@ -35,7 +38,7 @@ export function EditPostPage() {
         .from('posts')
         .select('*')
         .eq('id', id)
-        .in('organization_id', organizations.map(org => org.id))
+        .eq('organization_id', selectedOrganization?.id)
         .single();
 
       if (error) throw error;
@@ -67,6 +70,8 @@ export function EditPostPage() {
 
     try {
       const userData = await getCurrentUser();
+      console.log('User Data:', userData);
+      console.log('User:', userData?.user);
       if (!userData?.user) throw new Error('Not authenticated');
 
       // Verify organization access
@@ -84,7 +89,7 @@ export function EditPostPage() {
           updated_at: new Date().toISOString()
         })
         .eq('id', id)
-        .eq('organization_id', formData.organization_id);
+        .eq('organization_id', selectedOrganization?.id);
 
       if (updateError) throw updateError;
       navigate('/admin/posts');

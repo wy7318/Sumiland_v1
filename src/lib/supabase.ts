@@ -31,7 +31,7 @@ export const updateSupabaseHeaders = async (organizationId: string | null) => {
           ...supabase.headers,
           'x-organization-id': organizationId
         };
-        console.log('[Supabase] Headers updated successfully');
+        console.log('[Supabase] Headers updated successfully' + organizationId);
       } else {
         console.error('[Supabase] No active session found when updating headers');
         // Check if user is signed out and update flag if needed
