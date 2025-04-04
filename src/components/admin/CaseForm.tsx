@@ -7,7 +7,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { CustomFieldsForm } from './CustomFieldsForm';
 import { UserSearch } from './UserSearch';
 import { useOrganization } from '../../contexts/OrganizationContext';
-
+import { DateTime } from 'luxon'; // Import Luxon for timezone handling
 
 type PicklistValue = {
   id: string;
@@ -34,6 +34,12 @@ type FormData = {
   owner_id: string | null;
   description: string;
   resume_url: string | null;
+  escalated_at: string | null;
+  closed_at: string | null;
+  origin: string | null;
+  closed_by: string | null;
+  escalated_by: string | null;
+  priority: string | null;
 };
 
 const initialFormData: FormData = {
@@ -43,7 +49,13 @@ const initialFormData: FormData = {
   status: '',
   owner_id: null,
   description: '',
-  resume_url: null
+  resume_url: null,
+  escalated_at: null,
+  closed_at: null,
+  origin: null,
+  closed_by: null,
+  escalated_by: null,
+  priority: null
 };
 
 export function CaseForm() {
@@ -54,10 +66,39 @@ export function CaseForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState<FormData>(initialFormData);
+  const [previousStatus, setPreviousStatus] = useState<string>('');
   const [caseTypes, setCaseTypes] = useState<PicklistValue[]>([]);
   const [caseStatuses, setCaseStatuses] = useState<PicklistValue[]>([]);
+  const [casePriorities, setCasePriorities] = useState<PicklistValue[]>([]);
+  const [caseOrigins, setCaseOrigins] = useState<PicklistValue[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
   const [customFields, setCustomFields] = useState<Record<string, any>>({});
+  const [orgTimezone, setOrgTimezone] = useState('UTC'); // Default timezone
+
+  // Fetch organization timezone
+  useEffect(() => {
+    const fetchTimezone = async () => {
+      if (!selectedOrganization?.id) return;
+
+      const { data, error } = await supabase
+        .from('organizations')
+        .select('timezone')
+        .eq('id', selectedOrganization.id)
+        .single();
+
+      if (error) {
+        console.error('Failed to fetch org timezone:', error);
+        return;
+      }
+
+      if (data?.timezone) {
+        setOrgTimezone(data.timezone);
+        console.log('CaseForm - Using timezone:', data.timezone);
+      }
+    };
+
+    fetchTimezone();
+  }, [selectedOrganization]);
 
   useEffect(() => {
     fetchPicklists();
@@ -65,7 +106,14 @@ export function CaseForm() {
     if (id) {
       fetchCase();
     }
-  }, [id]);
+  }, [id, orgTimezone]); // Add orgTimezone as dependency to re-fetch when it changes
+
+  // Set the previous status when formData.status changes
+  useEffect(() => {
+    if (formData.status) {
+      setPreviousStatus(formData.status);
+    }
+  }, []);
 
   const fetchPicklists = async () => {
     try {
@@ -110,6 +158,48 @@ export function CaseForm() {
           setFormData(prev => ({ ...prev, status: defaultStatus }));
         }
       }
+
+      // Fetch case priority
+      const { data: priorityData, error: priorityError } = await supabase
+        .from('picklist_values')
+        .select('id, value, label, is_default, is_active, color, text_color')
+        .eq('type', 'case_priority')
+        .eq('is_active', true)
+        .eq('organization_id', selectedOrganization?.id)
+        .order('display_order', { ascending: true })
+        .order('label', { ascending: true });
+
+      if (priorityError) throw priorityError;
+      setCasePriorities(priorityData || []);
+
+      // If no case is being edited, set default status
+      if (!id && priorityData) {
+        const defaultPriority = priorityData.find(s => s.is_default)?.value || priorityData[0]?.value;
+        if (defaultPriority) {
+          setFormData(prev => ({ ...prev, priority: defaultPriority }));
+        }
+      }
+
+      // Fetch case origin
+      const { data: originData, error: originError } = await supabase
+        .from('picklist_values')
+        .select('id, value, label, is_default, is_active, color, text_color')
+        .eq('type', 'case_origin')
+        .eq('is_active', true)
+        .eq('organization_id', selectedOrganization?.id)
+        .order('display_order', { ascending: true })
+        .order('label', { ascending: true });
+
+      if (originError) throw originError;
+      setCaseOrigins(originData || []);
+
+      // If no case is being edited, set default status
+      if (!id && originData) {
+        const defaultOrigin = originData.find(s => s.is_default)?.value || originData[0]?.value;
+        if (defaultOrigin) {
+          setFormData(prev => ({ ...prev, origin: defaultOrigin }));
+        }
+      }
     } catch (err) {
       console.error('Error fetching picklists:', err);
       setError('Failed to load picklist values');
@@ -148,6 +238,23 @@ export function CaseForm() {
         .single();
 
       if (error) throw error;
+
+      // Format dates using organization timezone
+      const formatDateTime = (dateTimeString) => {
+        if (!dateTimeString) return null;
+        try {
+          // Parse UTC datetime and convert to organization timezone
+          return DateTime
+            .fromISO(dateTimeString, { zone: 'UTC' })
+            .setZone(orgTimezone)
+            .toISO({ includeOffset: false, suppressMilliseconds: true })
+            .slice(0, 16); // Gets YYYY-MM-DDThh:mm
+        } catch (err) {
+          console.error('Error formatting datetime:', err);
+          return null;
+        }
+      };
+
       if (caseData) {
         setFormData({
           title: caseData.title,
@@ -157,6 +264,12 @@ export function CaseForm() {
           owner_id: caseData.owner_id,
           description: caseData.description,
           resume_url: caseData.resume_url,
+          escalated_at: formatDateTime(caseData.escalated_at),
+          closed_at: formatDateTime(caseData.closed_at),
+          origin: caseData.origin,
+          closed_by: caseData.closed_by,
+          escalated_by: caseData.escalated_by,
+          priority: caseData.priority,
           organization_id: caseData.organization_id
         });
 
@@ -183,6 +296,68 @@ export function CaseForm() {
     }
   };
 
+  // Convert local timezone datetime to UTC for submission
+  const convertToUTC = (localDateTimeStr) => {
+    if (!localDateTimeStr) return null;
+
+    try {
+      // Parse the datetime string as being in the organization timezone
+      return DateTime
+        .fromISO(localDateTimeStr, { zone: orgTimezone })
+        .toUTC()
+        .toISO();
+    } catch (err) {
+      console.error('Error converting datetime to UTC:', err);
+      return null;
+    }
+  };
+
+  const handleDateChange = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  // Handle status changes and automatically set escalated_by and closed_by
+  const handleStatusChange = (newStatus) => {
+    // Save the current status before updating
+    const currentStatus = formData.status;
+
+    // Check if this is the initial load or a real change
+    if (previousStatus && currentStatus !== newStatus) {
+      const updates = { status: newStatus };
+
+      // If changing to Escalated status and it hasn't been escalated before
+      if (newStatus === 'Escalated' && currentStatus !== 'Escalated' && !formData.escalated_by) {
+        // Get current time in organization timezone
+        const now = DateTime.now().setZone(orgTimezone)
+          .toISO({ includeOffset: false, suppressMilliseconds: true })
+          .slice(0, 16); // YYYY-MM-DDThh:mm format
+
+        // updates.escalated_at = now;
+        updates.escalated_by = user?.id || null;
+      }
+
+      // If changing to Closed status and it hasn't been closed before
+      if (newStatus === 'Closed' && currentStatus !== 'Closed' && !formData.closed_by) {
+        // Get current time in organization timezone
+        const now = DateTime.now().setZone(orgTimezone)
+          .toISO({ includeOffset: false, suppressMilliseconds: true })
+          .slice(0, 16); // YYYY-MM-DDThh:mm format
+
+        // updates.closed_at = now;
+        updates.closed_by = user?.id || null;
+      }
+
+      // Update the form data with all changes
+      setFormData(prev => ({ ...prev, ...updates }));
+    } else {
+      // Just update the status if it's the initial load
+      setFormData(prev => ({ ...prev, status: newStatus }));
+    }
+
+    // Update the previous status for the next change
+    setPreviousStatus(newStatus);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -202,9 +377,39 @@ export function CaseForm() {
 
       if (!orgData?.organization_id) throw new Error('No organization found');
 
+      // Check status and set escalated_by/closed_by if needed
+      let updatedFormData = { ...formData };
+
+      // If status is Escalated but escalated_by is not set, set it now
+      if (formData.status === 'Escalated' && !formData.escalated_by) {
+        updatedFormData.escalated_by = userData.user.id;
+
+        // If escalated_at is also not set, set it to current time
+        if (!formData.escalated_at) {
+          updatedFormData.escalated_at = DateTime.now().setZone(orgTimezone)
+            .toISO({ includeOffset: false, suppressMilliseconds: true })
+            .slice(0, 16);
+        }
+      }
+
+      // If status is Closed but closed_by is not set, set it now
+      if (formData.status === 'Closed' && !formData.closed_by) {
+        updatedFormData.closed_by = userData.user.id;
+
+        // If closed_at is also not set, set it to current time
+        if (!formData.closed_at) {
+          updatedFormData.closed_at = DateTime.now().setZone(orgTimezone)
+            .toISO({ includeOffset: false, suppressMilliseconds: true })
+            .slice(0, 16);
+        }
+      }
+
+      // Convert dates back to UTC for storage
       const caseData = {
-        ...formData,
-        sub_type: formData.sub_type || null,
+        ...updatedFormData,
+        escalated_at: convertToUTC(updatedFormData.escalated_at),
+        closed_at: convertToUTC(updatedFormData.closed_at),
+        sub_type: updatedFormData.sub_type || null,
         organization_id: orgData.organization_id,
         updated_at: new Date().toISOString(),
         updated_by: userData.user.id
@@ -279,6 +484,47 @@ export function CaseForm() {
     };
   };
 
+  // Get style for priority badge
+  const getPriorityStyle = (priority: string) => {
+    const priorityValue = casePriorities.find(s => s.value === priority);
+    if (!priorityValue?.color) return {};
+    return {
+      backgroundColor: priorityValue.color,
+      color: priorityValue.text_color || '#FFFFFF'
+    };
+  };
+
+  // Get style for origin badge
+  const getOriginStyle = (origin: string) => {
+    const originValue = caseOrigins.find(s => s.value === origin);
+    if (!originValue?.color) return {};
+    return {
+      backgroundColor: originValue.color,
+      color: originValue.text_color || '#FFFFFF'
+    };
+  };
+
+  // Get user info by ID
+  const getUserInfo = (userId) => {
+    if (!userId) return null;
+    const userInfo = staff.find(s => s.id === userId);
+    return userInfo || null;
+  };
+
+  // Format date for display (no need to modify this if the fields already have organization timezone)
+  const getReadableDate = (dateTimeStr) => {
+    if (!dateTimeStr) return '';
+
+    try {
+      // Format the date for display
+      return DateTime
+        .fromISO(dateTimeStr, { zone: orgTimezone })
+        .toLocaleString(DateTime.DATETIME_SHORT);
+    } catch (err) {
+      return dateTimeStr;
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -327,8 +573,8 @@ export function CaseForm() {
             <select
               id="type"
               value={formData.type}
-              onChange={(e) => setFormData(prev => ({ 
-                ...prev, 
+              onChange={(e) => setFormData(prev => ({
+                ...prev,
                 type: e.target.value,
                 sub_type: '' // Reset sub-type when type changes
               }))}
@@ -365,7 +611,6 @@ export function CaseForm() {
               </select>
             </div>
           )}
-
           <div>
             <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-1">
               Status
@@ -373,7 +618,7 @@ export function CaseForm() {
             <select
               id="status"
               value={formData.status}
-              onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
+              onChange={(e) => handleStatusChange(e.target.value)}
               className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
               required
               style={getStatusStyle(formData.status)}
@@ -388,6 +633,48 @@ export function CaseForm() {
           </div>
 
           <div>
+            <label htmlFor="priority" className="block text-sm font-medium text-gray-700 mb-1">
+              Priority
+            </label>
+            <select
+              id="priority"
+              value={formData.priority}
+              onChange={(e) => setFormData(prev => ({ ...prev, priority: e.target.value }))}
+              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+              required
+              style={getPriorityStyle(formData.priority)}
+            >
+              <option value="">Select Priority</option>
+              {casePriorities.map(priority => (
+                <option key={priority.id} value={priority.value}>
+                  {priority.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="origin" className="block text-sm font-medium text-gray-700 mb-1">
+              Origin
+            </label>
+            <select
+              id="origin"
+              value={formData.origin}
+              onChange={(e) => setFormData(prev => ({ ...prev, origin: e.target.value }))}
+              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+              required
+              style={getOriginStyle(formData.origin)}
+            >
+              <option value="">Select Origin</option>
+              {caseOrigins.map(origin => (
+                <option key={origin.id} value={origin.value}>
+                  {origin.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
             <label htmlFor="owner" className="block text-sm font-medium text-gray-700 mb-1">
               Assigned To
             </label>
@@ -396,6 +683,73 @@ export function CaseForm() {
               selectedUserId={formData.owner_id}
               onSelect={(userId) => setFormData(prev => ({ ...prev, owner_id: userId }))}
             />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Escalated Date {formData.escalated_at && `(${getReadableDate(formData.escalated_at)})`}
+            </label>
+            <input
+              type="datetime-local"
+              value={formData.escalated_at || ''}
+              onChange={(e) => handleDateChange('escalated_at', e.target.value)}
+              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+            />
+            <div className="text-xs text-gray-500 mt-1">
+              Time is in {orgTimezone} timezone
+              {formData.status === 'Escalated' && !formData.escalated_at &&
+                ' - Will be set automatically on save'}
+            </div>
+          </div>
+          <div>
+            <label htmlFor="owner" className="block text-sm font-medium text-gray-700 mb-1">
+              Escalated By
+            </label>
+            {formData.escalated_by ? (
+              <div className="w-full px-4 py-2 rounded-lg border border-gray-300 bg-gray-50">
+                {getUserInfo(formData.escalated_by)?.name || 'Unknown User'}
+              </div>
+            ) : (
+              <div className="text-gray-500 w-full px-4 py-2 rounded-lg border border-gray-300 bg-gray-50">
+                {formData.status === 'Escalated' && !formData.escalated_by ? 'Will be set on save' : 'Not escalated'}
+              </div>
+            )}
+            <div className="text-xs text-gray-500 mt-1">
+              Set automatically when a case is first escalated
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Closed Date {formData.closed_at && `(${getReadableDate(formData.closed_at)})`}
+            </label>
+            <input
+              type="datetime-local"
+              value={formData.closed_at || ''}
+              onChange={(e) => handleDateChange('closed_at', e.target.value)}
+              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+            />
+            <div className="text-xs text-gray-500 mt-1">
+              Time is in {orgTimezone} timezone
+              {formData.status === 'Closed' && !formData.closed_at &&
+                ' - Will be set automatically on save'}
+            </div>
+          </div>
+          <div>
+            <label htmlFor="owner" className="block text-sm font-medium text-gray-700 mb-1">
+              Closed By
+            </label>
+            {formData.closed_by ? (
+              <div className="w-full px-4 py-2 rounded-lg border border-gray-300 bg-gray-50">
+                {getUserInfo(formData.closed_by)?.name || 'Unknown User'}
+              </div>
+            ) : (
+              <div className="text-gray-500 w-full px-4 py-2 rounded-lg border border-gray-300 bg-gray-50">
+                {formData.status === 'Closed' && !formData.closed_by ? 'Will be set on save' : 'Not closed'}
+              </div>
+            )}
+            <div className="text-xs text-gray-500 mt-1">
+              Set automatically when a case is first closed
+            </div>
           </div>
         </div>
 
