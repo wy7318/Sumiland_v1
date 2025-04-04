@@ -25,6 +25,13 @@ type Case = {
   attachment_url: string | null;
   created_at: string;
   organization_id: string;
+  // Add the additional fields
+  escalated_at: string | null;
+  closed_at: string | null;
+  origin: string | null;
+  closed_by: string | null;
+  escalated_by: string | null;
+  priority: string | null;
   contact: {
     first_name: string;
     last_name: string;
@@ -255,12 +262,40 @@ export function CasesPage() {
 
   const handleStatusChange = async (caseId: string, newStatus: string) => {
     try {
+      // First, get the current case to check if it's already been escalated or closed
+      const { data: currentCase, error: caseError } = await supabase
+        .from('cases')
+        .select('status, escalated_by, closed_by')
+        .eq('id', caseId)
+        .single();
+
+      if (caseError) throw caseError;
+
+      // Get current user information
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error('Not authenticated');
+
+      // Initialize updates object
+      const updates = {
+        status: newStatus,
+        updated_at: new Date().toISOString()
+      };
+
+      // If changing to Escalated status and it hasn't been escalated before
+      if (newStatus === 'Escalated' && !currentCase.escalated_by) {
+        updates.escalated_at = new Date().toISOString();
+        updates.escalated_by = userData.user.id;
+      }
+
+      // If changing to Closed status and it hasn't been closed before
+      if (newStatus === 'Closed' && !currentCase.closed_by) {
+        updates.closed_at = new Date().toISOString();
+        updates.closed_by = userData.user.id;
+      }
+
       const { error } = await supabase
         .from('cases')
-        .update({ 
-          status: newStatus,
-          updated_at: new Date().toISOString()
-        })
+        .update(updates)
         .eq('id', caseId);
 
       if (error) throw error;
@@ -296,7 +331,7 @@ export function CasesPage() {
         if (!window.confirm(`Are you sure you want to delete ${selectedCases.length} cases?`)) {
           return;
         }
-        
+
         const { error } = await supabase
           .from('cases')
           .delete()
@@ -304,15 +339,108 @@ export function CasesPage() {
 
         if (error) throw error;
       } else {
-        const { error } = await supabase
+        // Get current user information
+        const { data: userData } = await supabase.auth.getUser();
+        if (!userData.user) throw new Error('Not authenticated');
+
+        // First, we need to get the current cases to check which ones have already been escalated/closed
+        const { data: currentCases, error: casesError } = await supabase
           .from('cases')
-          .update({ 
-            status: action,
-            updated_at: new Date().toISOString()
-          })
+          .select('id, status, escalated_by, closed_by')
           .in('id', selectedCases);
 
-        if (error) throw error;
+        if (casesError) throw casesError;
+
+        // For escalated cases
+        if (action === 'Escalated') {
+          // Filter cases that haven't been escalated yet
+          const casesToEscalate = currentCases
+            .filter(c => !c.escalated_by)
+            .map(c => c.id);
+
+          if (casesToEscalate.length > 0) {
+            // Update these cases with escalation info
+            const { error } = await supabase
+              .from('cases')
+              .update({
+                status: action,
+                escalated_at: new Date().toISOString(),
+                escalated_by: userData.user.id,
+                updated_at: new Date().toISOString()
+              })
+              .in('id', casesToEscalate);
+
+            if (error) throw error;
+          }
+
+          // Update remaining cases with just the status
+          const remainingCases = currentCases
+            .filter(c => c.escalated_by)
+            .map(c => c.id);
+
+          if (remainingCases.length > 0) {
+            const { error } = await supabase
+              .from('cases')
+              .update({
+                status: action,
+                updated_at: new Date().toISOString()
+              })
+              .in('id', remainingCases);
+
+            if (error) throw error;
+          }
+        }
+        // For closed cases
+        else if (action === 'Closed') {
+          // Filter cases that haven't been closed yet
+          const casesToClose = currentCases
+            .filter(c => !c.closed_by)
+            .map(c => c.id);
+
+          if (casesToClose.length > 0) {
+            // Update these cases with closure info
+            const { error } = await supabase
+              .from('cases')
+              .update({
+                status: action,
+                closed_at: new Date().toISOString(),
+                closed_by: userData.user.id,
+                updated_at: new Date().toISOString()
+              })
+              .in('id', casesToClose);
+
+            if (error) throw error;
+          }
+
+          // Update remaining cases with just the status
+          const remainingCases = currentCases
+            .filter(c => c.closed_by)
+            .map(c => c.id);
+
+          if (remainingCases.length > 0) {
+            const { error } = await supabase
+              .from('cases')
+              .update({
+                status: action,
+                updated_at: new Date().toISOString()
+              })
+              .in('id', remainingCases);
+
+            if (error) throw error;
+          }
+        }
+        // For other status changes
+        else {
+          const { error } = await supabase
+            .from('cases')
+            .update({
+              status: action,
+              updated_at: new Date().toISOString()
+            })
+            .in('id', selectedCases);
+
+          if (error) throw error;
+        }
       }
 
       await fetchCases();

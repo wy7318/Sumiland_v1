@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { 
+import {
   ArrowLeft, Building2, Mail, Phone, Calendar,
   Edit, AlertCircle, FileText, Download, Clock, Calendar as CalendarIcon,
-  CheckCircle, X, Send, Reply, User
+  CheckCircle, X, Send, Reply, User, AlertTriangle, CheckSquare
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { cn } from '../../lib/utils';
@@ -17,6 +17,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useOrganization } from '../../contexts/OrganizationContext';
 import { RelatedEmails } from './RelatedEmails';
 import { RelatedTasks } from './RelatedTasks';
+import { DateTime } from 'luxon'; // Import Luxon for timezone handling
 
 type Case = {
   id: string;
@@ -31,6 +32,12 @@ type Case = {
   attachment_url: string | null;
   created_at: string;
   organization_id: string;
+  escalated_at: string | null;
+  closed_at: string | null;
+  origin: string | null;
+  closed_by: string | null;
+  escalated_by: string | null;
+  priority: string | null;
   contact: {
     first_name: string;
     last_name: string;
@@ -39,6 +46,14 @@ type Case = {
     company: string | null;
   } | null;
   owner: {
+    id: string;
+    name: string;
+  } | null;
+  escalated_by_user?: {
+    id: string;
+    name: string;
+  } | null;
+  closed_by_user?: {
     id: string;
     name: string;
   } | null;
@@ -85,25 +100,50 @@ export function CaseDetailPage() {
   const [editingFeed, setEditingFeed] = useState<Feed | null>(null);
   const [caseTypes, setCaseTypes] = useState<PicklistValue[]>([]);
   const [caseStatuses, setCaseStatuses] = useState<PicklistValue[]>([]);
+  const [casePriorities, setCasePriorities] = useState<PicklistValue[]>([]);
+  const [caseOrigins, setCaseOrigins] = useState<PicklistValue[]>([]);
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [showEmailConfigModal, setShowEmailConfigModal] = useState(false);
   const [refreshEmailList, setRefreshEmailList] = useState(0);
+  const [orgTimezone, setOrgTimezone] = useState('UTC'); // Default timezone
 
+  // Fetch organization timezone
+  useEffect(() => {
+    const fetchTimezone = async () => {
+      if (!selectedOrganization?.id) return;
+
+      const { data, error } = await supabase
+        .from('organizations')
+        .select('timezone')
+        .eq('id', selectedOrganization.id)
+        .single();
+
+      if (error) {
+        console.error('Failed to fetch org timezone:', error);
+        return;
+      }
+
+      if (data?.timezone) {
+        setOrgTimezone(data.timezone);
+        console.log('CaseDetailPage - Using timezone:', data.timezone);
+      }
+    };
+
+    fetchTimezone();
+  }, [selectedOrganization]);
 
   useEffect(() => {
     fetchPicklists();
     if (id) {
       fetchCase();
     }
-  }, [id]);
+  }, [id, orgTimezone]);
 
   useEffect(() => {
     if (caseData) {
       fetchFeeds();
     }
   }, [caseData]);
-
-
 
   const fetchPicklists = async () => {
     try {
@@ -130,6 +170,30 @@ export function CaseDetailPage() {
 
       if (statusError) throw statusError;
       setCaseStatuses(statusData || []);
+
+      // Fetch case priorities
+      const { data: priorityData, error: priorityError } = await supabase
+        .from('picklist_values')
+        .select('id, value, label, is_default, is_active, color, text_color')
+        .eq('type', 'case_priority')
+        .eq('is_active', true)
+        .eq('organization_id', selectedOrganization?.id)
+        .order('display_order', { ascending: true });
+
+      if (priorityError) throw priorityError;
+      setCasePriorities(priorityData || []);
+
+      // Fetch case origins
+      const { data: originData, error: originError } = await supabase
+        .from('picklist_values')
+        .select('id, value, label, is_default, is_active, color, text_color')
+        .eq('type', 'case_origin')
+        .eq('is_active', true)
+        .eq('organization_id', selectedOrganization?.id)
+        .order('display_order', { ascending: true });
+
+      if (originError) throw originError;
+      setCaseOrigins(originData || []);
     } catch (err) {
       console.error('Error fetching picklists:', err);
       setError('Failed to load picklist values');
@@ -140,6 +204,7 @@ export function CaseDetailPage() {
     try {
       if (!id) return;
 
+      // First fetch the case data
       const { data: caseData, error } = await supabase
         .from('cases')
         .select(`
@@ -154,7 +219,37 @@ export function CaseDetailPage() {
         .single();
 
       if (error) throw error;
-      setCaseData(caseData);
+
+      // Enrich the case data with user information
+      const enrichedCaseData = { ...caseData };
+
+      // Fetch escalated_by user if it exists
+      if (caseData.escalated_by) {
+        const { data: escalatedByUser, error: escalatedByError } = await supabase
+          .from('profiles')
+          .select('id, name')
+          .eq('id', caseData.escalated_by)
+          .single();
+
+        if (!escalatedByError && escalatedByUser) {
+          enrichedCaseData.escalated_by_user = escalatedByUser;
+        }
+      }
+
+      // Fetch closed_by user if it exists
+      if (caseData.closed_by) {
+        const { data: closedByUser, error: closedByError } = await supabase
+          .from('profiles')
+          .select('id, name')
+          .eq('id', caseData.closed_by)
+          .single();
+
+        if (!closedByError && closedByUser) {
+          enrichedCaseData.closed_by_user = closedByUser;
+        }
+      }
+
+      setCaseData(enrichedCaseData);
     } catch (err) {
       console.error('Error fetching case:', err);
       setError('Failed to load case');
@@ -186,16 +281,57 @@ export function CaseDetailPage() {
     }
   };
 
+  // Format date with timezone
+  const formatDateTime = (dateTimeStr) => {
+    if (!dateTimeStr) return '';
+
+    try {
+      return DateTime
+        .fromISO(dateTimeStr, { zone: 'UTC' })
+        .setZone(orgTimezone)
+        .toLocaleString(DateTime.DATETIME_SHORT);
+    } catch (err) {
+      console.error('Error formatting datetime:', err);
+      return new Date(dateTimeStr).toLocaleString();
+    }
+  };
+
   const handleStatusChange = async (newStatus: string) => {
     try {
       if (!id || !caseData) return;
 
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error('Not authenticated');
+
+      // Initialize updates object
+      const updates = {
+        status: newStatus,
+        updated_at: new Date().toISOString()
+      };
+
+      // If changing to Escalated status and it hasn't been escalated before
+      if (newStatus === 'Escalated' && !caseData.escalated_by) {
+        // Get current time in organization timezone
+        const now = DateTime.now().setZone(orgTimezone)
+          .toISO();
+
+        updates.escalated_at = now;
+        updates.escalated_by = userData.user.id;
+      }
+
+      // If changing to Closed status and it hasn't been closed before
+      if (newStatus === 'Closed' && !caseData.closed_by) {
+        // Get current time in organization timezone
+        const now = DateTime.now().setZone(orgTimezone)
+          .toISO();
+
+        updates.closed_at = now;
+        updates.closed_by = userData.user.id;
+      }
+
       const { error } = await supabase
         .from('cases')
-        .update({
-          status: newStatus,
-          updated_at: new Date().toISOString()
-        })
+        .update(updates)
         .eq('id', id);
 
       if (error) throw error;
@@ -301,7 +437,7 @@ export function CaseDetailPage() {
 
   const handleEmailClick = async () => {
     if (!user) return;
-    
+
     try {
       const config = await getEmailConfig(user.id);
       if (!config) {
@@ -332,6 +468,26 @@ export function CaseDetailPage() {
     return {
       backgroundColor: typeValue.color,
       color: typeValue.text_color || '#FFFFFF'
+    };
+  };
+
+  // Get style for priority badge
+  const getPriorityStyle = (priority: string) => {
+    const priorityValue = casePriorities.find(p => p.value === priority);
+    if (!priorityValue?.color) return {};
+    return {
+      backgroundColor: priorityValue.color,
+      color: priorityValue.text_color || '#FFFFFF'
+    };
+  };
+
+  // Get style for origin badge
+  const getOriginStyle = (origin: string) => {
+    const originValue = caseOrigins.find(o => o.value === origin);
+    if (!originValue?.color) return {};
+    return {
+      backgroundColor: originValue.color,
+      color: originValue.text_color || '#FFFFFF'
     };
   };
 
@@ -490,7 +646,7 @@ export function CaseDetailPage() {
               <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
                 <div>
                   <h1 className="text-2xl font-bold mb-2">{caseData.title}</h1>
-                  <div className="flex items-center gap-4">
+                  <div className="flex flex-wrap items-center gap-2 md:gap-4">
                     <span
                       className="px-2 py-1 text-xs font-medium rounded-full"
                       style={getTypeStyle(caseData.type)}
@@ -514,6 +670,27 @@ export function CaseDetailPage() {
                         </option>
                       ))}
                     </select>
+
+                    {/* Added Priority Badge */}
+                    {caseData.priority && (
+                      <span
+                        className="px-2 py-1 text-xs font-medium rounded-full flex items-center"
+                        style={getPriorityStyle(caseData.priority)}
+                      >
+                        <AlertTriangle className="w-3 h-3 mr-1" />
+                        {casePriorities.find(p => p.value === caseData.priority)?.label || caseData.priority}
+                      </span>
+                    )}
+
+                    {/* Added Origin Badge */}
+                    {caseData.origin && (
+                      <span
+                        className="px-2 py-1 text-xs font-medium rounded-full"
+                        style={getOriginStyle(caseData.origin)}
+                      >
+                        {caseOrigins.find(o => o.value === caseData.origin)?.label || caseData.origin}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -583,6 +760,56 @@ export function CaseDetailPage() {
                       selectedUserId={caseData.owner_id}
                       onSelect={handleAssign}
                     />
+
+                    {/* Escalation Information */}
+                    {caseData.escalated_at && (
+                      <div className="pt-3 mt-3 border-t border-gray-200">
+                        <div className="text-sm font-medium text-gray-500 mb-1 flex items-center">
+                          <AlertTriangle className="w-4 h-4 text-amber-500 mr-1" />
+                          Escalated
+                        </div>
+                        <div className="text-gray-700 flex items-center">
+                          <Clock className="w-4 h-4 text-gray-400 mr-1" />
+                          {formatDateTime(caseData.escalated_at)}
+                          {caseData.escalated_by_user ? (
+                            <span className="ml-2 text-sm text-gray-500 flex items-center">
+                              <User className="w-3 h-3 mr-1" />
+                              by {caseData.escalated_by_user.name}
+                            </span>
+                          ) : caseData.escalated_by && (
+                            <span className="ml-2 text-sm text-gray-500 flex items-center">
+                              <User className="w-3 h-3 mr-1" />
+                              by user ID: {caseData.escalated_by.substring(0, 8)}...
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Closed Information */}
+                    {caseData.closed_at && (
+                      <div className="pt-3 mt-3 border-t border-gray-200">
+                        <div className="text-sm font-medium text-gray-500 mb-1 flex items-center">
+                          <CheckSquare className="w-4 h-4 text-green-500 mr-1" />
+                          Closed
+                        </div>
+                        <div className="text-gray-700 flex items-center">
+                          <Clock className="w-4 h-4 text-gray-400 mr-1" />
+                          {formatDateTime(caseData.closed_at)}
+                          {caseData.closed_by_user ? (
+                            <span className="ml-2 text-sm text-gray-500 flex items-center">
+                              <User className="w-3 h-3 mr-1" />
+                              by {caseData.closed_by_user.name}
+                            </span>
+                          ) : caseData.closed_by && (
+                            <span className="ml-2 text-sm text-gray-500 flex items-center">
+                              <User className="w-3 h-3 mr-1" />
+                              by user ID: {caseData.closed_by.substring(0, 8)}...
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -594,6 +821,7 @@ export function CaseDetailPage() {
                       <div className="text-sm font-medium text-gray-500 mb-1">Description</div>
                       <p className="text-gray-700 whitespace-pre-wrap">{caseData.description}</p>
                     </div>
+
                     {/* Files Section */}
                     <div className="flex flex-wrap gap-4">
                       {caseData.resume_url && (
@@ -710,7 +938,7 @@ export function CaseDetailPage() {
               to={caseData.contact.email}
               caseTitle={caseData.title}
               orgId={selectedOrganization?.id}
-              caseId = {id}
+              caseId={id}
               onClose={() => setShowEmailModal(false)}
               onSuccess={() => {
                 setShowEmailModal(false);
