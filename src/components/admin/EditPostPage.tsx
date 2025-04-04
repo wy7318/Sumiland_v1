@@ -6,9 +6,8 @@ import { supabase } from '../../lib/supabase';
 import { getCurrentUser } from '../../lib/auth';
 import { ImageUpload } from './ImageUpload';
 import { useAuth } from '../../contexts/AuthContext';
+import { RichTextEditor } from './RichTextEditor';
 import type { Database } from '../../lib/database.types';
-import { useOrganization } from '../../contexts/OrganizationContext';
-
 
 type Post = Database['public']['Tables']['posts']['Row'];
 
@@ -18,7 +17,6 @@ export function EditPostPage() {
   const { organizations } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { selectedOrganization } = useOrganization();
   const [formData, setFormData] = useState<Partial<Post>>({
     title: '',
     content: '',
@@ -38,7 +36,7 @@ export function EditPostPage() {
         .from('posts')
         .select('*')
         .eq('id', id)
-        .eq('organization_id', selectedOrganization?.id)
+        .in('organization_id', organizations.map(org => org.id))
         .single();
 
       if (error) throw error;
@@ -61,6 +59,10 @@ export function EditPostPage() {
     setFormData(prev => ({ ...prev, featured_image: url }));
   };
 
+  const handleContentChange = (html: string) => {
+    setFormData(prev => ({ ...prev, content: html }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!id) return;
@@ -70,8 +72,6 @@ export function EditPostPage() {
 
     try {
       const userData = await getCurrentUser();
-      console.log('User Data:', userData);
-      console.log('User:', userData?.user);
       if (!userData?.user) throw new Error('Not authenticated');
 
       // Verify organization access
@@ -89,7 +89,7 @@ export function EditPostPage() {
           updated_at: new Date().toISOString()
         })
         .eq('id', id)
-        .eq('organization_id', selectedOrganization?.id);
+        .eq('organization_id', formData.organization_id);
 
       if (updateError) throw updateError;
       navigate('/admin/posts');
@@ -173,13 +173,9 @@ export function EditPostPage() {
           <label htmlFor="content" className="block text-sm font-medium text-gray-700 mb-1">
             Content
           </label>
-          <textarea
-            id="content"
-            required
-            rows={10}
-            value={formData.content}
-            onChange={(e) => setFormData(prev => ({ ...prev, content: e.target.value }))}
-            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+          <RichTextEditor
+            content={formData.content || ''}
+            onChange={handleContentChange}
           />
         </div>
 
