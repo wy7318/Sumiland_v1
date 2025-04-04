@@ -469,17 +469,20 @@ export function OpportunityDetailPage() {
           item_name: product.product.name,
           item_desc: product.product.description || null,
           quantity: product.quantity,
-          unit_price: product.unit_price
+          unit_price: product.unit_price,
+          line_total: product.quantity * product.unit_price // Add this line
         })),
 
         // Calculate subtotal based on products
-        subtotal: opportunity.products.reduce((sum, product) =>
-          sum + (product.quantity * product.unit_price), 0),
+        subtotal: parseFloat(opportunity.products.reduce((sum, product) =>
+          sum + (product.quantity * product.unit_price), 0).toFixed(2)),
 
         // Set total amount equal to subtotal since tax and discount are 0
-        total_amount: opportunity.products.reduce((sum, product) =>
-          sum + (product.quantity * product.unit_price), 0)
+        total_amount: parseFloat(opportunity.products.reduce((sum, product) =>
+          sum + (product.quantity * product.unit_price), 0).toFixed(2))
       };
+      console.log('quoteData ; ' + quoteData);
+
 
       // Navigate to the QuoteForm with the data as state
       navigate('/admin/quotes/new', {

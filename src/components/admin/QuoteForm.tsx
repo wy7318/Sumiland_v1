@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Save,
@@ -145,6 +145,7 @@ export function QuoteForm() {
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [customFields, setCustomFields] = useState<Record<string, any>>({});
+  const location = useLocation();
 
   // Search states
   const [customerSearch, setCustomerSearch] = useState('');
@@ -185,6 +186,9 @@ export function QuoteForm() {
   // References for Google Maps Places Autocomplete
   const shippingAutocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   const billingAutocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+  // Add state to track if this is from an opportunity conversion
+  const [convertedFromOpportunity, setConvertedFromOpportunity] = useState(false);
+  const [opportunityId, setOpportunityId] = useState<string | null>(null);
 
   // Load Google Maps API
   useEffect(() => {
@@ -230,6 +234,41 @@ export function QuoteForm() {
       console.error('Error loading Google Maps:', error);
     });
   }, [useShippingForBilling]);
+
+  // Handle prefilled data from opportunity conversion
+  useEffect(() => {
+    if (location.state?.convertedFromOpportunity && location.state?.quoteData) {
+      setConvertedFromOpportunity(true);
+      setOpportunityId(location.state.opportunityId);
+
+      const quoteData = location.state.quoteData;
+
+      // Set form data from converted opportunity
+      setFormData({
+        ...formData,
+        customer_id: quoteData.customer_id || '',
+        vendor_id: quoteData.vendor_id || null,
+        status: quoteData.status || '',
+        notes: quoteData.notes || '',
+        items: quoteData.items || [],
+        organization_id: quoteData.organization_id || selectedOrganization?.id,
+        tax_percent: quoteData.tax_percent ?? 0,       // Use nullish coalescing
+        tax_amount: quoteData.tax_amount ?? 0,         // instead of logical OR
+        discount_amount: quoteData.discount_amount ?? 0, // to handle 0 values correctly
+        subtotal: quoteData.subtotal || 0,
+        total_amount: quoteData.total_amount || 0
+      });
+
+      // Fetch customer and vendor data to display
+      if (quoteData.customer_id) {
+        fetchCustomerById(quoteData.customer_id);
+      }
+
+      if (quoteData.vendor_id) {
+        fetchVendorById(quoteData.vendor_id);
+      }
+    }
+  }, [location.state]);
 
   // Function to extract address components from Google Maps
   const updateAddressFromPlace = (place: google.maps.places.PlaceResult, type: 'shipping' | 'billing') => {
@@ -534,6 +573,41 @@ export function QuoteForm() {
     }
   };
 
+  // Add functions to fetch customer and vendor by ID
+  const fetchCustomerById = async (customerId) => {
+    try {
+      const { data, error } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('customer_id', customerId)
+        .single();
+
+      if (error) throw error;
+      if (data) {
+        setSelectedCustomer(data);
+      }
+    } catch (err) {
+      console.error('Error fetching customer:', err);
+    }
+  };
+
+  const fetchVendorById = async (vendorId) => {
+    try {
+      const { data, error } = await supabase
+        .from('vendors')
+        .select('*')
+        .eq('id', vendorId)
+        .single();
+
+      if (error) throw error;
+      if (data) {
+        setSelectedVendor(data);
+      }
+    } catch (err) {
+      console.error('Error fetching vendor:', err);
+    }
+  };
+
   const fetchCustomers = async () => {
     try {
       const { data, error } = await supabase
@@ -744,6 +818,8 @@ export function QuoteForm() {
         organization_id: selectedOrganization?.id
       };
 
+      let quoteId = id;
+
       if (id) {
         // Update existing quote
         const { error: updateError } = await supabase
@@ -858,6 +934,7 @@ export function QuoteForm() {
           .single();
 
         if (insertError) throw insertError;
+        quoteId = newQuote.quote_id;
 
         // Insert items
         const { error: itemsError } = await supabase
@@ -876,6 +953,51 @@ export function QuoteForm() {
           );
 
         if (itemsError) throw itemsError;
+
+        // ✅ NEW CODE: If this quote was converted from an opportunity, update the opportunity
+        if (convertedFromOpportunity && opportunityId) {
+          console.log("🟢 Debug - Updating Opportunity as Converted");
+          const { error: opportunityError } = await supabase
+            .from('opportunities')
+            .update({
+              is_converted: true,
+              converted_to_id: newQuote.quote_id,
+              converted_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              updated_by: userData.user.id
+            })
+            .eq('id', opportunityId);
+
+          if (opportunityError) {
+            console.error('Warning: Failed to update opportunity conversion status:', opportunityError);
+            // Continue with the flow even if this update fails - we don't want to fail the whole transaction
+          } else {
+            console.log(`Successfully marked opportunity ${opportunityId} as converted to quote ${newQuote.quote_id}`);
+          }
+        }
+      }
+
+      // Save custom field values
+      if (userData.user) {
+        for (const [fieldId, value] of Object.entries(customFields)) {
+          const { error: valueError } = await supabase
+            .from('custom_field_values')
+            .upsert({
+              organization_id: formData.organization_id,
+              entity_id: quoteId,
+              field_id: fieldId,
+              value,
+              created_by: userData.user.id,
+              updated_by: userData.user.id,
+              updated_at: new Date().toISOString()
+            }, {
+              onConflict: 'organization_id,field_id,entity_id'
+            });
+
+          if (valueError) {
+            console.error('Error saving custom field value:', valueError);
+          }
+        }
       }
 
       navigate('/admin/quotes');
@@ -893,6 +1015,23 @@ export function QuoteForm() {
       animate={{ opacity: 1 }}
       className="bg-white rounded-lg shadow-md p-6"
     >
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">
+          {id ? 'Edit Quote' : (convertedFromOpportunity ? 'Convert Opportunity to Quote' : 'Create New Quote')}
+        </h1>
+        {/* Show a badge if this is from an opportunity conversion */}
+        {convertedFromOpportunity && (
+          <div className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm">
+            Converted from Opportunity
+          </div>
+        )}
+        <button
+          onClick={() => navigate('/admin/quotes')}
+          className="p-2 text-gray-500 hover:text-gray-700 rounded-full hover:bg-gray-100"
+        >
+          <X className="w-6 h-6" />
+        </button>
+      </div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">
           {id ? 'Edit Quote' : 'Create New Quote'}

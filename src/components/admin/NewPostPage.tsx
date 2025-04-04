@@ -6,11 +6,13 @@ import { supabase } from '../../lib/supabase';
 import { getCurrentUser } from '../../lib/auth';
 import { ImageUpload } from './ImageUpload';
 import { useAuth } from '../../contexts/AuthContext';
+import { useOrganization } from '../../contexts/OrganizationContext';
 
 export function NewPostPage() {
   const navigate = useNavigate();
   const { organizations } = useAuth();
   const [loading, setLoading] = useState(false);
+  const { selectedOrganization } = useOrganization();
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     title: '',
@@ -30,10 +32,12 @@ export function NewPostPage() {
 
     try {
       const userData = await getCurrentUser();
+      console.log('User Data:', userData);
+      console.log('User:', userData?.user);
       if (!userData?.user) throw new Error('Not authenticated');
 
       // Get the first organization (you might want to add organization selection)
-      const organizationId = organizations[0]?.id;
+      const organizationId = selectedOrganization?.id;
       if (!organizationId) throw new Error('No organization available');
 
       // First check if user has an author record

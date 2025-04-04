@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase';
 import type { Database } from '../../lib/database.types';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { useOrganization } from '../../contexts/OrganizationContext';
 
 type Post = Database['public']['Tables']['posts']['Row'];
 
@@ -13,6 +14,7 @@ export function PostsPage() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { selectedOrganization } = useOrganization();
 
   useEffect(() => {
     fetchPosts();
@@ -26,7 +28,7 @@ export function PostsPage() {
       const { data, error } = await supabase
         .from('posts')
         .select('*')
-        .in('organization_id', organizations.map(org => org.id))
+        .eq('organization_id', selectedOrganization?.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
