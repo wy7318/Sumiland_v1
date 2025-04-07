@@ -14,6 +14,7 @@ import type { Database } from '../../lib/database.types';
 import { useOrganization } from '../../contexts/OrganizationContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { EmailConfigModal } from './EmailConfigModal';
+import { useEmailComposer } from './EmailProvider';
 import { getEmailConfig } from '../../lib/email';
 import { EmailModal } from './EmailModal';
 import { RelatedEmails } from './RelatedEmails';
@@ -68,6 +69,7 @@ export function LeadDetailPage() {
   const [converting, setConverting] = useState(false);
   const [conversionError, setConversionError] = useState<string | null>(null);
   const [showEmailModal, setShowEmailModal] = useState(false);
+  const { openEmailComposer } = useEmailComposer();
   const [showEmailConfigModal, setShowEmailConfigModal] = useState(false);
   const [refreshEmailList, setRefreshEmailList] = useState(0);
 
@@ -162,20 +164,30 @@ export function LeadDetailPage() {
   };
 
   const handleEmailClick = async () => {
-      if (!user) return;
-      
-      try {
-        const config = await getEmailConfig(user.id);
-        if (!config) {
-          setShowEmailConfigModal(true);
-        } else {
-          setShowEmailModal(true);
-        }
-      } catch (err) {
-        console.error('Error checking email config:', err);
-        setError(err instanceof Error ? err.message : 'Failed to check email configuration');
+    if (!user) return;
+
+    try {
+      const config = await getEmailConfig(user.id);
+      if (!config) {
+        setShowEmailConfigModal(true);
+      } else {
+        // Open email composer with stored state
+        openEmailComposer({
+          to: lead.email,
+          caseTitle: lead.company,
+          orgId: selectedOrganization?.id,
+          caseId: id,
+          onSuccess: () => {
+            // Refresh the email list after successful send
+            setRefreshEmailList(prev => prev + 1);
+          }
+        });
       }
-    };
+    } catch (err) {
+      console.error('Error checking email config:', err);
+      setError(err instanceof Error ? err.message : 'Failed to check email configuration');
+    }
+  };
 
   const handleStatusChange = async (newStatus: string) => {
     try {
@@ -732,7 +744,16 @@ export function LeadDetailPage() {
               onClose={() => setShowEmailConfigModal(false)}
               onSuccess={() => {
                 setShowEmailConfigModal(false);
-                setShowEmailModal(true);
+                // After config is set up, open the email composer
+                openEmailComposer({
+                  to: lead.email,
+                  caseTitle: lead.company,
+                  orgId: selectedOrganization?.id,
+                  caseId: id,
+                  onSuccess: () => {
+                    setRefreshEmailList(prev => prev + 1);
+                  }
+                });
               }}
             />
           )}

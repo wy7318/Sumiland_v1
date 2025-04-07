@@ -11,6 +11,7 @@ import { cn } from '../../lib/utils';
 import { CustomFieldsSection } from './CustomFieldsSection';
 import { UserSearch } from './UserSearch';
 import { EmailConfigModal } from './EmailConfigModal';
+import { useEmailComposer } from './EmailProvider';
 import { EmailModal } from './EmailModal';
 import { getEmailConfig } from '../../lib/email';
 import { useAuth } from '../../contexts/AuthContext';
@@ -103,6 +104,7 @@ export function CaseDetailPage() {
   const [casePriorities, setCasePriorities] = useState<PicklistValue[]>([]);
   const [caseOrigins, setCaseOrigins] = useState<PicklistValue[]>([]);
   const [showEmailModal, setShowEmailModal] = useState(false);
+  const { openEmailComposer } = useEmailComposer();
   const [showEmailConfigModal, setShowEmailConfigModal] = useState(false);
   const [refreshEmailList, setRefreshEmailList] = useState(0);
   const [orgTimezone, setOrgTimezone] = useState('UTC'); // Default timezone
@@ -443,13 +445,39 @@ export function CaseDetailPage() {
       if (!config) {
         setShowEmailConfigModal(true);
       } else {
-        setShowEmailModal(true);
+        // Open email composer with stored state
+        openEmailComposer({
+          to: caseData.contact.email,
+          caseTitle: caseData.title,
+          orgId: selectedOrganization?.id,
+          caseId: id,
+          onSuccess: () => {
+            // Refresh the email list after successful send
+            setRefreshEmailList(prev => prev + 1);
+          }
+        });
       }
     } catch (err) {
       console.error('Error checking email config:', err);
       setError(err instanceof Error ? err.message : 'Failed to check email configuration');
     }
   };
+
+  // const handleEmailClick = async () => {
+  //   if (!user) return;
+
+  //   try {
+  //     const config = await getEmailConfig(user.id);
+  //     if (!config) {
+  //       setShowEmailConfigModal(true);
+  //     } else {
+  //       setShowEmailModal(true);
+  //     }
+  //   } catch (err) {
+  //     console.error('Error checking email config:', err);
+  //     setError(err instanceof Error ? err.message : 'Failed to check email configuration');
+  //   }
+  // };
 
   // Get style for status badge
   const getStatusStyle = (status: string) => {
@@ -923,12 +951,31 @@ export function CaseDetailPage() {
           </div>
 
           {/* Email Modals */}
-          {showEmailConfigModal && (
+          {/* {showEmailConfigModal && (
             <EmailConfigModal
               onClose={() => setShowEmailConfigModal(false)}
               onSuccess={() => {
                 setShowEmailConfigModal(false);
                 setShowEmailModal(true);
+              }}
+            />
+          )} */}
+
+          {showEmailConfigModal && (
+            <EmailConfigModal
+              onClose={() => setShowEmailConfigModal(false)}
+              onSuccess={() => {
+                setShowEmailConfigModal(false);
+                // After config is set up, open the email composer
+                openEmailComposer({
+                  to: caseData.contact.email,
+                  caseTitle: caseData.title,
+                  orgId: selectedOrganization?.id,
+                  caseId: id,
+                  onSuccess: () => {
+                    setRefreshEmailList(prev => prev + 1);
+                  }
+                });
               }}
             />
           )}
