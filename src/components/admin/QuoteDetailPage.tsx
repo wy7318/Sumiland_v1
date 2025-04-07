@@ -16,6 +16,7 @@ import { useOrganization } from '../../contexts/OrganizationContext';
 import { RelatedEmails } from './RelatedEmails';
 import { RelatedTasks } from './RelatedTasks';
 import { EmailConfigModal } from './EmailConfigModal';
+import { useEmailComposer } from './EmailProvider';
 import { EmailModal } from './EmailModal';
 import { getEmailConfig } from '../../lib/email';
 
@@ -120,6 +121,7 @@ export function QuoteDetailPage() {
   const [approvalStatuses, setApprovalStatuses] = useState<PicklistValue[]>([]);
   const [creatingOrder, setCreatingOrder] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
+  const { openEmailComposer } = useEmailComposer();
   const [showEmailConfigModal, setShowEmailConfigModal] = useState(false);
   const [refreshEmailList, setRefreshEmailList] = useState(0);
 
@@ -351,6 +353,22 @@ export function QuoteDetailPage() {
   };
   
 
+  // const handleEmailClick = async () => {
+  //   if (!user) return;
+
+  //   try {
+  //     const config = await getEmailConfig(user.id);
+  //     if (!config) {
+  //       setShowEmailConfigModal(true);
+  //     } else {
+  //       setShowEmailModal(true);
+  //     }
+  //   } catch (err) {
+  //     console.error('Error checking email config:', err);
+  //     setError(err instanceof Error ? err.message : 'Failed to check email configuration');
+  //   }
+  // };
+
   const handleEmailClick = async () => {
     if (!user) return;
 
@@ -359,7 +377,18 @@ export function QuoteDetailPage() {
       if (!config) {
         setShowEmailConfigModal(true);
       } else {
-        setShowEmailModal(true);
+        // Open email composer with stored state
+        openEmailComposer({
+          to: quote.customer.email,
+          caseTitle: quote.quote_number,
+          orgId: selectedOrganization?.id,
+          caseId: id,
+          autoClose: true, // Explicitly set to true to close after sending
+          onSuccess: () => {
+            // Refresh the email list after successful send
+            setRefreshEmailList(prev => prev + 1);
+          }
+        });
       }
     } catch (err) {
       console.error('Error checking email config:', err);
@@ -1104,12 +1133,31 @@ export function QuoteDetailPage() {
           </div>
 
           {/* Email Modals */}
-          {showEmailConfigModal && (
+          {/* {showEmailConfigModal && (
             <EmailConfigModal
               onClose={() => setShowEmailConfigModal(false)}
               onSuccess={() => {
                 setShowEmailConfigModal(false);
                 setShowEmailModal(true);
+              }}
+            />
+          )} */}
+
+          {showEmailConfigModal && (
+            <EmailConfigModal
+              onClose={() => setShowEmailConfigModal(false)}
+              onSuccess={() => {
+                setShowEmailConfigModal(false);
+                // After config is set up, open the email composer
+                openEmailComposer({
+                  to: quote.customer.email,
+                  caseTitle: quote.quote_number,
+                  orgId: selectedOrganization?.id,
+                  caseId: id,
+                  onSuccess: () => {
+                    setRefreshEmailList(prev => prev + 1);
+                  }
+                });
               }}
             />
           )}
