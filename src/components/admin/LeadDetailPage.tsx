@@ -177,6 +177,7 @@ export function LeadDetailPage() {
           caseTitle: lead.company,
           orgId: selectedOrganization?.id,
           caseId: id,
+          autoClose: true, // Explicitly set to true to close after sending
           onSuccess: () => {
             // Refresh the email list after successful send
             setRefreshEmailList(prev => prev + 1);

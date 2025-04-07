@@ -16,6 +16,7 @@ type EmailComposerOptions = {
     orgId?: string;
     caseId?: string;
     onSuccess?: () => void;
+    autoClose?: boolean; // Added option to control auto-closing
 };
 
 const EmailContext = createContext<EmailContextType | undefined>(undefined);
@@ -38,7 +39,10 @@ export function EmailProvider({ children }: EmailProviderProps) {
     const [isMinimized, setIsMinimized] = useState(false);
 
     const openEmailComposer = (options: EmailComposerOptions) => {
-        setEmailOptions(options);
+        setEmailOptions({
+            ...options,
+            autoClose: options.autoClose !== false // Default to true if not specified
+        });
         setIsOpen(true);
         setIsMinimized(false);
     };
@@ -61,8 +65,11 @@ export function EmailProvider({ children }: EmailProviderProps) {
         if (emailOptions?.onSuccess) {
             emailOptions.onSuccess();
         }
-        // We don't automatically close the email composer on success
-        // to allow for multiple emails to be sent in succession
+
+        // Auto-close by default (unless explicitly disabled)
+        if (emailOptions?.autoClose !== false) {
+            closeEmailComposer();
+        }
     };
 
     return (
