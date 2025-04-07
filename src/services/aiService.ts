@@ -1,6 +1,14 @@
 // services/aiService.ts
 import { supabase } from '../lib/supabase';
 
+// Add at the top of your aiService.ts file
+export const OPENAI_MODELS = {
+  GPT_3_5_TURBO: 'gpt-3.5-turbo',
+  GPT_4: 'gpt-4',
+  GPT_4_TURBO: 'gpt-4-turbo',
+  GPT_4O: 'gpt-4o'
+};
+
 interface AIGenerationParams {
   prompt: string;
   title?: string;

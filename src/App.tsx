@@ -59,6 +59,7 @@ import { TasksPage } from './components/admin/TasksPage';
 import { TaskFormPage } from './components/admin/TaskFormPage';
 import { FullTaskCalendar } from './components/admin/FullTaskCalendar';
 import FAQPage from './components/FAQPage';
+import { EmailProvider } from './components/admin/EmailProvider';
 
 
 
@@ -138,12 +139,14 @@ function App() {
                                 }
                             />
 
-                            {/* Protected Admin Routes */}
+                            {/* Protected Admin  Routes */}
                             <Route
                                 path="/admin/*"
                                 element={
                                     <ProtectedRoute>
-                                        <AdminLayout />
+                                        <EmailProvider>
+                                            <AdminLayout />
+                                        </EmailProvider>
                                     </ProtectedRoute>
                                 }
                             >
