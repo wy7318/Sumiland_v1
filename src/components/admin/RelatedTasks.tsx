@@ -5,7 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { cn } from '../../lib/utils';
 import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
-import { CheckCircle, Circle, Calendar, ChevronRight, X } from 'lucide-react';
+import { CheckCircle, Circle, Calendar, ChevronRight, X, List, ChevronDown, ChevronUp } from 'lucide-react';
 import { DateTime } from 'luxon';
 
 interface Task {
@@ -24,9 +24,10 @@ type Props = {
     organizationId: string;
     title?: string;
     refreshKey?: number;
+    defaultExpanded?: boolean;
 };
 
-export function RelatedTasks({ recordId, organizationId, title = 'Tasks', refreshKey }: Props) {
+export function RelatedTasks({ recordId, organizationId, title = 'Tasks', refreshKey, defaultExpanded = false }: Props) {
     const navigate = useNavigate();
     const { user } = useAuth();
     const [tasks, setTasks] = useState<Task[]>([]);
@@ -34,6 +35,8 @@ export function RelatedTasks({ recordId, organizationId, title = 'Tasks', refres
     const [selectedTask, setSelectedTask] = useState<Task | null>(null);
     const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
     const [orgTimezone, setOrgTimezone] = useState('UTC');
+    const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+    const [isViewAllModalOpen, setIsViewAllModalOpen] = useState(false);
 
     // Fetch the organization timezone
     useEffect(() => {
@@ -127,6 +130,50 @@ export function RelatedTasks({ recordId, organizationId, title = 'Tasks', refres
         return DateTime.now().setZone(orgTimezone).toLocaleString(DateTime.DATE_MED);
     };
 
+    const toggleExpanded = () => {
+        setIsExpanded(!isExpanded);
+    };
+
+    // Function to render a task item - reused in both views
+    const renderTaskItem = (task: Task) => (
+        <div
+            key={task.id}
+            onClick={() => {
+                setSelectedTask(task);
+                setIsViewAllModalOpen(false);  // Close the "View All" modal if open
+            }}
+            className="px-4 py-3 hover:bg-blue-50 cursor-pointer transition-colors duration-150"
+        >
+            <div className="flex items-start">
+                <div className="flex-shrink-0 mt-0.5">
+                    {task.is_done ? (
+                        <CheckCircle className="w-4 h-4 text-green-500" />
+                    ) : (
+                        <Circle className="w-4 h-4 text-gray-300" />
+                    )}
+                </div>
+                <div className="ml-3 flex-1 min-w-0">
+                    <p className={cn(
+                        "text-sm truncate",
+                        task.is_done ? "text-gray-500 line-through" : "text-gray-900"
+                    )}>
+                        {task.title}
+                    </p>
+                    <div className="flex items-center mt-1 text-xs text-gray-500">
+                        <Calendar className="w-3 h-3 mr-1" />
+                        {formatDate(task.due_date)}
+                        {task.is_personal && (
+                            <span className="ml-2 bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-xxs">
+                                Personal
+                            </span>
+                        )}
+                    </div>
+                </div>
+                <ChevronRight className="w-5 h-5 text-gray-400" />
+            </div>
+        </div>
+    );
+
     return (
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
             <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 flex items-center">
@@ -139,69 +186,100 @@ export function RelatedTasks({ recordId, organizationId, title = 'Tasks', refres
                     />
                 </svg>
                 <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">{title}</h3>
-                <span className="ml-auto bg-gray-200 text-gray-700 text-xs font-medium px-2 py-0.5 rounded-full">
+                <span className="ml-auto bg-gray-200 text-gray-700 text-xs font-medium px-2 py-0.5 rounded-full mr-2">
                     {tasks.length}
                 </span>
+                <button
+                    onClick={toggleExpanded}
+                    className="text-gray-500 hover:text-gray-700 focus:outline-none"
+                >
+                    {isExpanded ? (
+                        <ChevronUp className="w-4 h-4" />
+                    ) : (
+                        <ChevronDown className="w-4 h-4" />
+                    )}
+                </button>
             </div>
 
-            {loading ? (
-                <div className="p-4 flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
-                </div>
-            ) : tasks.length === 0 ? (
-                <div className="p-4 text-center text-sm text-gray-500">
-                    No tasks found for this record.
-                </div>
-            ) : (
-                <div className="divide-y divide-gray-200">
-                    {tasks.map((task) => (
-                        <div
-                            key={task.id}
-                            onClick={() => setSelectedTask(task)}
-                            className="px-4 py-3 hover:bg-blue-50 cursor-pointer transition-colors duration-150"
-                        >
-                            <div className="flex items-start">
-                                <div className="flex-shrink-0 mt-0.5">
-                                    {task.is_done ? (
-                                        <CheckCircle className="w-4 h-4 text-green-500" />
-                                    ) : (
-                                        <Circle className="w-4 h-4 text-gray-300" />
-                                    )}
-                                </div>
-                                <div className="ml-3 flex-1 min-w-0">
-                                    <p className={cn(
-                                        "text-sm truncate",
-                                        task.is_done ? "text-gray-500 line-through" : "text-gray-900"
-                                    )}>
-                                        {task.title}
-                                    </p>
-                                    <div className="flex items-center mt-1 text-xs text-gray-500">
-                                        <Calendar className="w-3 h-3 mr-1" />
-                                        {formatDate(task.due_date)}
-                                        {task.is_personal && (
-                                            <span className="ml-2 bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-xxs">
-                                                Personal
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
-                                <ChevronRight className="w-5 h-5 text-gray-400" />
-                            </div>
+            {isExpanded && (
+                <>
+                    {loading ? (
+                        <div className="p-4 flex items-center justify-center">
+                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
                         </div>
-                    ))}
-                </div>
+                    ) : tasks.length === 0 ? (
+                        <div className="p-4 text-center text-sm text-gray-500">
+                            No tasks found for this record.
+                        </div>
+                    ) : (
+                        <>
+                            <div className="divide-y divide-gray-200">
+                                {/* Only show the first 5 tasks */}
+                                {tasks.slice(0, 5).map(renderTaskItem)}
+                            </div>
+
+                            {/* "View All" button - show when there are more than 5 tasks */}
+                            {tasks.length > 5 && (
+                                <div className="px-4 py-3 border-t border-gray-200 bg-gray-50 text-center">
+                                    <button
+                                        onClick={() => setIsViewAllModalOpen(true)}
+                                        className="w-full text-center text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center justify-center"
+                                    >
+                                        <List className="w-4 h-4 mr-1" />
+                                        View All Tasks ({tasks.length})
+                                    </button>
+                                </div>
+                            )}
+                        </>
+                    )}
+                </>
             )}
 
-            {tasks.length > 0 && (
-                <div className="bg-gray-50 px-4 py-2 border-t border-gray-200 text-right">
-                    <button
-                        onClick={() => (navigate(`/admin/tasks`))}
-                        className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+            {/* View All Tasks Modal */}
+            {isViewAllModalOpen && (
+                <motion.div
+                    className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    onClick={() => setIsViewAllModalOpen(false)}
+                >
+                    <motion.div
+                        className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col"
+                        initial={{ scale: 0.95, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        onClick={(e) => e.stopPropagation()}
                     >
-                        View All Tasks
-                    </button>
-                </div>
+                        <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                            <div>
+                                <h4 className="text-lg font-semibold text-gray-900">All Tasks</h4>
+                                <p className="text-sm text-gray-500 mt-1">
+                                    Showing all {tasks.length} tasks
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setIsViewAllModalOpen(false)}
+                                className="text-gray-400 hover:text-gray-500 p-1 rounded-full hover:bg-gray-100"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
 
+                        <div className="overflow-y-auto flex-1">
+                            <div className="divide-y divide-gray-200">
+                                {tasks.map(renderTaskItem)}
+                            </div>
+                        </div>
+
+                        <div className="bg-gray-50 px-6 py-3 border-t border-gray-200 flex justify-end">
+                            <button
+                                onClick={() => setIsViewAllModalOpen(false)}
+                                className="px-4 py-2 bg-gray-200 text-gray-800 text-sm font-medium rounded hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </motion.div>
+                </motion.div>
             )}
 
             {/* Task Detail Modal */}
