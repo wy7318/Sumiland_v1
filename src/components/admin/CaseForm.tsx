@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Save, X, AlertCircle } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Save, X, AlertCircle, Search } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { CustomFieldsForm } from './CustomFieldsForm';
@@ -19,11 +19,30 @@ type PicklistValue = {
   text_color: string | null;
 };
 
+type Vendor = {
+  id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  contact_person?: string;
+};
+
 type Staff = {
   id: string;
   name: string;
   email: string;
   role: string;
+};
+
+type Customer = {
+  customer_id: string;
+  id: string; // Some may use id instead of customer_id
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string | null;
+  company: string | null;
+  vendor_id: string | null; // This is needed for auto-populating vendor_id
 };
 
 type FormData = {
@@ -40,6 +59,9 @@ type FormData = {
   closed_by: string | null;
   escalated_by: string | null;
   priority: string | null;
+  // Add the missing fields
+  contact_id: string | null;
+  vendor_id: string | null;
 };
 
 const initialFormData: FormData = {
@@ -55,7 +77,10 @@ const initialFormData: FormData = {
   origin: null,
   closed_by: null,
   escalated_by: null,
-  priority: null
+  priority: null,
+  // Initialize the new fields
+  contact_id: null,
+  vendor_id: null
 };
 
 export function CaseForm() {
@@ -75,6 +100,17 @@ export function CaseForm() {
   const [customFields, setCustomFields] = useState<Record<string, any>>({});
   const [orgTimezone, setOrgTimezone] = useState('UTC'); // Default timezone
 
+
+  // Add customer search related states
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
+
+  // Add ref for customer search dropdown
+  const customerSearchRef = useRef<HTMLDivElement>(null);
   // Fetch organization timezone
   useEffect(() => {
     const fetchTimezone = async () => {
@@ -114,6 +150,58 @@ export function CaseForm() {
       setPreviousStatus(formData.status);
     }
   }, []);
+
+  // Handle customer search filtering
+  useEffect(() => {
+    if (customerSearch) {
+      const filtered = customers.filter(customer =>
+        customer.first_name.toLowerCase().includes(customerSearch.toLowerCase()) ||
+        customer.last_name.toLowerCase().includes(customerSearch.toLowerCase()) ||
+        customer.email.toLowerCase().includes(customerSearch.toLowerCase()) ||
+        customer.company?.toLowerCase().includes(customerSearch.toLowerCase())
+      );
+      setFilteredCustomers(filtered);
+    } else {
+      setFilteredCustomers([]);
+    }
+  }, [customerSearch, customers]);
+
+  // Handle clicks outside dropdowns
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (customerSearchRef.current && !customerSearchRef.current.contains(event.target as Node)) {
+        setShowCustomerDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (formData.vendor_id) {
+      fetchVendorById(formData.vendor_id);
+    } else {
+      setSelectedVendor(null);
+    }
+  }, [formData.vendor_id]);
+
+  const fetchVendorById = async (vendorId) => {
+    try {
+      const { data, error } = await supabase
+        .from('vendors')
+        .select('*')
+        .eq('id', vendorId)
+        .single();
+
+      if (error) throw error;
+      if (data) {
+        setSelectedVendor(data);
+      }
+    } catch (err) {
+      console.error('Error fetching vendor:', err);
+    }
+  };
 
   const fetchPicklists = async () => {
     try {
@@ -229,6 +317,70 @@ export function CaseForm() {
     }
   };
 
+  // Add function to fetch customers
+  const fetchCustomers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('organization_id', selectedOrganization?.id)
+        .order('first_name');
+
+      if (error) throw error;
+      setCustomers(data || []);
+    } catch (err) {
+      console.error('Error fetching customers:', err);
+      setError('Failed to load customers');
+    }
+  };
+
+  // Add function to handle customer selection
+  const handleCustomerSelect = (customer: Customer) => {
+    setSelectedCustomer(customer);
+
+    setFormData(prev => ({
+      ...prev,
+      contact_id: customer.customer_id || customer.id,
+      vendor_id: customer.vendor_id
+    }));
+
+    setCustomerSearch('');
+    setShowCustomerDropdown(false);
+
+    // If the customer has a vendor_id, fetch vendor details
+    if (customer.vendor_id) {
+      fetchVendorById(customer.vendor_id);
+    }
+  };
+  // Add function to fetch customer by ID
+  const fetchCustomerById = async (customerId) => {
+    try {
+      const { data, error } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('customer_id', customerId)
+        .single();
+
+      if (error) {
+        // Try with id field if customer_id fails
+        const { data: altData, error: altError } = await supabase
+          .from('customers')
+          .select('*')
+          .eq('id', customerId)
+          .single();
+
+        if (altError) throw altError;
+        if (altData) {
+          setSelectedCustomer(altData);
+        }
+      } else if (data) {
+        setSelectedCustomer(data);
+      }
+    } catch (err) {
+      console.error('Error fetching customer:', err);
+    }
+  };
+
   const fetchCase = async () => {
     try {
       const { data: caseData, error } = await supabase
@@ -270,8 +422,17 @@ export function CaseForm() {
           closed_by: caseData.closed_by,
           escalated_by: caseData.escalated_by,
           priority: caseData.priority,
-          organization_id: caseData.organization_id
+          organization_id: caseData.organization_id,
+
+          // Include the new fields
+          contact_id: caseData.contact_id,
+          vendor_id: caseData.vendor_id
         });
+
+        // Fetch customer data if contact_id exists
+        if (caseData.contact_id) {
+          fetchCustomerById(caseData.contact_id);
+        }
 
         // Fetch custom fields for this case
         const { data: customFieldValues, error: customFieldsError } = await supabase
@@ -412,7 +573,10 @@ export function CaseForm() {
         sub_type: updatedFormData.sub_type || null,
         organization_id: orgData.organization_id,
         updated_at: new Date().toISOString(),
-        updated_by: userData.user.id
+        updated_by: userData.user.id,
+        // Include the contact_id and vendor_id in the submission
+        contact_id: updatedFormData.contact_id,
+        vendor_id: updatedFormData.vendor_id
       };
 
       let caseId: string;
@@ -565,6 +729,8 @@ export function CaseForm() {
           />
         </div>
 
+        
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <label htmlFor="type" className="block text-sm font-medium text-gray-700 mb-1">
@@ -684,6 +850,33 @@ export function CaseForm() {
               onSelect={(userId) => setFormData(prev => ({ ...prev, owner_id: userId }))}
             />
           </div>
+
+          {/* Display vendor_id info */}
+          <div>
+            <label htmlFor="vendor" className="block text-sm font-medium text-gray-700 mb-1">
+              Vendor
+            </label>
+            <div className="w-full px-4 py-2 rounded-lg border border-gray-300 bg-gray-50">
+              {selectedVendor ? (
+                <div>
+                  <span className="font-medium">{selectedVendor.name}</span>
+                  {selectedVendor.contact_person && (
+                    <div className="text-sm text-gray-500">Contact: {selectedVendor.contact_person}</div>
+                  )}
+                  {selectedVendor.email && (
+                    <div className="text-sm text-gray-500">Email: {selectedVendor.email}</div>
+                  )}
+                </div>
+              ) : formData.vendor_id ? (
+                `Vendor ID: ${formData.vendor_id} (loading details...)`
+              ) : (
+                "No vendor associated (will be auto-populated from customer)"
+              )}
+            </div>
+            <div className="text-xs text-gray-500 mt-1">
+              This field is automatically set based on the selected customer
+            </div>
+          </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Escalated Date {formData.escalated_at && `(${getReadableDate(formData.escalated_at)})`}
@@ -753,6 +946,98 @@ export function CaseForm() {
           </div>
         </div>
 
+        {/* Add Customer Search Component */}
+        <div ref={customerSearchRef} className="relative">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Customer Contact
+          </label>
+          {selectedCustomer ? (
+            <div className="flex items-center justify-between p-2 border rounded-lg">
+              <div>
+                <p className="font-medium">
+                  {selectedCustomer.first_name} {selectedCustomer.last_name}
+                </p>
+                <p className="text-sm text-gray-500">{selectedCustomer.email}</p>
+                {selectedCustomer.company && (
+                  <p className="text-sm text-gray-500">{selectedCustomer.company}</p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedCustomer(null);
+                  setFormData(prev => ({ ...prev, contact_id: null, vendor_id: null }));
+                }}
+                className="p-1 hover:bg-gray-100 rounded-full"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <input
+                type="text"
+                value={customerSearch}
+                onChange={(e) => {
+                  setCustomerSearch(e.target.value);
+                  setShowCustomerDropdown(true);
+                  if (!customers.length) {
+                    fetchCustomers();
+                  }
+                }}
+                onFocus={() => {
+                  setShowCustomerDropdown(true);
+                  if (!customers.length) {
+                    fetchCustomers();
+                  }
+                }}
+                placeholder="Search customers..."
+                className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+              />
+            </div>
+          )}
+
+          <AnimatePresence>
+            {showCustomerDropdown && customerSearch && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="absolute z-10 w-full mt-1 bg-white rounded-lg shadow-lg border border-gray-200"
+              >
+                {filteredCustomers.length > 0 ? (
+                  <ul className="py-1 max-h-60 overflow-auto">
+                    {filteredCustomers.map(customer => (
+                      <li
+                        key={customer.customer_id || customer.id}
+                        onClick={() => handleCustomerSelect(customer)}
+                        className="px-4 py-2 hover:bg-gray-50 cursor-pointer"
+                      >
+                        <div className="font-medium">
+                          {customer.first_name} {customer.last_name}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {customer.email}
+                        </div>
+                        {customer.company && (
+                          <div className="text-sm text-gray-500">
+                            {customer.company}
+                          </div>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="p-4 text-gray-500">
+                    No customers found
+                  </div>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
         <div>
           <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
             Description
@@ -766,6 +1051,8 @@ export function CaseForm() {
             required
           />
         </div>
+
+        
 
         <CustomFieldsForm
           entityType="cases"

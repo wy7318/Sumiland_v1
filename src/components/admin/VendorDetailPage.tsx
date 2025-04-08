@@ -11,6 +11,12 @@ import { useAuth } from '../../contexts/AuthContext';
 import { cn, formatCurrency } from '../../lib/utils';
 import { CustomFieldsSection } from './CustomFieldsSection';
 import { useOrganization } from '../../contexts/OrganizationContext';
+import { RelatedTasks } from './RelatedTasks';
+import { RelatedQuotes } from './RelatedQuotes';
+import { RelatedOrders } from './RelatedOrders';
+import { RelatedCustomers } from './RelatedCustomers';
+import { RelatedCases } from './RelatedCases';
+import { RelatedOpportunities } from './RelatedOpportunities';
 
 type Vendor = {
   id: string;
@@ -94,6 +100,7 @@ export function VendorDetailPage() {
   const [editingFeed, setEditingFeed] = useState<Feed | null>(null);
   const [accountTypes, setAccountTypes] = useState<PicklistValue[]>([]);
   const [accountStatuses, setAccountStatuses] = useState<PicklistValue[]>([]);
+  const [refreshRecordsList, setRefreshRecordsList] = useState(0);
 
   useEffect(() => {
     fetchPicklists();
@@ -473,304 +480,396 @@ export function VendorDetailPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <button
-          onClick={() => navigate('/admin/vendors')}
-          className="inline-flex items-center text-gray-600 hover:text-gray-900"
-        >
-          <ArrowLeft className="w-5 h-5 mr-2" />
-          Back to Accounts
-        </button>
+    <div className="flex flex-col lg:flex-row gap-4">
+      <div className="lg:w-3/4 space-y-6">
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => navigate('/admin/vendors')}
+            className="inline-flex items-center text-gray-600 hover:text-gray-900"
+          >
+            <ArrowLeft className="w-5 h-5 mr-2" />
+            Back to Accounts
+          </button>
 
-        {/* Right buttons group */}
-        <div className="flex space-x-3">
-          <Link
-            to={`/admin/vendors/${id}/edit`}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
-          >
-            <Edit className="w-4 h-4 mr-2" />
-            Edit Account
-          </Link>
-          <Link
-            to={`/admin/tasks/new?module=vendors&recordId=${id}`}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700"
-          >
-            <Calendar className="w-4 h-4 mr-2" />
-            Add Task
-          </Link>
+          {/* Right buttons group */}
+          <div className="flex space-x-3">
+            <Link
+              to={`/admin/vendors/${id}/edit`}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
+            >
+              <Edit className="w-4 h-4 mr-2" />
+              Edit Account
+            </Link>
+            <Link
+              to={`/admin/tasks/new?module=vendors&recordId=${id}`}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700"
+            >
+              <Calendar className="w-4 h-4 mr-2" />
+              Add Task
+            </Link>
+          </div>
+        </div>
+
+
+        <div className="bg-white shadow rounded-lg overflow-hidden">
+          <div className="p-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
+              <div>
+                <h1 className="text-2xl font-bold mb-2">{vendor.name}</h1>
+                <div className="flex items-center gap-4">
+                  <span
+                    className="px-2 py-1 text-xs font-medium rounded-full"
+                    style={getTypeStyle(vendor.type)}
+                  >
+                    {accountTypes.find(t => t.value === vendor.type)?.label || vendor.type}
+                  </span>
+                  <select
+                    value={vendor.status}
+                    onChange={(e) => handleStatusChange(e.target.value)}
+                    className="text-sm font-medium rounded-full px-3 py-1"
+                    style={getStatusStyle(vendor.status)}
+                  >
+                    {accountStatuses.map(status => (
+                      <option key={status.id} value={status.value}>
+                        {status.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* Contact Information */}
+              {vendor.customer && (
+                <div>
+                  <h2 className="text-lg font-semibold mb-4">Contact Information</h2>
+                  <div className="bg-gray-50 rounded-lg p-4 space-y-4">
+                    <div className="flex items-center">
+                      <User className="w-5 h-5 text-gray-400 mr-3" />
+                      <div>
+                        <div className="font-medium">
+                          {vendor.customer.first_name} {vendor.customer.last_name}
+                        </div>
+                        {vendor.customer.company && (
+                          <div className="text-sm text-gray-500">
+                            {vendor.customer.company}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center">
+                      <Mail className="w-5 h-5 text-gray-400 mr-3" />
+                      <a
+                        href={`mailto:${vendor.customer.email}`}
+                        className="text-primary-600 hover:text-primary-700"
+                      >
+                        {vendor.customer.email}
+                      </a>
+                    </div>
+                    {vendor.customer.phone && (
+                      <div className="flex items-center">
+                        <Phone className="w-5 h-5 text-gray-400 mr-3" />
+                        <a
+                          href={`tel:${vendor.customer.phone}`}
+                          className="text-primary-600 hover:text-primary-700"
+                        >
+                          {vendor.customer.phone}
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Account Details */}
+              <div>
+                <h2 className="text-lg font-semibold mb-4">Account Details</h2>
+                <div className="bg-gray-50 rounded-lg p-4 space-y-4">
+                  {vendor.payment_terms && (
+                    <div>
+                      <div className="text-sm font-medium text-gray-500 mb-1">Payment Terms</div>
+                      <div className="text-gray-700">{vendor.payment_terms}</div>
+                    </div>
+                  )}
+                  {/* Annual Revenue - New Field */}
+                  <div>
+                    <div className="text-sm font-medium text-gray-500 mb-1">Annual Revenue</div>
+                    <div className="text-gray-700 flex items-center">
+                      <DollarSign className="w-4 h-4 text-gray-400 mr-1" />
+                      {formatRevenueValue(vendor.annual_revenue)}
+                    </div>
+                  </div>
+                  {/* Website - New Field */}
+                  {vendor.website && (
+                    <div>
+                      <div className="text-sm font-medium text-gray-500 mb-1">Website</div>
+                      <div className="text-gray-700 flex items-center">
+                        <Globe className="w-4 h-4 text-gray-400 mr-1" />
+                        <a
+                          href={vendor.website.startsWith('http') ? vendor.website : `https://${vendor.website}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary-600 hover:text-primary-700 hover:underline"
+                        >
+                          {vendor.website}
+                        </a>
+                      </div>
+                    </div>
+                  )}
+                  <div>
+                    <div className="text-sm font-medium text-gray-500 mb-1">Created</div>
+                    <div className="text-gray-700">
+                      {new Date(vendor.created_at).toLocaleDateString()}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Owner Information - New Section */}
+              {vendor.owner && (
+                <div>
+                  <h2 className="text-lg font-semibold mb-4">Account Owner</h2>
+                  <div className="bg-gray-50 rounded-lg p-4 space-y-4">
+                    <div className="flex items-center">
+                      <User className="w-5 h-5 text-gray-400 mr-3" />
+                      <div>
+                        <div className="font-medium">{vendor.owner.name}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Parent Account - New Section */}
+              {vendor.parent && (
+                <div>
+                  <h2 className="text-lg font-semibold mb-4">Parent Account</h2>
+                  <div className="bg-gray-50 rounded-lg p-4 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center">
+                        <Users className="w-5 h-5 text-gray-400 mr-3" />
+                        <div className="font-medium">{vendor.parent.name}</div>
+                      </div>
+                      <Link
+                        to={`/admin/vendors/${vendor.parent.id}`}
+                        className="text-primary-600 hover:text-primary-700 text-sm"
+                      >
+                        View
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Shipping Address */}
+              {(vendor.shipping_address_line1 || vendor.shipping_city || vendor.shipping_state || vendor.shipping_country) && (
+                <div>
+                  <h2 className="text-lg font-semibold mb-4">Shipping Address</h2>
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <div className="space-y-1">
+                      {vendor.shipping_address_line1 && (
+                        <div>{vendor.shipping_address_line1}</div>
+                      )}
+                      {vendor.shipping_address_line2 && (
+                        <div>{vendor.shipping_address_line2}</div>
+                      )}
+                      <div>
+                        {[
+                          vendor.shipping_city,
+                          vendor.shipping_state,
+                          vendor.shipping_country
+                        ].filter(Boolean).join(', ')}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Billing Address */}
+              {(vendor.billing_address_line1 || vendor.billing_city || vendor.billing_state || vendor.billing_country) && (
+                <div>
+                  <h2 className="text-lg font-semibold mb-4">Billing Address</h2>
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <div className="space-y-1">
+                      {vendor.billing_address_line1 && (
+                        <div>{vendor.billing_address_line1}</div>
+                      )}
+                      {vendor.billing_address_line2 && (
+                        <div>{vendor.billing_address_line2}</div>
+                      )}
+                      <div>
+                        {[
+                          vendor.billing_city,
+                          vendor.billing_state,
+                          vendor.billing_country
+                        ].filter(Boolean).join(', ')}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Notes */}
+              {vendor.notes && (
+                <div className="md:col-span-2">
+                  <h2 className="text-lg font-semibold mb-4">Notes</h2>
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <p className="text-gray-700 whitespace-pre-wrap">{vendor.notes}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Add Custom Fields section */}
+              <div className="md:col-span-2">
+                <CustomFieldsSection
+                  entityType="vendors"
+                  entityId={id}
+                  organizationId={selectedOrganization?.id}
+                  className="bg-gray-50 rounded-lg p-4"
+                />
+              </div>
+            </div>
+
+            {/* Add Feed Section */}
+            <div className="mt-8">
+              <h2 className="text-lg font-semibold mb-4">Comments</h2>
+
+              <div className="space-y-4">
+                {/* Comment Form */}
+                <form onSubmit={handleSubmitComment} className="space-y-4">
+                  {replyTo && (
+                    <div className="flex items-center justify-between bg-gray-50 p-2 rounded-lg">
+                      <span className="text-sm text-gray-600">
+                        Replying to {replyTo.profile.name}'s comment
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setReplyTo(null)}
+                        className="p-1 hover:bg-gray-200 rounded-full"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+                  <div className="flex items-start space-x-4">
+                    <div className="flex-1">
+                      <textarea
+                        value={newComment}
+                        onChange={(e) => setNewComment(e.target.value)}
+                        placeholder="Add a comment..."
+                        rows={3}
+                        className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={!newComment.trim()}
+                      className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                    >
+                      <Send className="w-4 h-4 mr-2" />
+                      Send
+                    </button>
+                  </div>
+                </form>
+
+                {/* Feed Items */}
+                <div className="space-y-4">
+                  {feeds
+                    .filter(feed => !feed.parent_id)
+                    .map(feed => renderFeedItem(feed))}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-
-      <div className="bg-white shadow rounded-lg overflow-hidden">
-        <div className="p-6">
-          <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
-            <div>
-              <h1 className="text-2xl font-bold mb-2">{vendor.name}</h1>
-              <div className="flex items-center gap-4">
-                <span
-                  className="px-2 py-1 text-xs font-medium rounded-full"
-                  style={getTypeStyle(vendor.type)}
-                >
-                  {accountTypes.find(t => t.value === vendor.type)?.label || vendor.type}
-                </span>
-                <select
-                  value={vendor.status}
-                  onChange={(e) => handleStatusChange(e.target.value)}
-                  className="text-sm font-medium rounded-full px-3 py-1"
-                  style={getStatusStyle(vendor.status)}
-                >
-                  {accountStatuses.map(status => (
-                    <option key={status.id} value={status.value}>
-                      {status.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
+      {/* Related Tabs Sidebar */}
+      <div className="lg:w-1/4">
+        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          {/* Tab Header */}
+          <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+            <h2 className="text-base font-semibold text-gray-800 flex items-center">
+              <svg
+                className="w-4 h-4 text-gray-500 mr-2"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+                />
+              </svg>
+              Related Records
+            </h2>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Contact Information */}
-            {vendor.customer && (
-              <div>
-                <h2 className="text-lg font-semibold mb-4">Contact Information</h2>
-                <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-                  <div className="flex items-center">
-                    <User className="w-5 h-5 text-gray-400 mr-3" />
-                    <div>
-                      <div className="font-medium">
-                        {vendor.customer.first_name} {vendor.customer.last_name}
-                      </div>
-                      {vendor.customer.company && (
-                        <div className="text-sm text-gray-500">
-                          {vendor.customer.company}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center">
-                    <Mail className="w-5 h-5 text-gray-400 mr-3" />
-                    <a
-                      href={`mailto:${vendor.customer.email}`}
-                      className="text-primary-600 hover:text-primary-700"
-                    >
-                      {vendor.customer.email}
-                    </a>
-                  </div>
-                  {vendor.customer.phone && (
-                    <div className="flex items-center">
-                      <Phone className="w-5 h-5 text-gray-400 mr-3" />
-                      <a
-                        href={`tel:${vendor.customer.phone}`}
-                        className="text-primary-600 hover:text-primary-700"
-                      >
-                        {vendor.customer.phone}
-                      </a>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Account Details */}
-            <div>
-              <h2 className="text-lg font-semibold mb-4">Account Details</h2>
-              <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-                {vendor.payment_terms && (
-                  <div>
-                    <div className="text-sm font-medium text-gray-500 mb-1">Payment Terms</div>
-                    <div className="text-gray-700">{vendor.payment_terms}</div>
-                  </div>
-                )}
-                {/* Annual Revenue - New Field */}
-                <div>
-                  <div className="text-sm font-medium text-gray-500 mb-1">Annual Revenue</div>
-                  <div className="text-gray-700 flex items-center">
-                    <DollarSign className="w-4 h-4 text-gray-400 mr-1" />
-                    {formatRevenueValue(vendor.annual_revenue)}
-                  </div>
-                </div>
-                {/* Website - New Field */}
-                {vendor.website && (
-                  <div>
-                    <div className="text-sm font-medium text-gray-500 mb-1">Website</div>
-                    <div className="text-gray-700 flex items-center">
-                      <Globe className="w-4 h-4 text-gray-400 mr-1" />
-                      <a
-                        href={vendor.website.startsWith('http') ? vendor.website : `https://${vendor.website}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary-600 hover:text-primary-700 hover:underline"
-                      >
-                        {vendor.website}
-                      </a>
-                    </div>
-                  </div>
-                )}
-                <div>
-                  <div className="text-sm font-medium text-gray-500 mb-1">Created</div>
-                  <div className="text-gray-700">
-                    {new Date(vendor.created_at).toLocaleDateString()}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Owner Information - New Section */}
-            {vendor.owner && (
-              <div>
-                <h2 className="text-lg font-semibold mb-4">Account Owner</h2>
-                <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-                  <div className="flex items-center">
-                    <User className="w-5 h-5 text-gray-400 mr-3" />
-                    <div>
-                      <div className="font-medium">{vendor.owner.name}</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Parent Account - New Section */}
-            {vendor.parent && (
-              <div>
-                <h2 className="text-lg font-semibold mb-4">Parent Account</h2>
-                <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <Users className="w-5 h-5 text-gray-400 mr-3" />
-                      <div className="font-medium">{vendor.parent.name}</div>
-                    </div>
-                    <Link
-                      to={`/admin/vendors/${vendor.parent.id}`}
-                      className="text-primary-600 hover:text-primary-700 text-sm"
-                    >
-                      View
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Shipping Address */}
-            {(vendor.shipping_address_line1 || vendor.shipping_city || vendor.shipping_state || vendor.shipping_country) && (
-              <div>
-                <h2 className="text-lg font-semibold mb-4">Shipping Address</h2>
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="space-y-1">
-                    {vendor.shipping_address_line1 && (
-                      <div>{vendor.shipping_address_line1}</div>
-                    )}
-                    {vendor.shipping_address_line2 && (
-                      <div>{vendor.shipping_address_line2}</div>
-                    )}
-                    <div>
-                      {[
-                        vendor.shipping_city,
-                        vendor.shipping_state,
-                        vendor.shipping_country
-                      ].filter(Boolean).join(', ')}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Billing Address */}
-            {(vendor.billing_address_line1 || vendor.billing_city || vendor.billing_state || vendor.billing_country) && (
-              <div>
-                <h2 className="text-lg font-semibold mb-4">Billing Address</h2>
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="space-y-1">
-                    {vendor.billing_address_line1 && (
-                      <div>{vendor.billing_address_line1}</div>
-                    )}
-                    {vendor.billing_address_line2 && (
-                      <div>{vendor.billing_address_line2}</div>
-                    )}
-                    <div>
-                      {[
-                        vendor.billing_city,
-                        vendor.billing_state,
-                        vendor.billing_country
-                      ].filter(Boolean).join(', ')}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Notes */}
-            {vendor.notes && (
-              <div className="md:col-span-2">
-                <h2 className="text-lg font-semibold mb-4">Notes</h2>
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <p className="text-gray-700 whitespace-pre-wrap">{vendor.notes}</p>
-                </div>
-              </div>
-            )}
-
-            {/* Add Custom Fields section */}
-            <div className="md:col-span-2">
-              <CustomFieldsSection
-                entityType="vendors"
-                entityId={id}
+          {/* Tab Content */}
+          <div className="divide-y divide-gray-200">
+            {/* Tasks */}
+            <div className="p-4">
+              <RelatedTasks
+                recordId={id}
                 organizationId={selectedOrganization?.id}
-                className="bg-gray-50 rounded-lg p-4"
+                refreshKey={refreshRecordsList}
+                title="Tasks"
               />
             </div>
-          </div>
 
-          {/* Add Feed Section */}
-          <div className="mt-8">
-            <h2 className="text-lg font-semibold mb-4">Comments</h2>
+            {/* Customers */}
+            <div className="p-4">
+              <RelatedCustomers
+                vendorId={id}
+                organizationId={selectedOrganization?.id}
+                refreshKey={refreshRecordsList}
+                title="Customers"
+              />
+            </div>
 
-            <div className="space-y-4">
-              {/* Comment Form */}
-              <form onSubmit={handleSubmitComment} className="space-y-4">
-                {replyTo && (
-                  <div className="flex items-center justify-between bg-gray-50 p-2 rounded-lg">
-                    <span className="text-sm text-gray-600">
-                      Replying to {replyTo.profile.name}'s comment
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setReplyTo(null)}
-                      className="p-1 hover:bg-gray-200 rounded-full"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                )}
-                <div className="flex items-start space-x-4">
-                  <div className="flex-1">
-                    <textarea
-                      value={newComment}
-                      onChange={(e) => setNewComment(e.target.value)}
-                      placeholder="Add a comment..."
-                      rows={3}
-                      className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-                    />
-                  </div>
-                  <button
-                    type="submit"
-                    disabled={!newComment.trim()}
-                    className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
-                  >
-                    <Send className="w-4 h-4 mr-2" />
-                    Send
-                  </button>
-                </div>
-              </form>
+            {/* Quotes Section */}
+            <div className="p-4">
+              <RelatedQuotes
+                recordId={id}
+                vendorId={id}
+                organizationId={selectedOrganization?.id}
+                refreshKey={refreshRecordsList}
+              />
+            </div>
 
-              {/* Feed Items */}
-              <div className="space-y-4">
-                {feeds
-                  .filter(feed => !feed.parent_id)
-                  .map(feed => renderFeedItem(feed))}
-              </div>
+            {/* Orders Section */}
+            <div className="p-4">
+              <RelatedOrders
+                recordId={id}
+                vendorId={id}
+                organizationId={selectedOrganization?.id}
+                refreshKey={refreshRecordsList}
+              />
+            </div>
+
+            
+
+            {/* Cases Section */}
+            <div className="p-4">
+              <RelatedCases
+                recordId={id}
+                vendorId={id}
+                organizationId={selectedOrganization?.id}
+                refreshKey={refreshRecordsList}
+              />
+            </div>
+
+            {/* Opportunities Section */}
+            <div className="p-4">
+              <RelatedOpportunities
+                recordId={id}
+                vendorId={id}
+                organizationId={selectedOrganization?.id}
+                refreshKey={refreshRecordsList}
+              />
             </div>
           </div>
         </div>

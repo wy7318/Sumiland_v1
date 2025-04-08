@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { X, ChevronRight, FileText, Clock, List, ChevronDown, ChevronUp } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { formatCurrency } from '../../lib/utils';
+import { useLocation } from 'react-router-dom';
 
 type Quote = {
     quote_id: string;
@@ -18,6 +19,7 @@ type Props = {
     organizationId: string;
     title?: string;
     refreshKey?: number;
+    vendorId?: string;
     defaultExpanded?: boolean;
 };
 
@@ -26,24 +28,38 @@ export function RelatedQuotes({
     organizationId,
     title = 'Quotes',
     refreshKey,
+    vendorId,
     defaultExpanded = false
 }: Props) {
     const [quotes, setQuotes] = useState<Quote[]>([]);
     const [loading, setLoading] = useState(true);
     const [isViewAllModalOpen, setIsViewAllModalOpen] = useState(false);
+    const location = useLocation();
     const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+
+    const isVendorView = location.pathname.includes('/admin/vendors');
 
     const fetchQuotes = async () => {
         if (!organizationId || !recordId) return;
 
         setLoading(true);
 
-        const { data, error } = await supabase
+        let query = supabase
             .from('quote_hdr')
             .select('*')
-            .eq('customer_id', recordId)
             .eq('organization_id', organizationId)
             .order('created_at', { ascending: false });
+
+        // Different query approach based on context
+        if (isVendorView && vendorId) {
+            console.log('Yes Account');
+            query = query.eq('vendor_id', vendorId)
+        } else {
+            console.log('No Account');
+            query = query.eq('customer_id', recordId)
+        }
+
+        const { data, error } = await query;
 
         if (error) {
             console.error('Failed to fetch quotes:', error);
@@ -54,10 +70,10 @@ export function RelatedQuotes({
     };
 
     useEffect(() => {
-        if (organizationId && recordId) {
+        if (organizationId && (recordId || vendorId)) {
             fetchQuotes();
         }
-    }, [recordId, organizationId, refreshKey]);
+    }, [recordId, organizationId, refreshKey, vendorId]);
 
     // Function to render a quote item - reused in both views
     const renderQuoteItem = (quote: Quote) => (

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { motion } from 'framer-motion';
 import { X, ChevronRight, MessageSquare, Clock, List, ChevronDown, ChevronUp } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 
 type Case = {
     id: string;
@@ -19,6 +19,7 @@ type Props = {
     organizationId: string;
     title?: string;
     refreshKey?: number;
+    vendorId?: string;
     defaultExpanded?: boolean;
 };
 
@@ -27,24 +28,38 @@ export function RelatedCases({
     organizationId,
     title = 'Cases',
     refreshKey,
+    vendorId,
     defaultExpanded = false
 }: Props) {
     const [cases, setCases] = useState<Case[]>([]);
     const [loading, setLoading] = useState(true);
     const [isViewAllModalOpen, setIsViewAllModalOpen] = useState(false);
+    const location = useLocation();
     const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
+    const isVendorView = location.pathname.includes('/admin/vendors');
+
     const fetchCases = async () => {
-        if (!organizationId || !recordId) return;
+        if (!organizationId || (!recordId && !vendorId)) return;
 
         setLoading(true);
 
-        const { data, error } = await supabase
+        let query = supabase
             .from('cases')
             .select('*')
-            .eq('contact_id', recordId)
             .eq('organization_id', organizationId)
             .order('created_at', { ascending: false });
+
+        // Different query approach based on context
+        if (isVendorView && vendorId) {
+            console.log('Vendor view - querying by account_id');
+            query = query.eq('vendor_id', vendorId);
+        } else {
+            console.log('Customer view - querying by contact_id');
+            query = query.eq('contact_id', recordId);
+        }
+
+        const { data, error } = await query;
 
         if (error) {
             console.error('Failed to fetch cases:', error);
@@ -55,10 +70,10 @@ export function RelatedCases({
     };
 
     useEffect(() => {
-        if (organizationId && recordId) {
+        if (organizationId && (recordId || vendorId)) {
             fetchCases();
         }
-    }, [recordId, organizationId, refreshKey]);
+    }, [recordId, organizationId, refreshKey, vendorId, isVendorView]);
 
     // Function to render a case item - reused in both views
     const renderCaseItem = (case_: Case) => (

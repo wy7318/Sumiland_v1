@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { cn } from '../../lib/utils';
+import { AccountDetailsModal } from './AccountDetailsModal';
 import { CustomFieldsSection } from './CustomFieldsSection';
 import { UserSearch } from './UserSearch';
 import { EmailConfigModal } from './EmailConfigModal';
@@ -19,6 +20,14 @@ import { useOrganization } from '../../contexts/OrganizationContext';
 import { RelatedEmails } from './RelatedEmails';
 import { RelatedTasks } from './RelatedTasks';
 import { DateTime } from 'luxon'; // Import Luxon for timezone handling
+
+type Vendor = {
+  id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  contact_person?: string;
+};
 
 type Case = {
   id: string;
@@ -39,6 +48,8 @@ type Case = {
   closed_by: string | null;
   escalated_by: string | null;
   priority: string | null;
+  vendor_id: string | null; // Add this field
+  vendor: Vendor | null; // Add this field
   contact: {
     first_name: string;
     last_name: string;
@@ -108,6 +119,7 @@ export function CaseDetailPage() {
   const [showEmailConfigModal, setShowEmailConfigModal] = useState(false);
   const [refreshEmailList, setRefreshEmailList] = useState(0);
   const [orgTimezone, setOrgTimezone] = useState('UTC'); // Default timezone
+  const [showAccountModal, setShowAccountModal] = useState(false);
 
   // Fetch organization timezone
   useEffect(() => {
@@ -224,6 +236,19 @@ export function CaseDetailPage() {
 
       // Enrich the case data with user information
       const enrichedCaseData = { ...caseData };
+
+      // Fetch vendor information if vendor_id exists
+      if (caseData.vendor_id) {
+        const { data: vendorData, error: vendorError } = await supabase
+          .from('vendors')
+          .select('*')
+          .eq('id', caseData.vendor_id)
+          .single();
+
+        if (!vendorError && vendorData) {
+          enrichedCaseData.vendor = vendorData;
+        }
+      }
 
       // Fetch escalated_by user if it exists
       if (caseData.escalated_by) {
@@ -773,12 +798,36 @@ export function CaseDetailPage() {
                             </a>
                           </div>
                         )}
+                        {/* Vendor Information - ADD HERE */}
+                        {caseData.vendor && (
+                          <div className="mt-4 pt-4 border-t border-gray-200">
+                            <div className="font-medium mb-2">Vendor Information</div>
+                            <div className="flex items-center">
+                              <Building2 className="w-5 h-5 text-gray-400 mr-3" />
+                              <div className="font-medium">{caseData.vendor.name}</div>
+                            </div>
+                            <button
+                              onClick={() => setShowAccountModal(true)}
+                              className="text-primary-600 hover:text-primary-700 text-sm"
+                            >
+                              View Details
+                            </button>
+
+                          </div>
+                          
+                        )}
                       </>
                     ) : (
                       <div className="text-sm text-gray-400">No contact information available</div>
                     )}
+
+                    
                   </div>
+
+                  
                 </div>
+
+                
 
                 {/* Assignment */}
                 <div>
@@ -992,6 +1041,13 @@ export function CaseDetailPage() {
                 setShowEmailModal(false);
                 setRefreshEmailList(prev => prev + 1); // 🔁 refresh RelatedEmails
               }}
+            />
+          )}
+
+          {showAccountModal && caseData.vendor && (
+            <AccountDetailsModal
+              vendor={caseData.vendor}
+              onClose={() => setShowAccountModal(false)}
             />
           )}
         </div>

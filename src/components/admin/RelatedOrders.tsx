@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { motion } from 'framer-motion';
 import { X, ChevronRight, ShoppingBag, Clock, List, ChevronDown, ChevronUp } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { formatCurrency } from '../../lib/utils';
 
 type Order = {
@@ -19,6 +19,7 @@ type Props = {
     organizationId: string;
     title?: string;
     refreshKey?: number;
+    vendorId?: string;
     defaultExpanded?: boolean;
 };
 
@@ -27,24 +28,38 @@ export function RelatedOrders({
     organizationId,
     title = 'Orders',
     refreshKey,
+    vendorId,
     defaultExpanded = false
 }: Props) {
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
     const [isViewAllModalOpen, setIsViewAllModalOpen] = useState(false);
+    const location = useLocation();
     const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
+    const isVendorView = location.pathname.includes('/admin/vendors');
+
     const fetchOrders = async () => {
-        if (!organizationId || !recordId) return;
+        if (!organizationId || (!recordId && !vendorId)) return;
 
         setLoading(true);
 
-        const { data, error } = await supabase
+        let query = supabase
             .from('order_hdr')
             .select('*')
-            .eq('customer_id', recordId)
             .eq('organization_id', organizationId)
             .order('created_at', { ascending: false });
+
+        // Different query approach based on context
+        if (isVendorView && vendorId) {
+            console.log('Vendor view - querying by vendor_id');
+            query = query.eq('vendor_id', vendorId);
+        } else {
+            console.log('Customer view - querying by customer_id');
+            query = query.eq('customer_id', recordId);
+        }
+
+        const { data, error } = await query;
 
         if (error) {
             console.error('Failed to fetch orders:', error);
@@ -55,10 +70,10 @@ export function RelatedOrders({
     };
 
     useEffect(() => {
-        if (organizationId && recordId) {
+        if (organizationId && (recordId || vendorId)) {
             fetchOrders();
         }
-    }, [recordId, organizationId, refreshKey]);
+    }, [recordId, organizationId, refreshKey, vendorId, isVendorView]);
 
     // Function to render an order item - reused in both views
     const renderOrderItem = (order: Order) => (
