@@ -5,7 +5,7 @@ import {
   ArrowLeft, Building2, Mail, Phone, Calendar,
   Edit, AlertCircle, FileText, DollarSign, User,
   CheckCircle, X, Send, Package, Truck, MapPin,
-  ClipboardList, Clock, FileBarChart2
+  ClipboardList, Clock, FileBarChart2, LinkIcon
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { cn, formatCurrency, formatDateTime } from '../../lib/utils';
@@ -20,6 +20,7 @@ import { useEmailComposer } from './EmailProvider';
 import { EmailModal } from './EmailModal';
 import { getEmailConfig } from '../../lib/email';
 import { SquarePaymentLinkButton } from './SquarePaymentLinkButton';
+import { TestSquareWebhookButton } from './TestSquareWebhookButton';
 
 
 type Order = {
@@ -153,6 +154,7 @@ export function OrderDetailPage() {
   const [refreshEmailList, setRefreshEmailList] = useState(0);
   // Add states for Square integration
   const [squareInvoice, setSquareInvoice] = useState(null);
+  
 
   useEffect(() => {
     fetchPicklists();
@@ -671,41 +673,7 @@ export function OrderDetailPage() {
                       </span>
                     </div>
 
-                    {/* Add Square payment status if available */}
-                    {squareInvoice && (
-                      <div className="pt-3 border-t border-gray-200">
-                        <div className="flex justify-between items-center">
-                          <span className="text-gray-600">Square Invoice:</span>
-                          <span className={cn(
-                            "px-2 py-1 text-xs font-medium rounded-full",
-                            squareInvoice.status === 'DRAFT' && "bg-gray-100 text-gray-800",
-                            squareInvoice.status === 'UNPAID' && "bg-yellow-100 text-yellow-800",
-                            squareInvoice.status === 'SCHEDULED' && "bg-blue-100 text-blue-800",
-                            squareInvoice.status === 'PARTIALLY_PAID' && "bg-orange-100 text-orange-800",
-                            squareInvoice.status === 'PAID' && "bg-green-100 text-green-800",
-                            squareInvoice.status === 'CANCELED' && "bg-red-100 text-red-800"
-                          )}>
-                            {squareInvoice.status.replace('_', ' ')}
-                          </span>
-                        </div>
-
-                        {squareInvoice.payment_link && (
-                          <div className="mt-2">
-                            <a
-                              href={squareInvoice.payment_link}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-sm text-primary-600 hover:text-primary-700 flex items-center"
-                            >
-                              <LinkIcon className="w-3 h-3 mr-1" />
-                              View Square Invoice
-                            </a>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Add Square payment button inside payment section */}
+                    {/* Add Square payment link button and information here */}
                     {order.payment_status !== 'Fully Received' && (
                       <div className="pt-3 border-t border-gray-200">
                         <div className="text-sm text-gray-600 mb-2">Need payment from customer?</div>
@@ -713,6 +681,8 @@ export function OrderDetailPage() {
                       </div>
                     )}
                   </div>
+
+                  
                 </div>
 
                 {/* Customer Information */}
@@ -764,51 +734,7 @@ export function OrderDetailPage() {
                   </div>
                 </div>
 
-                {/* Payment Information */}
-                <div>
-                  <h2 className="text-lg font-semibold mb-4">Payment Information</h2>
-                  <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600">Subtotal:</span>
-                      <span className="font-medium">{formatCurrency(order.subtotal)}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600">Tax ({order.tax_percent ?? 0}%):</span>
-                      <span className="font-medium">{formatCurrency(order.tax_amount ?? 0)}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600">Discount:</span>
-                      <span className="font-medium text-red-600">
-                        -{formatCurrency(order.discount_amount ?? 0)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600">Total Amount:</span>
-                      <span className="font-medium">{formatCurrency(order.total_amount)}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600">Amount Received:</span>
-                      <span className="font-medium">{formatCurrency(order.payment_amount)}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600">Balance Due:</span>
-                      <span className="font-medium text-red-600">
-                        {formatCurrency(order.total_amount - order.payment_amount)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600">Payment Status:</span>
-                      <span className={cn(
-                        "px-2 py-1 text-xs font-medium rounded-full",
-                        order.payment_status === 'Pending' && "bg-gray-100 text-gray-800",
-                        order.payment_status === 'Partial Received' && "bg-orange-100 text-orange-800",
-                        order.payment_status === 'Fully Received' && "bg-green-100 text-green-800"
-                      )}>
-                        {order.payment_status}
-                      </span>
-                    </div>
-                  </div>
-                </div>
+                
 
                 {/* Shipping Information */}
                 <div className="md:col-span-2">

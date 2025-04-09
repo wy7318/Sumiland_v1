@@ -1,135 +1,151 @@
-// components/SquarePaymentLinkButton.jsx
+// components/SquarePaymentLinkButton.tsx
 import { useState, useEffect } from 'react';
-import { DollarSign, Link as LinkIcon, Copy, ExternalLink, Check, AlertTriangle } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+import { DollarSign, Link as LinkIcon, Copy, ExternalLink, Check, AlertTriangle, Settings } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useOrganization } from '../../contexts/OrganizationContext';
 import { SquareSetupModal } from './SquareSetupModal';
+import {
+    generatePaymentLink,
+    getExistingInvoice,
+    getSquareCredentials,
+    PaymentLinkResponse
+} from '../../services/squareService';
 
-export function SquarePaymentLinkButton({ order, className }) {
+interface SquarePaymentLinkButtonProps {
+    order: any; // Use your actual Order type here
+    className?: string;
+}
+
+export function SquarePaymentLinkButton({ order, className }: SquarePaymentLinkButtonProps) {
     const { user } = useAuth();
     const { selectedOrganization } = useOrganization();
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
-    const [paymentLink, setPaymentLink] = useState(null);
+    const [error, setError] = useState<string | null>(null);
+    const [paymentLink, setPaymentLink] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
     const [showSetupModal, setShowSetupModal] = useState(false);
-    const [existingInvoice, setExistingInvoice] = useState(null);
+    const [hasSquareCredentials, setHasSquareCredentials] = useState(false);
+    const [forceEditMode, setForceEditMode] = useState(false);
 
     useEffect(() => {
         if (order?.order_id && selectedOrganization?.id) {
             checkExistingInvoice();
+            checkSquareCredentials();
         }
     }, [order?.order_id, selectedOrganization?.id]);
 
     const checkExistingInvoice = async () => {
         try {
-            const { data, error } = await supabase
-                .from('square_invoices')
-                .select('*')
-                .eq('order_id', order.order_id)
-                .eq('organization_id', selectedOrganization.id)
-                .order('created_at', { ascending: false })
-                .limit(1)
-                .single();
+            if (!order?.order_id || !selectedOrganization?.id) return;
 
-            if (error && error.code !== 'PGRST116') {
-                throw error;
-            }
+            const invoiceData = await getExistingInvoice(order.order_id, selectedOrganization.id);
 
-            if (data && data.payment_link) {
-                setExistingInvoice(data);
-                setPaymentLink(data.payment_link);
+            if (invoiceData && invoiceData.payment_link) {
+                setPaymentLink(invoiceData.payment_link);
             }
         } catch (err) {
             console.error('Error checking for existing invoice:', err);
         }
     };
 
+    const checkSquareCredentials = async () => {
+        try {
+            if (!selectedOrganization?.id) return;
+
+            const credentials = await getSquareCredentials(selectedOrganization.id);
+            setHasSquareCredentials(!!credentials);
+        } catch (err) {
+            console.error('Error checking Square credentials:', err);
+        }
+    };
+
     const handleGeneratePaymentLink = async () => {
+        if (!selectedOrganization?.id) {
+            setError('Organization not selected');
+            return;
+        }
+
         setLoading(true);
         setError(null);
 
         try {
-            // Check if Square is set up for this organization
-            const { data: credentials, error: credentialsError } = await supabase
-                .from('square_credentials')
-                .select('*')
-                .eq('organization_id', selectedOrganization.id)
-                .eq('is_active', true)
-                .single();
+            // First check if Square is set up for this organization
+            const credentials = await getSquareCredentials(selectedOrganization.id);
 
-            if (credentialsError || !credentials) {
+            if (!credentials) {
                 // If Square is not set up, show the setup modal
                 setShowSetupModal(true);
+                setLoading(false);
                 return;
             }
 
-            // Call the Supabase Edge Function
-            const response = await fetch(`${process.env.SUPABASE_FUNCTIONS_URL}/square-payment-link`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${process.env.SUPABASE_ANON_KEY}`
-                },
-                body: JSON.stringify({
-                    order,
-                    organizationId: selectedOrganization.id,
-                    userId: user.id
-                })
+            // If we have credentials, generate the payment link
+            const result = await generatePaymentLink({
+                order,
+                organizationId: selectedOrganization.id,
+                userId: user?.id
             });
 
-            const data = await response.json();
-
-            if (!response.ok) {
-                if (data.setup_required) {
+            if (!result.success) {
+                if (result.setupRequired) {
                     setShowSetupModal(true);
                     return;
                 }
-                throw new Error(data.message || 'Failed to generate payment link');
+                throw new Error(result.error || 'Failed to generate payment link');
             }
 
-            // Store the invoice data in Supabase
-            if (!existingInvoice) {
-                await supabase.from('square_invoices').insert({
-                    organization_id: selectedOrganization.id,
-                    order_id: order.order_id,
-                    square_invoice_id: data.invoiceId,
-                    payment_link: data.paymentLink,
-                    status: 'PUBLISHED',
-                    total_amount: Math.round(order.total_amount * 100), // Store in cents
-                    currency: 'USD'
-                });
+            // Set the payment link if successful
+            if (result.paymentLink) {
+                setPaymentLink(result.paymentLink);
+            } else {
+                throw new Error('No payment link received from server');
             }
-
-            setPaymentLink(data.paymentLink);
         } catch (err) {
             console.error('Error generating payment link:', err);
-            setError(err.message || 'An error occurred while generating the payment link');
+            setError(err instanceof Error ? err.message : 'An error occurred while generating the payment link');
         } finally {
             setLoading(false);
         }
     };
 
     const copyToClipboard = () => {
+        if (!paymentLink) return;
+
         navigator.clipboard.writeText(paymentLink).then(() => {
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
         });
     };
 
+    const handleOpenSettings = () => {
+        setForceEditMode(true);
+        setShowSetupModal(true);
+    };
+
     return (
         <div className={className}>
             {!paymentLink ? (
-                <div>
-                    <button
-                        onClick={handleGeneratePaymentLink}
-                        disabled={loading}
-                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500"
-                    >
-                        <DollarSign className="w-4 h-4 mr-2" />
-                        {loading ? 'Generating...' : 'Generate Square Payment Link'}
-                    </button>
+                <div className="flex flex-col space-y-2">
+                    <div className="flex space-x-2">
+                        <button
+                            onClick={handleGeneratePaymentLink}
+                            disabled={loading}
+                            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500"
+                        >
+                            <DollarSign className="w-4 h-4 mr-2" />
+                            {loading ? 'Generating...' : 'Generate Square Payment Link'}
+                        </button>
+
+                        {hasSquareCredentials && (
+                            <button
+                                onClick={handleOpenSettings}
+                                title="Update Square Settings"
+                                className="inline-flex items-center p-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                            >
+                                <Settings className="w-4 h-4" />
+                            </button>
+                        )}
+                    </div>
 
                     {error && (
                         <div className="mt-2 text-sm text-red-600 flex items-center">
@@ -143,6 +159,14 @@ export function SquarePaymentLinkButton({ order, className }) {
                     <div className="flex items-center space-x-2">
                         <LinkIcon className="w-4 h-4 text-emerald-600" />
                         <span className="text-sm font-medium">Payment link generated</span>
+
+                        <button
+                            onClick={handleOpenSettings}
+                            title="Update Square Settings"
+                            className="inline-flex items-center p-1 border border-gray-300 text-xs rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none"
+                        >
+                            <Settings className="w-3 h-3" />
+                        </button>
                     </div>
 
                     <div className="flex items-center">
@@ -181,11 +205,22 @@ export function SquarePaymentLinkButton({ order, className }) {
 
             {showSetupModal && (
                 <SquareSetupModal
-                    onClose={() => setShowSetupModal(false)}
+                    onClose={() => {
+                        setShowSetupModal(false);
+                        setForceEditMode(false);
+                        // Refresh credentials check when modal closes
+                        checkSquareCredentials();
+                    }}
                     onSuccess={() => {
                         setShowSetupModal(false);
-                        handleGeneratePaymentLink();
+                        setForceEditMode(false);
+                        checkSquareCredentials();
+                        // Only auto-generate a payment link if we weren't in forced edit mode
+                        if (!forceEditMode) {
+                            handleGeneratePaymentLink();
+                        }
                     }}
+                    forceEdit={forceEditMode}
                 />
             )}
         </div>
