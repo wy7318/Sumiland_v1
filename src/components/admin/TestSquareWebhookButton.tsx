@@ -82,7 +82,7 @@ export function TestSquareWebhookButton({
                     ) : (
                         <RefreshCw className="w-3 h-3 mr-1" />
                     )}
-                    Test Payment Webhook
+                    Update Payment Information
                 </button>
 
                 {success && (

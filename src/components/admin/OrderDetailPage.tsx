@@ -680,6 +680,39 @@ export function OrderDetailPage() {
                         <SquarePaymentLinkButton order={order} />
                       </div>
                     )}
+
+                    {/* {order.payment_status !== 'Fully Received' && squareInvoice && (
+                      <div className="mt-2 flex items-center justify-between">
+                        <span className="text-sm text-gray-600">Square Invoice:</span>
+                        <span className={cn(
+                          "px-2 py-1 text-xs font-medium rounded-full",
+                          squareInvoice.status === 'DRAFT' && "bg-gray-100 text-gray-800",
+                          squareInvoice.status === 'UNPAID' && "bg-yellow-100 text-yellow-800",
+                          squareInvoice.status === 'SCHEDULED' && "bg-blue-100 text-blue-800",
+                          squareInvoice.status === 'PARTIALLY_PAID' && "bg-orange-100 text-orange-800",
+                          squareInvoice.status === 'PAID' && "bg-green-100 text-green-800",
+                          squareInvoice.status === 'CANCELED' && "bg-red-100 text-red-800"
+                        )}>
+                          {squareInvoice.status.replace('_', ' ')}
+                        </span>
+                      </div>
+                    )} */}
+
+                    {/* Add test webhook button if in development mode */}
+                    {/* {process.env.NODE_ENV === 'development' && squareInvoice && order.payment_status !== 'Fully Received' && (
+                      <div className="mt-2 pt-2 border-t border-gray-200">
+                        <TestSquareWebhookButton
+                          squareInvoiceId={squareInvoice.square_invoice_id}
+                          orderId={id}
+                          organizationId={selectedOrganization?.id}
+                          onSuccess={() => {
+                            // Refresh the order data to show updated payment status
+                            fetchOrder();
+                          }}
+                          className="mt-1"
+                        />
+                      </div>
+                    )} */}
                   </div>
 
                   
