@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
 import {
     Plus, Search, Building2, Mail, Phone, User,
     Edit, Trash2, AlertCircle, FileDown, Filter,
-    ChevronDown, ChevronUp, Eye, Users
+    ChevronDown, ChevronUp, Eye, Users, Briefcase, Shield
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
@@ -31,7 +30,6 @@ type Vendor = {
     notes: string | null;
     created_at: string;
     organization_id: string;
-    // New fields
     owner_id: string | null;
     parent_id: string | null;
     annual_revenue: number | null;
@@ -74,6 +72,7 @@ export function VendorsPage() {
     const [selectedVendors, setSelectedVendors] = useState<string[]>([]);
     const [accountTypes, setAccountTypes] = useState<PicklistValue[]>([]);
     const [accountStatuses, setAccountStatuses] = useState<PicklistValue[]>([]);
+    const [filtersExpanded, setFiltersExpanded] = useState(true);
 
     useEffect(() => {
         fetchPicklists();
@@ -347,112 +346,160 @@ export function VendorsPage() {
         return 0;
     });
 
+    const statusColorMap = {
+        active: 'green',
+        inactive: 'gray',
+        pending: 'yellow',
+        declined: 'red'
+    };
+
     if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-600"></div>
             </div>
         );
     }
 
     return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <h1 className="text-2xl font-bold">Account Management</h1>
-                <div className="flex gap-4">
+        <div className="space-y-8 p-6 bg-gray-50 min-h-screen font-sans">
+            {/* Header Section */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+                <div>
+                    <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-700 to-purple-500 bg-clip-text text-transparent">
+                        Account Management
+                    </h1>
+                    <p className="text-gray-500 mt-1">Manage and organize your business accounts</p>
+                </div>
+                <div className="flex flex-wrap gap-3">
                     <button
                         onClick={exportToCSV}
-                        className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                        className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white border border-gray-200 text-gray-700 font-medium shadow-sm hover:shadow-md transition-all duration-200 hover:border-indigo-300"
                     >
-                        <FileDown className="w-4 h-4 mr-2" />
-                        Export CSV
+                        <FileDown className="w-4 h-4" />
+                        <span>Export CSV</span>
                     </button>
                     <Link
                         to="/admin/vendors/new"
-                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
+                        className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-indigo-600 to-indigo-700 text-white font-medium shadow-md hover:shadow-lg transition-all duration-200 hover:from-indigo-700 hover:to-indigo-800"
                     >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add Account
+                        <Plus className="w-4 h-4" />
+                        <span>Add Account</span>
                     </Link>
                 </div>
             </div>
 
             {error && (
-                <div className="bg-red-50 text-red-600 p-4 rounded-lg flex items-center">
-                    <AlertCircle className="w-5 h-5 mr-2" />
-                    {error}
+                <div className="bg-red-50 text-red-600 p-4 rounded-xl flex items-center border border-red-100 shadow-sm mb-6">
+                    <AlertCircle className="w-5 h-5 mr-3 flex-shrink-0" />
+                    <span>{error}</span>
                 </div>
             )}
 
-            <div className="bg-white shadow rounded-lg">
-                <div className="p-4 border-b border-gray-200">
-                    <div className="flex flex-wrap gap-4">
-                        <div className="flex-1 min-w-[300px]">
+            {/* Search & Filters Section */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-6">
+                <div className="p-6">
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                            <Filter className="w-5 h-5 text-indigo-500" />
+                            Search & Filters
+                        </h2>
+                        <button
+                            onClick={() => setFiltersExpanded(!filtersExpanded)}
+                            className="text-gray-500 hover:text-gray-700 transition-colors"
+                        >
+                            {filtersExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                        </button>
+                    </div>
+
+                    {filtersExpanded && (
+                        <div className="space-y-4">
                             <div className="relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                    <Search className="text-gray-400 w-5 h-5" />
+                                </div>
                                 <input
                                     type="text"
                                     placeholder="Search accounts by name, contact, owner..."
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                                    className="w-full pl-12 pr-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all duration-200"
                                 />
                             </div>
-                        </div>
 
-                        <select
-                            value={statusFilter}
-                            onChange={(e) => setStatusFilter(e.target.value)}
-                            className="px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-                        >
-                            <option value="all">All Status</option>
-                            {accountStatuses.map(status => (
-                                <option key={status.id} value={status.value}>
-                                    {status.label}
-                                </option>
-                            ))}
-                        </select>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="flex flex-col">
+                                    <label className="text-sm text-gray-600 mb-1.5 font-medium">Status Filter</label>
+                                    <select
+                                        value={statusFilter}
+                                        onChange={(e) => setStatusFilter(e.target.value)}
+                                        className="px-4 py-2.5 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all duration-200 bg-white"
+                                    >
+                                        <option value="all">All Status</option>
+                                        {accountStatuses.map(status => (
+                                            <option key={status.id} value={status.value}>
+                                                {status.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
 
-                        <select
-                            value={typeFilter}
-                            onChange={(e) => setTypeFilter(e.target.value)}
-                            className="px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-                        >
-                            <option value="all">All Types</option>
-                            {accountTypes.map(type => (
-                                <option key={type.id} value={type.value}>
-                                    {type.label}
-                                </option>
-                            ))}
-                        </select>
+                                <div className="flex flex-col">
+                                    <label className="text-sm text-gray-600 mb-1.5 font-medium">Type Filter</label>
+                                    <select
+                                        value={typeFilter}
+                                        onChange={(e) => setTypeFilter(e.target.value)}
+                                        className="px-4 py-2.5 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all duration-200 bg-white"
+                                    >
+                                        <option value="all">All Types</option>
+                                        {accountTypes.map(type => (
+                                            <option key={type.id} value={type.value}>
+                                                {type.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
 
-                        {selectedVendors.length > 0 && (
-                            <div className="flex items-center gap-2">
-                                <select
-                                    onChange={(e) => handleBulkAction(e.target.value)}
-                                    className="px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-                                >
-                                    <option value="">Bulk Actions</option>
-                                    <option value="active">Mark as Active</option>
-                                    <option value="inactive">Mark as Inactive</option>
-                                    <option value="delete">Delete Selected</option>
-                                </select>
-                                <span className="text-sm text-gray-500">
-                                    {selectedVendors.length} selected
-                                </span>
+                                {selectedVendors.length > 0 && (
+                                    <div className="flex flex-col">
+                                        <label className="text-sm text-gray-600 mb-1.5 font-medium">Bulk Actions</label>
+                                        <div className="flex items-center gap-3">
+                                            <select
+                                                onChange={(e) => {
+                                                    if (e.target.value) {
+                                                        handleBulkAction(e.target.value);
+                                                        e.target.value = '';
+                                                    }
+                                                }}
+                                                className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all duration-200 bg-white"
+                                            >
+                                                <option value="">Select Action</option>
+                                                <option value="active">Mark as Active</option>
+                                                <option value="inactive">Mark as Inactive</option>
+                                                <option value="delete">Delete Selected</option>
+                                            </select>
+                                            <span className="rounded-full bg-indigo-100 text-indigo-800 px-3 py-1 text-sm font-medium">
+                                                {selectedVendors.length} selected
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
-                        )}
-                    </div>
+                        </div>
+                    )}
                 </div>
+            </div>
 
+            {/* Data Table */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                            <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <thead>
+                            <tr className="bg-gray-50">
+                                <th className="px-6 py-4 text-left">
                                     <input
                                         type="checkbox"
-                                        checked={selectedVendors.length === filteredVendors.length}
+                                        checked={selectedVendors.length === filteredVendors.length && filteredVendors.length > 0}
                                         onChange={(e) => {
                                             if (e.target.checked) {
                                                 setSelectedVendors(filteredVendors.map(v => v.id));
@@ -460,295 +507,302 @@ export function VendorsPage() {
                                                 setSelectedVendors([]);
                                             }
                                         }}
-                                        className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                                        className="rounded-md border-gray-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4"
                                     />
                                 </th>
                                 <th
-                                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                                    className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                                     onClick={() => {
-                                        if (sortConfig.key === 'name') {
-                                            setSortConfig({
-                                                key: 'name',
-                                                direction: sortConfig.direction === 'asc' ? 'desc' : 'asc'
-                                            });
-                                        } else {
-                                            setSortConfig({
-                                                key: 'name',
-                                                direction: 'asc'
-                                            });
-                                        }
+                                        setSortConfig({
+                                            key: 'name',
+                                            direction: sortConfig.key === 'name' && sortConfig.direction === 'asc' ? 'desc' : 'asc'
+                                        });
                                     }}
                                 >
                                     <div className="flex items-center">
                                         <span>Name</span>
                                         {sortConfig.key === 'name' && (
                                             sortConfig.direction === 'asc' ?
-                                                <ChevronUp className="w-4 h-4 ml-1" /> :
-                                                <ChevronDown className="w-4 h-4 ml-1" />
+                                                <ChevronUp className="w-4 h-4 ml-1 text-indigo-500" /> :
+                                                <ChevronDown className="w-4 h-4 ml-1 text-indigo-500" />
                                         )}
                                     </div>
                                 </th>
                                 <th
-                                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                                    className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                                     onClick={() => {
-                                        if (sortConfig.key === 'type') {
-                                            setSortConfig({
-                                                key: 'type',
-                                                direction: sortConfig.direction === 'asc' ? 'desc' : 'asc'
-                                            });
-                                        } else {
-                                            setSortConfig({
-                                                key: 'type',
-                                                direction: 'asc'
-                                            });
-                                        }
+                                        setSortConfig({
+                                            key: 'type',
+                                            direction: sortConfig.key === 'type' && sortConfig.direction === 'asc' ? 'desc' : 'asc'
+                                        });
                                     }}
                                 >
                                     <div className="flex items-center">
                                         <span>Type</span>
                                         {sortConfig.key === 'type' && (
                                             sortConfig.direction === 'asc' ?
-                                                <ChevronUp className="w-4 h-4 ml-1" /> :
-                                                <ChevronDown className="w-4 h-4 ml-1" />
+                                                <ChevronUp className="w-4 h-4 ml-1 text-indigo-500" /> :
+                                                <ChevronDown className="w-4 h-4 ml-1 text-indigo-500" />
                                         )}
                                     </div>
                                 </th>
-                                {/* New Owner Column */}
                                 <th
-                                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                                    className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                                     onClick={() => {
-                                        if (sortConfig.key === 'owner.name') {
-                                            setSortConfig({
-                                                key: 'owner.name',
-                                                direction: sortConfig.direction === 'asc' ? 'desc' : 'asc'
-                                            });
-                                        } else {
-                                            setSortConfig({
-                                                key: 'owner.name',
-                                                direction: 'asc'
-                                            });
-                                        }
+                                        setSortConfig({
+                                            key: 'owner.name',
+                                            direction: sortConfig.key === 'owner.name' && sortConfig.direction === 'asc' ? 'desc' : 'asc'
+                                        });
                                     }}
                                 >
                                     <div className="flex items-center">
                                         <span>Owner</span>
                                         {sortConfig.key === 'owner.name' && (
                                             sortConfig.direction === 'asc' ?
-                                                <ChevronUp className="w-4 h-4 ml-1" /> :
-                                                <ChevronDown className="w-4 h-4 ml-1" />
+                                                <ChevronUp className="w-4 h-4 ml-1 text-indigo-500" /> :
+                                                <ChevronDown className="w-4 h-4 ml-1 text-indigo-500" />
                                         )}
                                     </div>
                                 </th>
                                 <th
-                                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                                    className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                                     onClick={() => {
-                                        if (sortConfig.key === 'customer.name') {
-                                            setSortConfig({
-                                                key: 'customer.name',
-                                                direction: sortConfig.direction === 'asc' ? 'desc' : 'asc'
-                                            });
-                                        } else {
-                                            setSortConfig({
-                                                key: 'customer.name',
-                                                direction: 'asc'
-                                            });
-                                        }
+                                        setSortConfig({
+                                            key: 'customer.name',
+                                            direction: sortConfig.key === 'customer.name' && sortConfig.direction === 'asc' ? 'desc' : 'asc'
+                                        });
                                     }}
                                 >
                                     <div className="flex items-center">
                                         <span>Contact</span>
                                         {sortConfig.key === 'customer.name' && (
                                             sortConfig.direction === 'asc' ?
-                                                <ChevronUp className="w-4 h-4 ml-1" /> :
-                                                <ChevronDown className="w-4 h-4 ml-1" />
+                                                <ChevronUp className="w-4 h-4 ml-1 text-indigo-500" /> :
+                                                <ChevronDown className="w-4 h-4 ml-1 text-indigo-500" />
                                         )}
                                     </div>
                                 </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Address
                                 </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Status
                                 </th>
                                 <th
-                                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                                    className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                                     onClick={() => {
-                                        if (sortConfig.key === 'created_at') {
-                                            setSortConfig({
-                                                key: 'created_at',
-                                                direction: sortConfig.direction === 'asc' ? 'desc' : 'asc'
-                                            });
-                                        } else {
-                                            setSortConfig({
-                                                key: 'created_at',
-                                                direction: 'desc'
-                                            });
-                                        }
+                                        setSortConfig({
+                                            key: 'created_at',
+                                            direction: sortConfig.key === 'created_at' && sortConfig.direction === 'asc' ? 'desc' : 'asc'
+                                        });
                                     }}
                                 >
                                     <div className="flex items-center">
                                         <span>Created</span>
                                         {sortConfig.key === 'created_at' && (
                                             sortConfig.direction === 'asc' ?
-                                                <ChevronUp className="w-4 h-4 ml-1" /> :
-                                                <ChevronDown className="w-4 h-4 ml-1" />
+                                                <ChevronUp className="w-4 h-4 ml-1 text-indigo-500" /> :
+                                                <ChevronDown className="w-4 h-4 ml-1 text-indigo-500" />
                                         )}
                                     </div>
                                 </th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th className="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Actions
                                 </th>
                             </tr>
                         </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                            {sortedVendors.map((vendor) => (
-                                <tr key={vendor.id} className="hover:bg-gray-50">
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedVendors.includes(vendor.id)}
-                                            onChange={(e) => {
-                                                if (e.target.checked) {
-                                                    setSelectedVendors(prev => [...prev, vendor.id]);
-                                                } else {
-                                                    setSelectedVendors(prev => prev.filter(id => id !== vendor.id));
-                                                }
-                                            }}
-                                            className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                                        />
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center">
-                                            <Building2 className="w-5 h-5 text-gray-400 mr-3" />
-                                            <div>
-                                                <div className="font-medium text-gray-900">{vendor.name}</div>
-                                                {vendor.payment_terms && (
-                                                    <div className="text-sm text-gray-500">
-                                                        Terms: {vendor.payment_terms}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <span
-                                            className={cn(
-                                                "px-2 py-1 text-xs font-medium rounded-full",
-                                                accountTypes.find((type) => type.value === vendor.type)?.color
-                                                    ? `bg-${accountTypes.find((type) => type.value === vendor.type)?.color}-100 text-${accountTypes.find((type) => type.value === vendor.type)?.text_color}-800`
-                                                    : "bg-gray-100 text-gray-800" // Fallback style
-                                            )}
-                                        >
-                                            {accountTypes.find((type) => type.value === vendor.type)?.label || vendor.type || 'N/A'}
-                                        </span>
-                                    </td>
-                                    {/* New Owner Cell */}
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        {vendor.owner ? (
-                                            <div className="flex items-center text-sm">
-                                                <User className="w-4 h-4 text-gray-400 mr-1" />
-                                                <span>{vendor.owner.name}</span>
-                                            </div>
-                                        ) : (
-                                            <span className="text-gray-400">No owner assigned</span>
-                                        )}
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        {vendor.customer ? (
-                                            <div className="space-y-1">
-                                                <div className="flex items-center text-sm">
-                                                    <User className="w-4 h-4 text-gray-400 mr-1" />
-                                                    {vendor.customer.first_name} {vendor.customer.last_name}
-                                                </div>
-                                                <div className="flex items-center text-sm">
-                                                    <Mail className="w-4 h-4 text-gray-400 mr-1" />
-                                                    <a
-                                                        href={`mailto:${vendor.customer.email}`}
-                                                        className="text-primary-600 hover:text-primary-700"
-                                                    >
-                                                        {vendor.customer.email}
-                                                    </a>
-                                                </div>
-                                                {vendor.customer.phone && (
-                                                    <div className="flex items-center text-sm">
-                                                        <Phone className="w-4 h-4 text-gray-400 mr-1" />
-                                                        <a
-                                                            href={`tel:${vendor.customer.phone}`}
-                                                            className="text-primary-600 hover:text-primary-700"
-                                                        >
-                                                            {vendor.customer.phone}
-                                                        </a>
-                                                    </div>
-                                                )}
-                                                {vendor.customer.company && (
-                                                    <div className="flex items-center text-sm">
-                                                        <Building2 className="w-4 h-4 text-gray-400 mr-1" />
-                                                        {vendor.customer.company}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ) : (
-                                            <span className="text-gray-400">No contact assigned</span>
-                                        )}
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="text-sm text-gray-500">
-                                            {[
-                                                vendor.shipping_address_line1,
-                                                vendor.shipping_city,
-                                                vendor.shipping_state,
-                                                vendor.shipping_country
-                                            ].filter(Boolean).join(', ') || 'No address provided'}
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <select
-                                            value={vendor.status}
-                                            onChange={(e) => handleStatusChange(vendor.id, e.target.value)}
-                                            className={cn(
-                                                "text-sm font-medium rounded-full px-3 py-1 border-2",
-                                                vendor.status === 'active'
-                                                    ? "bg-green-100 text-green-800 border-green-200"
-                                                    : "bg-gray-100 text-gray-800 border-gray-200"
-                                            )}
-                                        >
-                                            {accountStatuses.map(status => (
-                                                <option key={status.id} value={status.value}>
-                                                    {status.label}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                        {new Date(vendor.created_at).toLocaleDateString()}
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <div className="flex justify-end space-x-2">
-                                            <Link
-                                                to={`/admin/vendors/${vendor.id}`}
-                                                className="text-primary-600 hover:text-primary-900"
-                                            >
-                                                <Eye className="w-5 h-5" />
-                                            </Link>
-                                            <Link
-                                                to={`/admin/vendors/${vendor.id}/edit`}
-                                                className="text-blue-600 hover:text-blue-900"
-                                            >
-                                                <Edit className="w-5 h-5" />
-                                            </Link>
-                                            <button
-                                                onClick={() => handleDelete(vendor.id)}
-                                                className="text-red-600 hover:text-red-900"
-                                            >
-                                                <Trash2 className="w-5 h-5" />
-                                            </button>
+                        <tbody className="divide-y divide-gray-100">
+                            {sortedVendors.length === 0 ? (
+                                <tr>
+                                    <td colSpan={10} className="px-6 py-10 text-center text-gray-500">
+                                        <div className="flex flex-col items-center justify-center">
+                                            <Briefcase className="w-12 h-12 text-gray-300 mb-2" />
+                                            <p className="text-lg font-medium">No accounts found</p>
+                                            <p className="text-sm">Try adjusting your search or filters</p>
                                         </div>
                                     </td>
                                 </tr>
-                            ))}
+                            ) : (
+                                sortedVendors.map((vendor) => (
+                                    <tr key={vendor.id} className="hover:bg-gray-50 transition-colors">
+                                        <td className="px-6 py-4">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedVendors.includes(vendor.id)}
+                                                onChange={(e) => {
+                                                    if (e.target.checked) {
+                                                        setSelectedVendors(prev => [...prev, vendor.id]);
+                                                    } else {
+                                                        setSelectedVendors(prev => prev.filter(id => id !== vendor.id));
+                                                    }
+                                                }}
+                                                className="rounded-md border-gray-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4"
+                                            />
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center">
+                                                <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center mr-3 flex-shrink-0">
+                                                    <Building2 className="w-5 h-5" />
+                                                </div>
+                                                <div>
+                                                    <div className="font-medium text-gray-900">{vendor.name}</div>
+                                                    {vendor.payment_terms && (
+                                                        <div className="text-sm text-gray-500">
+                                                            Terms: {vendor.payment_terms}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <span
+                                                className={cn(
+                                                    "px-3 py-1.5 text-xs font-medium rounded-full inline-flex items-center",
+                                                    accountTypes.find((type) => type.value === vendor.type)?.color
+                                                        ? `bg-${accountTypes.find((type) => type.value === vendor.type)?.color}-100 text-${accountTypes.find((type) => type.value === vendor.type)?.text_color}-800`
+                                                        : "bg-gray-100 text-gray-800"
+                                                )}
+                                            >
+                                                {accountTypes.find((type) => type.value === vendor.type)?.label || vendor.type || 'N/A'}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            {vendor.owner ? (
+                                                <div className="flex items-center text-sm">
+                                                    <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center mr-2 flex-shrink-0">
+                                                        <User className="w-4 h-4" />
+                                                    </div>
+                                                    <span className="font-medium">{vendor.owner.name}</span>
+                                                </div>
+                                            ) : (
+                                                <span className="text-gray-400 text-sm italic">No owner assigned</span>
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            {vendor.customer ? (
+                                                <div className="space-y-1.5">
+                                                    <div className="flex items-center text-sm">
+                                                        <User className="w-4 h-4 text-gray-400 mr-1.5" />
+                                                        <span className="font-medium">{vendor.customer.first_name} {vendor.customer.last_name}</span>
+                                                    </div>
+                                                    <div className="flex items-center text-sm">
+                                                        <Mail className="w-4 h-4 text-gray-400 mr-1.5" />
+                                                        <a
+                                                            href={`mailto:${vendor.customer.email}`}
+                                                            className="text-indigo-600 hover:text-indigo-800 transition-colors"
+                                                        >
+                                                            {vendor.customer.email}
+                                                        </a>
+                                                    </div>
+                                                    {vendor.customer.phone && (
+                                                        <div className="flex items-center text-sm">
+                                                            <Phone className="w-4 h-4 text-gray-400 mr-1.5" />
+                                                            <a
+                                                                href={`tel:${vendor.customer.phone}`}
+                                                                className="text-indigo-600 hover:text-indigo-800 transition-colors"
+                                                            >
+                                                                {vendor.customer.phone}
+                                                            </a>
+                                                        </div>
+                                                    )}
+                                                    {vendor.customer.company && (
+                                                        <div className="flex items-center text-sm">
+                                                            <Building2 className="w-4 h-4 text-gray-400 mr-1.5" />
+                                                            {vendor.customer.company}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <span className="text-gray-400 text-sm italic">No contact assigned</span>
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="text-sm text-gray-500">
+                                                {[
+                                                    vendor.shipping_address_line1,
+                                                    vendor.shipping_city,
+                                                    vendor.shipping_state,
+                                                    vendor.shipping_country
+                                                ].filter(Boolean).join(', ') || (
+                                                        <span className="text-gray-400 italic">No address provided</span>
+                                                    )}
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <select
+                                                value={vendor.status}
+                                                onChange={(e) => handleStatusChange(vendor.id, e.target.value)}
+                                                className={cn(
+                                                    "text-sm font-medium px-3 py-1.5 rounded-full border-2 appearance-none cursor-pointer",
+                                                    vendor.status === 'active'
+                                                        ? "bg-green-50 text-green-700 border-green-200"
+                                                        : vendor.status === 'inactive'
+                                                            ? "bg-gray-50 text-gray-600 border-gray-200"
+                                                            : vendor.status === 'pending'
+                                                                ? "bg-yellow-50 text-yellow-700 border-yellow-200"
+                                                                : "bg-red-50 text-red-700 border-red-200"
+                                                )}
+                                                style={{
+                                                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236b7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7' /%3E%3C/svg%3E")`,
+                                                    backgroundRepeat: 'no-repeat',
+                                                    backgroundPosition: 'right 0.5rem center',
+                                                    backgroundSize: '1.5em 1.5em',
+                                                    paddingRight: '2.5rem'
+                                                }}
+                                            >
+                                                {accountStatuses.map(status => (
+                                                    <option key={status.id} value={status.value}>
+                                                        {status.label}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            {new Date(vendor.created_at).toLocaleDateString()}
+                                        </td>
+                                        <td className="px-6 py-4 text-right space-x-1">
+                                            <div className="flex justify-end items-center gap-2">
+                                                <Link
+                                                    to={`/admin/vendors/${vendor.id}`}
+                                                    className="p-1.5 bg-indigo-50 text-indigo-600 rounded-full hover:bg-indigo-100 transition-colors"
+                                                    title="View details"
+                                                >
+                                                    <Eye className="w-4 h-4" />
+                                                </Link>
+                                                <Link
+                                                    to={`/admin/vendors/${vendor.id}/edit`}
+                                                    className="p-1.5 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition-colors"
+                                                    title="Edit account"
+                                                >
+                                                    <Edit className="w-4 h-4" />
+                                                </Link>
+                                                <button
+                                                    onClick={() => handleDelete(vendor.id)}
+                                                    className="p-1.5 bg-red-50 text-red-600 rounded-full hover:bg-red-100 transition-colors"
+                                                    title="Delete account"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
                         </tbody>
                     </table>
                 </div>
+
+                {sortedVendors.length > 0 && (
+                    <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-between items-center">
+                        <div className="text-sm text-gray-500">
+                            Showing <span className="font-medium text-gray-700">{sortedVendors.length}</span> of <span className="font-medium text-gray-700">{vendors.length}</span> accounts
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Users className="w-5 h-5 text-indigo-500" />
+                            <span className="text-gray-700 font-medium">{vendors.length} total accounts</span>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

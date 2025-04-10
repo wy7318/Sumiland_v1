@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
 import {
   Plus, Search, Download, Edit, Trash2, ChevronDown, ChevronUp,
-  Check, X, FileSpreadsheet, AlertCircle, Eye, Building2, UserCheck
+  Check, X, FileSpreadsheet, AlertCircle, Eye, Building2, UserCheck,
+  Users, Mail, Phone, MapPin, Calendar, Filter
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
@@ -50,6 +50,7 @@ export function CustomersPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+  const [filtersExpanded, setFiltersExpanded] = useState(true);
 
   useEffect(() => {
     fetchCustomers();
@@ -83,7 +84,6 @@ export function CustomersPage() {
       setLoading(false);
     }
   };
-
 
   const handleDelete = async (customerId: string) => {
     try {
@@ -166,7 +166,6 @@ export function CustomersPage() {
       customer.company?.toLowerCase().includes(searchString) ||
       customer.phone?.toLowerCase().includes(searchString) ||
       customer.vendor?.name.toLowerCase().includes(searchString) ||
-      // Add owner name to search criteria
       customer.owner?.name.toLowerCase().includes(searchString)
     );
   });
@@ -181,297 +180,365 @@ export function CustomersPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-600"></div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Customer Management</h1>
-        <div className="flex gap-4">
+    <div className="space-y-8 p-6 bg-gray-50 min-h-screen font-sans">
+      {/* Header Section */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+        <div>
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-700 to-purple-500 bg-clip-text text-transparent">
+            Customer Management
+          </h1>
+          <p className="text-gray-500 mt-1">Manage your customer relationships and contacts</p>
+        </div>
+        <div className="flex flex-wrap gap-3">
           <button
             onClick={exportToCSV}
-            className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white border border-gray-200 text-gray-700 font-medium shadow-sm hover:shadow-md transition-all duration-200 hover:border-indigo-300"
           >
-            <FileSpreadsheet className="w-4 h-4 mr-2" />
-            Export CSV
+            <FileSpreadsheet className="w-4 h-4" />
+            <span>Export CSV</span>
           </button>
           <Link
             to="/admin/customers/new"
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-indigo-600 to-indigo-700 text-white font-medium shadow-md hover:shadow-lg transition-all duration-200 hover:from-indigo-700 hover:to-indigo-800"
           >
-            <Plus className="w-4 h-4 mr-2" />
-            Add Customer
+            <Plus className="w-4 h-4" />
+            <span>Add Customer</span>
           </Link>
         </div>
       </div>
 
       {error && (
-        <div className="bg-red-50 text-red-600 p-4 rounded-lg flex items-center">
-          <AlertCircle className="w-5 h-5 mr-2" />
-          {error}
+        <div className="bg-red-50 text-red-600 p-4 rounded-xl flex items-center border border-red-100 shadow-sm mb-6">
+          <AlertCircle className="w-5 h-5 mr-3 flex-shrink-0" />
+          <span>{error}</span>
         </div>
       )}
 
-      <div className="bg-white shadow rounded-lg">
-        <div className="p-4 border-b border-gray-200">
-          <div className="flex flex-wrap gap-4">
-            <div className="flex-1 min-w-[300px]">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input
-                  type="text"
-                  placeholder="Search customers by name, email, company, owner..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-                />
-              </div>
-            </div>
+      {/* Search Section */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-6">
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+              <Filter className="w-5 h-5 text-indigo-500" />
+              Search Customers
+            </h2>
+            <button
+              onClick={() => setFiltersExpanded(!filtersExpanded)}
+              className="text-gray-500 hover:text-gray-700 transition-colors"
+            >
+              {filtersExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+            </button>
           </div>
-        </div>
 
+          {filtersExpanded && (
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <Search className="text-gray-400 w-5 h-5" />
+              </div>
+              <input
+                type="text"
+                placeholder="Search customers by name, email, company, owner..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-12 pr-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all duration-200"
+              />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Customer List */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <thead>
+              <tr className="bg-gray-50">
+                <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Name
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Contact
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Company
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Account
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Owner
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Location
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Created
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {paginatedCustomers.map((customer) => (
-                <tr key={customer.customer_id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">
-                      {customer.first_name} {customer.last_name}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-500">{customer.email}</div>
-                    {customer.phone && (
-                      <div className="text-sm text-gray-500">{customer.phone}</div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">
-                      {customer.company || '-'}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {customer.vendor ? (
-                      <div className="flex items-center space-x-2">
-                        <Building2 className="w-4 h-4 text-gray-400" />
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">
-                            {customer.vendor.name}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {customer.vendor.type}
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <span className="text-gray-400">-</span>
-                    )}
-                  </td>
-                  {/* New Owner Column */}
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {customer.owner ? (
-                      <div className="flex items-center space-x-2">
-                        <UserCheck className="w-4 h-4 text-gray-400" />
-                        <div className="text-sm font-medium text-gray-900">
-                          {customer.owner.name}
-                        </div>
-                      </div>
-                    ) : (
-                      <span className="text-gray-400">-</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-500">
-                      {customer.city && customer.state ? `${customer.city}, ${customer.state}` : '-'}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(customer.created_at).toLocaleDateString()}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex justify-end space-x-2">
-                      <Link
-                        to={`/admin/customers/${customer.customer_id}`}
-                        className="text-primary-600 hover:text-primary-900"
-                      >
-                        <Eye className="w-5 h-5" />
-                      </Link>
-                      <Link
-                        to={`/admin/customers/${customer.customer_id}/edit`}
-                        className="text-blue-600 hover:text-blue-900"
-                      >
-                        <Edit className="w-5 h-5" />
-                      </Link>
-                      {showDeleteConfirm === customer.customer_id ? (
-                        <div className="flex items-center space-x-2">
-                          <button
-                            onClick={() => handleDelete(customer.customer_id)}
-                            className="text-red-600 hover:text-red-900"
-                          >
-                            <Check className="w-5 h-5" />
-                          </button>
-                          <button
-                            onClick={() => setShowDeleteConfirm(null)}
-                            className="text-gray-600 hover:text-gray-900"
-                          >
-                            <X className="w-5 h-5" />
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => setShowDeleteConfirm(customer.customer_id)}
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          <Trash2 className="w-5 h-5" />
-                        </button>
-                      )}
+            <tbody className="divide-y divide-gray-100">
+              {paginatedCustomers.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-6 py-10 text-center text-gray-500">
+                    <div className="flex flex-col items-center justify-center">
+                      <Users className="w-12 h-12 text-gray-300 mb-2" />
+                      <p className="text-lg font-medium">No customers found</p>
+                      <p className="text-sm">Try adjusting your search criteria</p>
                     </div>
                   </td>
                 </tr>
-              ))}
+              ) : (
+                paginatedCustomers.map((customer) => (
+                  <tr key={customer.customer_id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center">
+                        <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center mr-3 flex-shrink-0">
+                          <span className="font-semibold">
+                            {customer.first_name.charAt(0)}{customer.last_name.charAt(0)}
+                          </span>
+                        </div>
+                        <div className="font-medium text-gray-900">
+                          {customer.first_name} {customer.last_name}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="space-y-1.5">
+                        <div className="flex items-center text-sm">
+                          <Mail className="w-4 h-4 text-gray-400 mr-1.5" />
+                          <a
+                            href={`mailto:${customer.email}`}
+                            className="text-indigo-600 hover:text-indigo-800 transition-colors"
+                          >
+                            {customer.email}
+                          </a>
+                        </div>
+                        {customer.phone && (
+                          <div className="flex items-center text-sm">
+                            <Phone className="w-4 h-4 text-gray-400 mr-1.5" />
+                            <a
+                              href={`tel:${customer.phone}`}
+                              className="text-indigo-600 hover:text-indigo-800 transition-colors"
+                            >
+                              {customer.phone}
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      {customer.company ? (
+                        <div className="flex items-center text-sm">
+                          <Building2 className="w-4 h-4 text-gray-400 mr-1.5" />
+                          <span className="font-medium">{customer.company}</span>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400 text-sm italic">No company</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
+                      {customer.vendor ? (
+                        <div className="space-y-1">
+                          <div className="text-sm font-medium text-gray-900">
+                            {customer.vendor.name}
+                          </div>
+                          <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+                            {customer.vendor.type}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400 text-sm italic">No account</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
+                      {customer.owner ? (
+                        <div className="flex items-center text-sm">
+                          <div className="w-8 h-8 rounded-full bg-green-100 text-green-700 flex items-center justify-center mr-2 flex-shrink-0">
+                            <UserCheck className="w-4 h-4" />
+                          </div>
+                          <span className="font-medium">{customer.owner.name}</span>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400 text-sm italic">No owner assigned</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
+                      {customer.city && customer.state ? (
+                        <div className="flex items-center text-sm">
+                          <MapPin className="w-4 h-4 text-gray-400 mr-1.5" />
+                          <span>{customer.city}, {customer.state}</span>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400 text-sm italic">No location</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center text-sm text-gray-500">
+                        <Calendar className="w-4 h-4 text-gray-400 mr-1.5" />
+                        {new Date(customer.created_at).toLocaleDateString()}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex justify-end items-center gap-2">
+                        <Link
+                          to={`/admin/customers/${customer.customer_id}`}
+                          className="p-1.5 bg-indigo-50 text-indigo-600 rounded-full hover:bg-indigo-100 transition-colors"
+                          title="View details"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Link>
+                        <Link
+                          to={`/admin/customers/${customer.customer_id}/edit`}
+                          className="p-1.5 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition-colors"
+                          title="Edit customer"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Link>
+                        {showDeleteConfirm === customer.customer_id ? (
+                          <>
+                            <button
+                              onClick={() => handleDelete(customer.customer_id)}
+                              className="p-1.5 bg-green-50 text-green-600 rounded-full hover:bg-green-100 transition-colors"
+                              title="Confirm delete"
+                            >
+                              <Check className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => setShowDeleteConfirm(null)}
+                              className="p-1.5 bg-gray-50 text-gray-600 rounded-full hover:bg-gray-100 transition-colors"
+                              title="Cancel"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => setShowDeleteConfirm(customer.customer_id)}
+                            className="p-1.5 bg-red-50 text-red-600 rounded-full hover:bg-red-100 transition-colors"
+                            title="Delete customer"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
 
+        {/* Pagination */}
         {totalPages > 1 && (
-          <div className="px-4 py-3 border-t border-gray-200 flex items-center justify-between">
-            <div className="flex-1 flex justify-between sm:hidden">
+          <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex flex-col sm:flex-row gap-4 items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-700">
+                Showing <span className="font-medium text-gray-900">{(currentPage - 1) * itemsPerPage + 1}</span> to{' '}
+                <span className="font-medium text-gray-900">{Math.min(currentPage * itemsPerPage, filteredCustomers.length)}</span> of{' '}
+                <span className="font-medium text-gray-900">{filteredCustomers.length}</span> customers
+              </p>
+            </div>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setCurrentPage(1)}
+                disabled={currentPage === 1}
+                className="flex items-center justify-center w-8 h-8 rounded-full border border-gray-300 bg-white text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                title="First page"
+              >
+                <ChevronDown className="w-4 h-4 rotate-90" />
+              </button>
               <button
                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
-                className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                className="flex items-center justify-center w-8 h-8 rounded-full border border-gray-300 bg-white text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                title="Previous page"
               >
-                Previous
+                <ChevronDown className="w-4 h-4 rotate-90 -scale-x-100" />
               </button>
-              <button
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
-              >
-                Next
-              </button>
-            </div>
-            <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm text-gray-700">
-                  Showing{' '}
-                  <span className="font-medium">
-                    {(currentPage - 1) * itemsPerPage + 1}
-                  </span>{' '}
-                  to{' '}
-                  <span className="font-medium">
-                    {Math.min(currentPage * itemsPerPage, filteredCustomers.length)}
-                  </span>{' '}
-                  of{' '}
-                  <span className="font-medium">{filteredCustomers.length}</span>{' '}
-                  results
-                </p>
-              </div>
-              <div>
-                <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
-                  <button
-                    onClick={() => setCurrentPage(1)}
-                    disabled={currentPage === 1}
-                    className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
-                  >
-                    First
-                  </button>
-                  <button
-                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                    disabled={currentPage === 1}
-                    className="relative inline-flex items-center px-2 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
-                  >
-                    Previous
-                  </button>
-                  {Array.from({ length: totalPages }, (_, i) => i + 1)
-                    .filter(page =>
-                      page === 1 ||
-                      page === totalPages ||
-                      Math.abs(page - currentPage) <= 1
-                    )
-                    .map((page, index, array) => {
-                      if (index > 0 && array[index - 1] !== page - 1) {
-                        return [
-                          <span key={`ellipsis-${page}`} className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
-                            ...
-                          </span>,
+
+              <div className="flex items-center">
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter(page =>
+                    page === 1 ||
+                    page === totalPages ||
+                    Math.abs(page - currentPage) <= 1
+                  )
+                  .map((page, index, array) => {
+                    // Add ellipsis where needed
+                    if (index > 0 && array[index - 1] !== page - 1) {
+                      return (
+                        <div key={`gap-${page}`} className="flex items-center">
+                          <span className="w-8 text-center text-gray-500">...</span>
                           <button
-                            key={page}
                             onClick={() => setCurrentPage(page)}
                             className={cn(
-                              "relative inline-flex items-center px-4 py-2 border text-sm font-medium",
+                              "flex items-center justify-center w-8 h-8 mx-1 rounded-full text-sm font-medium transition-colors",
                               currentPage === page
-                                ? "z-10 bg-primary-50 border-primary-500 text-primary-600"
-                                : "bg-white border-gray-300 text-gray-500 hover:bg-gray-50"
+                                ? "bg-indigo-100 text-indigo-700 border border-indigo-300"
+                                : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
                             )}
                           >
                             {page}
                           </button>
-                        ];
-                      }
-                      return (
-                        <button
-                          key={page}
-                          onClick={() => setCurrentPage(page)}
-                          className={cn(
-                            "relative inline-flex items-center px-4 py-2 border text-sm font-medium",
-                            currentPage === page
-                              ? "z-10 bg-primary-50 border-primary-500 text-primary-600"
-                              : "bg-white border-gray-300 text-gray-500 hover:bg-gray-50"
-                          )}
-                        >
-                          {page}
-                        </button>
+                        </div>
                       );
-                    })}
-                  <button
-                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                    disabled={currentPage === totalPages}
-                    className="relative inline-flex items-center px-2 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
-                  >
-                    Next
-                  </button>
-                  <button
-                    onClick={() => setCurrentPage(totalPages)}
-                    disabled={currentPage === totalPages}
-                    className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
-                  >
-                    Last
-                  </button>
-                </nav>
+                    }
+
+                    return (
+                      <button
+                        key={page}
+                        onClick={() => setCurrentPage(page)}
+                        className={cn(
+                          "flex items-center justify-center w-8 h-8 mx-1 rounded-full text-sm font-medium transition-colors",
+                          currentPage === page
+                            ? "bg-indigo-100 text-indigo-700 border border-indigo-300"
+                            : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
+                        )}
+                      >
+                        {page}
+                      </button>
+                    );
+                  })}
               </div>
+
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="flex items-center justify-center w-8 h-8 rounded-full border border-gray-300 bg-white text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                title="Next page"
+              >
+                <ChevronDown className="w-4 h-4 -rotate-90" />
+              </button>
+              <button
+                onClick={() => setCurrentPage(totalPages)}
+                disabled={currentPage === totalPages}
+                className="flex items-center justify-center w-8 h-8 rounded-full border border-gray-300 bg-white text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                title="Last page"
+              >
+                <ChevronDown className="w-4 h-4 -rotate-90 -scale-x-100" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {paginatedCustomers.length > 0 && totalPages <= 1 && (
+          <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
+            <div className="text-sm text-gray-700">
+              Showing <span className="font-medium text-gray-900">{filteredCustomers.length}</span> customers
+            </div>
+            <div className="flex items-center gap-2">
+              <Users className="w-5 h-5 text-indigo-500" />
+              <span className="text-gray-700 font-medium">{customers.length} total customers</span>
             </div>
           </div>
         )}
