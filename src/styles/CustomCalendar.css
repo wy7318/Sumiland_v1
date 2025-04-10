@@ -29,6 +29,54 @@
     /* Light primary */
 }
 
+/* Add this to your CustomCalendar.css file */
+
+/* Main calendar container styles */
+.custom-calendar-container {
+    position: relative;
+    z-index: 1;
+}
+
+/* Ensure the selected tasks container has a higher z-index */
+.selected-tasks-container {
+    position: relative;
+    z-index: 5;
+    background-color: rgba(238, 242, 255, 1);
+    /* indigo-50 with opacity */
+}
+
+/* This prevents any nested calendars from appearing */
+.selected-tasks-container .react-calendar {
+    display: none !important;
+}
+
+/* Ensure the task list is visible */
+.task-list {
+    position: relative;
+    z-index: 10;
+}
+
+/* Style for the dot indicating tasks on a date */
+.task-dot {
+    height: 6px;
+    width: 6px;
+    border-radius: 50%;
+    margin: 0 auto;
+    margin-top: 2px;
+}
+
+/* Make sure the main calendar navigation buttons work */
+.react-calendar__navigation button {
+    position: relative;
+    z-index: 2;
+}
+
+/* Fix for the navigation arrows */
+.react-calendar__navigation__arrow {
+    position: relative;
+    z-index: 3;
+}
+
 .task-dot {
     width: 6px;
     height: 6px;

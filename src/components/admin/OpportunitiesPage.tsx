@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
 import {
   Plus, Search, Filter, ChevronDown, ChevronUp, Edit, Trash2,
   Eye, Package, Calendar, DollarSign, Building2, AlertCircle,
-  FileDown, Send, User, Mail, Phone, LayoutGrid, LayoutList
+  FileDown, Send, User, Mail, Phone, LayoutGrid, LayoutList,
+  UserCheck, Users, Check, X, Zap, Flag, MapPin, Globe
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
@@ -67,55 +67,131 @@ type SortConfig = {
   direction: 'asc' | 'desc';
 };
 
-function OpportunityCard({ opportunity }: { opportunity: KanbanOpportunity }) {
+function OpportunityCard({ opportunity, onStatusChange, statuses, handleDelete }: {
+  opportunity: KanbanOpportunity;
+  onStatusChange: (id: string, status: string) => void;
+  statuses: PicklistValue[];
+  handleDelete: (id: string) => void;
+}) {
+  const [showActions, setShowActions] = useState(false);
+
+  // Get style for status badge
+  const getStatusStyle = (status: string) => {
+    const statusValue = statuses.find(s => s.value === status);
+    if (!statusValue?.color) return {};
+    return {
+      backgroundColor: statusValue.color,
+      color: statusValue.text_color || '#FFFFFF'
+    };
+  };
+
   return (
     <KanbanCard id={opportunity.id}>
-      <div className="space-y-2">
-        <h4 className="font-medium">{opportunity.name}</h4>
+      <div className="space-y-3 relative p-1">
+        <div
+          className="absolute top-0 right-0 p-1 cursor-pointer text-gray-400 hover:text-gray-600 transition-colors"
+          onClick={() => setShowActions(!showActions)}
+        >
+          <ChevronDown className={`w-4 h-4 transition-transform ${showActions ? 'rotate-180' : ''}`} />
+        </div>
 
-        <div className="flex items-center text-sm text-gray-500">
-          <DollarSign className="w-4 h-4 mr-1" />
-          {formatCurrency(opportunity.amount)}
+        <div className="flex items-center space-x-2">
+          <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center flex-shrink-0">
+            <span className="text-xs font-semibold">
+              {opportunity.name.charAt(0)}{opportunity.name.charAt(1)}
+            </span>
+          </div>
+          <h4 className="font-medium text-gray-900">
+            {opportunity.name}
+          </h4>
+        </div>
+
+        <div className="flex items-center text-sm text-gray-600">
+          <DollarSign className="w-3.5 h-3.5 mr-1.5 text-gray-400 flex-shrink-0" />
+          <span className="font-medium">{formatCurrency(opportunity.amount)}</span>
           <span className="ml-2">({opportunity.probability}%)</span>
         </div>
 
         {opportunity.contact && (
-          <div className="flex items-center text-sm text-gray-500">
-            <User className="w-4 h-4 mr-1" />
-            {opportunity.contact.first_name} {opportunity.contact.last_name}
+          <div className="flex items-center text-sm text-gray-600">
+            <User className="w-3.5 h-3.5 mr-1.5 text-gray-400 flex-shrink-0" />
+            <span className="truncate">
+              {opportunity.contact.first_name} {opportunity.contact.last_name}
+            </span>
           </div>
         )}
 
         {opportunity.account && (
-          <div className="flex items-center text-sm text-gray-500">
-            <Building2 className="w-4 h-4 mr-1" />
-            {opportunity.account.name}
+          <div className="flex items-center text-sm text-gray-600">
+            <Building2 className="w-3.5 h-3.5 mr-1.5 text-gray-400 flex-shrink-0" />
+            <span className="truncate">{opportunity.account.name}</span>
           </div>
         )}
 
-        {opportunity.owner && (
-          <div className="flex items-center text-sm text-gray-500">
-            <User className="w-4 h-4 mr-1" />
-            {opportunity.owner.name}
-          </div>
-        )}
-
-        <div className="flex justify-end gap-2 mt-2">
-          <Link
-            to={`/admin/opportunities/${opportunity.id}`}
-            className="text-primary-600 hover:text-primary-900"
-            onClick={e => e.stopPropagation()}
-          >
-            <Eye className="w-4 h-4" />
-          </Link>
-          <Link
-            to={`/admin/opportunities/${opportunity.id}/edit`}
-            className="text-blue-600 hover:text-blue-900"
-            onClick={e => e.stopPropagation()}
-          >
-            <Edit className="w-4 h-4" />
-          </Link>
+        <div className="flex items-center text-sm text-gray-600 mt-1">
+          <UserCheck className="w-3.5 h-3.5 mr-1.5 text-gray-400 flex-shrink-0" />
+          {opportunity.owner ? (
+            <span className="font-medium">{opportunity.owner.name}</span>
+          ) : (
+            <span className="text-gray-400 italic">Unassigned</span>
+          )}
         </div>
+
+        {opportunity.expected_close_date && (
+          <div className="flex items-center text-sm text-gray-600">
+            <Calendar className="w-3.5 h-3.5 mr-1.5 text-gray-400 flex-shrink-0" />
+            <span>{new Date(opportunity.expected_close_date).toLocaleDateString()}</span>
+          </div>
+        )}
+
+        {showActions && (
+          <div className="mt-4 space-y-3 pt-3 border-t border-gray-100">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Stage</label>
+              <select
+                value={opportunity.status}
+                onChange={(e) => onStatusChange(opportunity.id, e.target.value)}
+                className="w-full text-sm rounded-lg border-gray-200 focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                style={getStatusStyle(opportunity.status)}
+              >
+                {statuses.map(status => (
+                  <option key={status.id} value={status.value}>
+                    {status.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex justify-between pt-2">
+              <Link
+                to={`/admin/opportunities/${opportunity.id}`}
+                className="p-1.5 bg-purple-50 text-purple-600 rounded-full hover:bg-purple-100 transition-colors"
+                title="View details"
+                onClick={e => e.stopPropagation()}
+              >
+                <Eye className="w-4 h-4" />
+              </Link>
+              <Link
+                to={`/admin/opportunities/${opportunity.id}/edit`}
+                className="p-1.5 bg-indigo-50 text-indigo-600 rounded-full hover:bg-indigo-100 transition-colors"
+                title="Edit opportunity"
+                onClick={e => e.stopPropagation()}
+              >
+                <Edit className="w-4 h-4" />
+              </Link>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDelete(opportunity.id);
+                }}
+                className="p-1.5 bg-red-50 text-red-600 rounded-full hover:bg-red-100 transition-colors"
+                title="Delete opportunity"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </KanbanCard>
   );
@@ -139,6 +215,8 @@ export function OpportunitiesPage() {
   const [opportunityTypes, setOpportunityTypes] = useState<PicklistValue[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [orgTimezone, setOrgTimezone] = useState('UTC');
+  const [filtersExpanded, setFiltersExpanded] = useState(true);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
 
   // Add this effect to fetch the organization timezone
   useEffect(() => {
@@ -158,7 +236,6 @@ export function OpportunitiesPage() {
 
       if (data?.timezone) {
         setOrgTimezone(data.timezone);
-        console.log('Opportunity page - Using timezone:', data.timezone);
       }
     };
 
@@ -168,7 +245,7 @@ export function OpportunitiesPage() {
   useEffect(() => {
     fetchPicklists();
     fetchOpportunities();
-  }, []);
+  }, [selectedOrganization]);
 
   // Add this utility function for formatting dates
   const formatDate = (dateStr, format = DateTime.DATE_MED) => {
@@ -280,6 +357,7 @@ export function OpportunitiesPage() {
 
       if (error) throw error;
       await fetchOpportunities();
+      setShowDeleteConfirm(null);
     } catch (err) {
       console.error('Error deleting opportunity:', err);
       setError(err instanceof Error ? err.message : 'Failed to delete opportunity');
@@ -324,10 +402,10 @@ export function OpportunitiesPage() {
   const filteredOpportunities = opportunities.filter(opp => {
     const matchesSearch =
       opp.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      opp.account?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      `${opp.contact?.first_name} ${opp.contact?.last_name}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (opp.account?.name.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+      `${opp.contact?.first_name || ''} ${opp.contact?.last_name || ''}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
       // Add owner name to search
-      opp.owner?.name?.toLowerCase().includes(searchQuery.toLowerCase());
+      (opp.owner?.name?.toLowerCase() || '').includes(searchQuery.toLowerCase());
 
     const matchesStage = stageFilter === 'all' || opp.stage === stageFilter;
     const matchesType = typeFilter === 'all' || opp.type === typeFilter;
@@ -376,342 +454,455 @@ export function OpportunitiesPage() {
   if (loading || !opportunityStages.length) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-600"></div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Opportunities</h1>
-        <div className="flex items-center gap-4">
+    <div className="space-y-8 p-6 bg-gray-50 min-h-screen font-sans">
+      {/* Header Section */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+        <div>
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-700 to-indigo-500 bg-clip-text text-transparent">
+            Opportunity Management
+          </h1>
+          <p className="text-gray-500 mt-1">Track and convert sales opportunities</p>
+        </div>
+        <div className="flex flex-wrap gap-3">
           <button
             onClick={() => setViewMode(viewMode === 'list' ? 'kanban' : 'list')}
-            className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white border border-gray-200 text-gray-700 font-medium shadow-sm hover:shadow-md transition-all duration-200 hover:border-purple-300"
           >
             {viewMode === 'list' ? (
               <>
-                <LayoutGrid className="w-4 h-4 mr-2" />
-                Kanban View
+                <LayoutGrid className="w-4 h-4" />
+                <span>Kanban View</span>
               </>
             ) : (
               <>
-                <LayoutList className="w-4 h-4 mr-2" />
-                List View
+                <LayoutList className="w-4 h-4" />
+                <span>List View</span>
               </>
             )}
           </button>
           <Link
             to="/admin/opportunities/new"
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-medium shadow-md hover:shadow-lg transition-all duration-200 hover:from-purple-700 hover:to-indigo-700"
           >
-            <Plus className="w-4 h-4 mr-2" />
-            New Opportunity
+            <Plus className="w-4 h-4" />
+            <span>New Opportunity</span>
           </Link>
         </div>
       </div>
 
       {error && (
-        <div className="bg-red-50 text-red-600 p-4 rounded-lg flex items-center">
-          <AlertCircle className="w-5 h-5 mr-2" />
-          {error}
+        <div className="bg-red-50 text-red-600 p-4 rounded-xl flex items-center border border-red-100 shadow-sm mb-6">
+          <AlertCircle className="w-5 h-5 mr-3 flex-shrink-0" />
+          <span>{error}</span>
         </div>
       )}
 
-      <div className="bg-white shadow rounded-lg">
-        <div className="p-4 border-b border-gray-200">
-          <div className="flex flex-wrap gap-4">
-            <div className="flex-1 min-w-[300px]">
+      {/* Search & Filters Section */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-6">
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+              <Filter className="w-5 h-5 text-purple-500" />
+              Search & Filters
+            </h2>
+            <button
+              onClick={() => setFiltersExpanded(!filtersExpanded)}
+              className="text-gray-500 hover:text-gray-700 transition-colors"
+            >
+              {filtersExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+            </button>
+          </div>
+
+          {filtersExpanded && (
+            <div className="space-y-4">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <Search className="text-gray-400 w-5 h-5" />
+                </div>
                 <input
                   type="text"
-                  placeholder="Search opportunities..."
+                  placeholder="Search opportunities by name, account, contact..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                  className="w-full pl-12 pr-4 py-3 rounded-xl border border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 outline-none transition-all duration-200"
                 />
               </div>
-            </div>
 
-            <select
-              value={stageFilter}
-              onChange={(e) => setStageFilter(e.target.value)}
-              className="px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-            >
-              <option value="all">All Stages</option>
-              {opportunityStages.map(stage => (
-                <option key={stage.id} value={stage.value}>
-                  {stage.label}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
-              className="px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-            >
-              <option value="all">All Types</option>
-              {opportunityTypes.map(type => (
-                <option key={type.id} value={type.value}>
-                  {type.label}
-                </option>
-              ))}
-            </select>
-
-            {selectedOpportunities.length > 0 && viewMode === 'list' && (
-              <div className="flex items-center gap-2">
-                <select
-                  onChange={(e) => handleBulkAction(e.target.value)}
-                  className="px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-                >
-                  <option value="">Bulk Actions</option>
-                  {opportunityStages.map(stage => (
-                    <option key={stage.id} value={stage.value}>
-                      Move to {stage.label}
-                    </option>
-                  ))}
-                  <option value="delete">Delete Selected</option>
-                </select>
-                <span className="text-sm text-gray-500">
-                  {selectedOpportunities.length} selected
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {viewMode === 'list' ? (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    <input
-                      type="checkbox"
-                      checked={selectedOpportunities.length === filteredOpportunities.length}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedOpportunities(filteredOpportunities.map(o => o.id));
-                        } else {
-                          setSelectedOpportunities([]);
-                        }
-                      }}
-                      className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                    />
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Name
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Account
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Contact
-                  </th>
-                  {/* Add Owner column header */}
-                  <th
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                    onClick={() => {
-                      if (sortConfig.key === 'owner.name') {
-                        setSortConfig({
-                          key: 'owner.name',
-                          direction: sortConfig.direction === 'asc' ? 'desc' : 'asc'
-                        });
-                      } else {
-                        setSortConfig({
-                          key: 'owner.name',
-                          direction: 'asc'
-                        });
-                      }
-                    }}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="flex flex-col">
+                  <label className="text-sm text-gray-600 mb-1.5 font-medium">Stage Filter</label>
+                  <select
+                    value={stageFilter}
+                    onChange={(e) => setStageFilter(e.target.value)}
+                    className="px-4 py-2.5 rounded-xl border border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 outline-none transition-all duration-200 bg-white"
                   >
-                    <div className="flex items-center">
-                      <span>Owner</span>
-                      {sortConfig.key === 'owner.name' && (
-                        sortConfig.direction === 'asc' ?
-                          <ChevronUp className="w-4 h-4 ml-1" /> :
-                          <ChevronDown className="w-4 h-4 ml-1" />
-                      )}
-                    </div>
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Stage
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Amount
-                  </th>
-                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Probability
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Expected Close
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {sortedOpportunities.map((opp) => (
-                  <tr key={opp.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <input
-                        type="checkbox"
-                        checked={selectedOpportunities.includes(opp.id)}
+                    <option value="all">All Stages</option>
+                    {opportunityStages.map(stage => (
+                      <option key={stage.id} value={stage.value}>
+                        {stage.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex flex-col">
+                  <label className="text-sm text-gray-600 mb-1.5 font-medium">Type Filter</label>
+                  <select
+                    value={typeFilter}
+                    onChange={(e) => setTypeFilter(e.target.value)}
+                    className="px-4 py-2.5 rounded-xl border border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 outline-none transition-all duration-200 bg-white"
+                  >
+                    <option value="all">All Types</option>
+                    {opportunityTypes.map(type => (
+                      <option key={type.id} value={type.value}>
+                        {type.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {selectedOpportunities.length > 0 && viewMode === 'list' && (
+                  <div className="flex flex-col">
+                    <label className="text-sm text-gray-600 mb-1.5 font-medium">Bulk Actions</label>
+                    <div className="flex items-center gap-3">
+                      <select
                         onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedOpportunities(prev => [...prev, opp.id]);
-                          } else {
-                            setSelectedOpportunities(prev => prev.filter(id => id !== opp.id));
+                          if (e.target.value) {
+                            handleBulkAction(e.target.value);
+                            e.target.value = '';
                           }
                         }}
-                        className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                      />
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm font-medium text-gray-900">
-                        {opp.name}
-                      </div>
-                      {opp.type && (
-                        <span
-                          className="mt-1 inline-flex text-xs leading-5 font-semibold rounded-full px-2 py-1"
-                          style={getTypeStyle(opp.type)}
-                        >
-                          {opportunityTypes.find(t => t.value === opp.type)?.label || opp.type}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4">
-                      {opp.account ? (
-                        <div className="flex items-center">
-                          <Building2 className="w-5 h-5 text-gray-400 mr-3" />
-                          <div>
-                            <div className="text-sm font-medium text-gray-900">
-                              {opp.account.name}
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              {opp.account.type}
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
-                        <span className="text-gray-400">No Account</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4">
-                      {opp.contact ? (
-                        <div className="space-y-1">
-                          <div className="flex items-center text-sm">
-                            <User className="w-4 h-4 text-gray-400 mr-1" />
-                            {opp.contact.first_name} {opp.contact.last_name}
-                          </div>
-                          <div className="flex items-center text-sm">
-                            <Mail className="w-4 h-4 text-gray-400 mr-1" />
-                            <a
-                              href={`mailto:${opp.contact.email}`}
-                              className="text-primary-600 hover:text-primary-700"
-                            >
-                              {opp.contact.email}
-                            </a>
-                          </div>
-                          {opp.contact.phone && (
-                            <div className="flex items-center text-sm">
-                              <Phone className="w-4 h-4 text-gray-400 mr-1" />
-                              <a
-                                href={`tel:${opp.contact.phone}`}
-                                className="text-primary-600 hover:text-primary-700"
-                              >
-                                {opp.contact.phone}
-                              </a>
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-gray-400">No Contact</span>
-                      )}
-                    </td>
-                    {/* Add Owner cell content */}
-                    <td className="px-6 py-4">
-                      {opp.owner ? (
-                        <div className="flex items-center text-sm">
-                          <User className="w-4 h-4 text-gray-400 mr-1" />
-                          {opp.owner.name}
-                        </div>
-                      ) : (
-                        <span className="text-gray-400">No owner assigned</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <select
-                        value={opp.stage}
-                        onChange={(e) => handleStageChange(opp.id, e.target.value)}
-                        className="text-sm font-medium rounded-full px-3 py-1"
-                        style={getStageStyle(opp.stage)}
+                        className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 outline-none transition-all duration-200 bg-white"
                       >
-                        {opportunityStages.map(stage => (
-                          <option key={stage.id} value={stage.value}>
-                            {stage.label}
-                          </option>
-                        ))}
+                        <option value="">Select Action</option>
+                        <optgroup label="Change Stage">
+                          {opportunityStages.map(stage => (
+                            <option key={stage.id} value={stage.value}>
+                              Move to {stage.label}
+                            </option>
+                          ))}
+                        </optgroup>
+                        <option value="delete">Delete Selected</option>
                       </select>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right">
-                      <div className="text-sm font-medium text-gray-900">
-                        {formatCurrency(opp.amount)}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-center">
-                      <div className="text-sm font-medium text-gray-900">
-                        {opp.probability}%
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {opp.expected_close_date ? (
-                        formatDate(opp.expected_close_date)
-                      ) : (
-                        <span className="text-gray-400">Not set</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex justify-end space-x-2">
-                        <Link
-                          to={`/admin/opportunities/${opp.id}`}
-                          className="text-primary-600 hover:text-primary-900"
-                        >
-                          <Eye className="w-5 h-5" />
-                        </Link>
-                        <Link
-                          to={`/admin/opportunities/${opp.id}/edit`}
-                          className="text-blue-600 hover:text-blue-900"
-                        >
-                          <Edit className="w-5 h-5" />
-                        </Link>
-                        <button
-                          onClick={() => handleDelete(opp.id)}
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          <Trash2 className="w-5 h-5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <div className="min-w-[1200px]">
-              <KanbanBoard
-                items={kanbanOpportunities}
-                statuses={opportunityStages}
-                onStatusChange={handleStageChange}
-                renderCard={(opportunity) => <OpportunityCard opportunity={opportunity as KanbanOpportunity} />}
-              />
+                      <span className="rounded-full bg-purple-100 text-purple-800 px-3 py-1 text-sm font-medium">
+                        {selectedOpportunities.length} selected
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
+          )}
+        </div>
+      </div>
+
+      {/* Opportunities Data */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        {viewMode === 'list' ? (
+          <>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="px-6 py-4 text-left">
+                      <input
+                        type="checkbox"
+                        checked={selectedOpportunities.length === filteredOpportunities.length && filteredOpportunities.length > 0}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedOpportunities(filteredOpportunities.map(o => o.id));
+                          } else {
+                            setSelectedOpportunities([]);
+                          }
+                        }}
+                        className="rounded-md border-gray-300 text-purple-600 focus:ring-purple-500 h-4 w-4"
+                      />
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Name
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Account
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Contact
+                    </th>
+                    <th
+                      className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                      onClick={() => {
+                        if (sortConfig.key === 'owner.name') {
+                          setSortConfig({
+                            key: 'owner.name',
+                            direction: sortConfig.direction === 'asc' ? 'desc' : 'asc'
+                          });
+                        } else {
+                          setSortConfig({
+                            key: 'owner.name',
+                            direction: 'asc'
+                          });
+                        }
+                      }}
+                    >
+                      <div className="flex items-center">
+                        <span>Owner</span>
+                        {sortConfig.key === 'owner.name' && (
+                          sortConfig.direction === 'asc' ?
+                            <ChevronUp className="w-4 h-4 ml-1 text-purple-500" /> :
+                            <ChevronDown className="w-4 h-4 ml-1 text-purple-500" />
+                        )}
+                      </div>
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Stage
+                    </th>
+                    <th className="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Amount
+                    </th>
+                    <th className="px-6 py-4 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Probability
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Expected Close
+                    </th>
+                    <th className="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {sortedOpportunities.length === 0 ? (
+                    <tr>
+                      <td colSpan={10} className="px-6 py-10 text-center text-gray-500">
+                        <div className="flex flex-col items-center justify-center">
+                          <DollarSign className="w-12 h-12 text-gray-300 mb-2" />
+                          <p className="text-lg font-medium">No opportunities found</p>
+                          <p className="text-sm">Try adjusting your search or filters</p>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    sortedOpportunities.map((opp) => (
+                      <tr key={opp.id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-6 py-4">
+                          <input
+                            type="checkbox"
+                            checked={selectedOpportunities.includes(opp.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedOpportunities(prev => [...prev, opp.id]);
+                              } else {
+                                setSelectedOpportunities(prev => prev.filter(id => id !== opp.id));
+                              }
+                            }}
+                            className="rounded-md border-gray-300 text-purple-600 focus:ring-purple-500 h-4 w-4"
+                          />
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center">
+                            <div className="w-10 h-10 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center mr-3 flex-shrink-0">
+                              <span className="font-semibold">{opp.name.charAt(0)}{opp.name.charAt(1)}</span>
+                            </div>
+                            <div>
+                              <div className="font-medium text-gray-900">
+                                {opp.name}
+                              </div>
+                              {opp.type && (
+                                <span
+                                  className="mt-1 inline-flex text-xs leading-5 font-semibold rounded-full px-2.5 py-0.5"
+                                  style={getTypeStyle(opp.type)}
+                                >
+                                  {opportunityTypes.find(t => t.value === opp.type)?.label || opp.type}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          {opp.account ? (
+                            <div className="flex items-center">
+                              <Building2 className="w-4 h-4 text-gray-400 mr-2 flex-shrink-0" />
+                              <div>
+                                <div className="text-sm font-medium text-gray-900">
+                                  {opp.account.name}
+                                </div>
+                                <div className="text-sm text-gray-500">
+                                  {opp.account.type}
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 text-sm italic">No account</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          {opp.contact ? (
+                            <div className="space-y-1">
+                              <div className="flex items-center text-sm">
+                                <User className="w-4 h-4 text-gray-400 mr-1.5 flex-shrink-0" />
+                                <span className="font-medium">
+                                  {opp.contact.first_name} {opp.contact.last_name}
+                                </span>
+                              </div>
+                              <div className="flex items-center text-sm">
+                                <Mail className="w-4 h-4 text-gray-400 mr-1.5 flex-shrink-0" />
+                                <a
+                                  href={`mailto:${opp.contact.email}`}
+                                  className="text-purple-600 hover:text-purple-800 transition-colors"
+                                >
+                                  {opp.contact.email}
+                                </a>
+                              </div>
+                              {opp.contact.phone && (
+                                <div className="flex items-center text-sm">
+                                  <Phone className="w-4 h-4 text-gray-400 mr-1.5 flex-shrink-0" />
+                                  <a
+                                    href={`tel:${opp.contact.phone}`}
+                                    className="text-purple-600 hover:text-purple-800 transition-colors"
+                                  >
+                                    {opp.contact.phone}
+                                  </a>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 text-sm italic">No contact</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          {opp.owner ? (
+                            <div className="flex items-center text-sm">
+                              <UserCheck className="w-4 h-4 text-gray-400 mr-1.5 flex-shrink-0" />
+                              <span className="font-medium">{opp.owner.name}</span>
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 text-sm italic">Unassigned</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <select
+                            value={opp.stage}
+                            onChange={(e) => handleStageChange(opp.id, e.target.value)}
+                            className="text-sm font-medium rounded-full px-3 py-1.5 border-2 appearance-none cursor-pointer"
+                            style={{
+                              ...getStageStyle(opp.stage),
+                              backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236b7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7' /%3E%3C/svg%3E")`,
+                              backgroundRepeat: 'no-repeat',
+                              backgroundPosition: 'right 0.5rem center',
+                              backgroundSize: '1.5em 1.5em',
+                              paddingRight: '2.5rem'
+                            }}
+                          >
+                            {opportunityStages.map(stage => (
+                              <option key={stage.id} value={stage.value}>
+                                {stage.label}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                          <div className="text-sm font-medium text-gray-900">
+                            {formatCurrency(opp.amount)}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                          <span className="px-3 py-1 inline-flex text-sm font-medium rounded-full bg-green-100 text-green-800">
+                            {opp.probability}%
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center text-sm text-gray-500">
+                            <Calendar className="w-4 h-4 text-gray-400 mr-1.5 flex-shrink-0" />
+                            {opp.expected_close_date ? (
+                              formatDate(opp.expected_close_date)
+                            ) : (
+                              <span className="text-gray-400 italic">Not set</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex justify-end items-center gap-2">
+                            <Link
+                              to={`/admin/opportunities/${opp.id}`}
+                              className="p-1.5 bg-purple-50 text-purple-600 rounded-full hover:bg-purple-100 transition-colors"
+                              title="View details"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Link>
+                            <Link
+                              to={`/admin/opportunities/${opp.id}/edit`}
+                              className="p-1.5 bg-indigo-50 text-indigo-600 rounded-full hover:bg-indigo-100 transition-colors"
+                              title="Edit opportunity"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Link>
+                            {showDeleteConfirm === opp.id ? (
+                              <>
+                                <button
+                                  onClick={() => handleDelete(opp.id)}
+                                  className="p-1.5 bg-green-50 text-green-600 rounded-full hover:bg-green-100 transition-colors"
+                                  title="Confirm delete"
+                                >
+                                  <Check className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => setShowDeleteConfirm(null)}
+                                  className="p-1.5 bg-gray-50 text-gray-600 rounded-full hover:bg-gray-100 transition-colors"
+                                  title="Cancel"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                onClick={() => setShowDeleteConfirm(opp.id)}
+                                className="p-1.5 bg-red-50 text-red-600 rounded-full hover:bg-red-100 transition-colors"
+                                title="Delete opportunity"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {sortedOpportunities.length > 0 && (
+              <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-between items-center">
+                <div className="text-sm text-gray-500">
+                  Showing <span className="font-medium text-gray-700">{sortedOpportunities.length}</span> of <span className="font-medium text-gray-700">{opportunities.length}</span> opportunities
+                </div>
+                <div className="flex items-center gap-2">
+                  <DollarSign className="w-5 h-5 text-purple-500" />
+                  <span className="text-gray-700 font-medium">{formatCurrency(sortedOpportunities.reduce((sum, opp) => sum + opp.amount, 0))} total value</span>
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="p-6">
+            <KanbanBoard
+              items={kanbanOpportunities}
+              statuses={opportunityStages}
+              onStatusChange={handleStageChange}
+              renderCard={(opportunity) => (
+                <OpportunityCard
+                  opportunity={opportunity as KanbanOpportunity}
+                  onStatusChange={handleStageChange}
+                  statuses={opportunityStages}
+                  handleDelete={handleDelete}
+                />
+              )}
+            />
           </div>
         )}
       </div>
