@@ -4,7 +4,8 @@ import { motion } from 'framer-motion';
 import {
   ArrowLeft, Building2, Mail, Phone, Calendar,
   Edit, AlertCircle, Send, Reply, X, User,
-  Globe, CheckCircle, DollarSign, Users
+  Globe, CheckCircle, DollarSign, Users, Bookmark,
+  MapPin, CreditCard, FileText, MessageSquare, Briefcase
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -18,6 +19,7 @@ import { RelatedCustomers } from './RelatedCustomers';
 import { RelatedCases } from './RelatedCases';
 import { RelatedOpportunities } from './RelatedOpportunities';
 
+// Types (kept from original file)
 type Vendor = {
   id: string;
   name: string;
@@ -44,12 +46,10 @@ type Vendor = {
   organization_id: string;
   notes: string | null;
   created_at: string;
-  // New fields
   owner_id: string | null;
   parent_id: string | null;
   annual_revenue: number | null;
   website: string | null;
-  // Related entities
   owner: {
     id: string;
     name: string;
@@ -102,6 +102,9 @@ export function VendorDetailPage() {
   const [accountStatuses, setAccountStatuses] = useState<PicklistValue[]>([]);
   const [refreshRecordsList, setRefreshRecordsList] = useState(0);
 
+  // New state for tabs
+  const [activeTab, setActiveTab] = useState('details');
+
   useEffect(() => {
     fetchPicklists();
     if (id) {
@@ -115,6 +118,7 @@ export function VendorDetailPage() {
     }
   }, [vendor]);
 
+  // Fetch functions kept the same as original
   const fetchPicklists = async () => {
     try {
       // Fetch account types
@@ -358,6 +362,14 @@ export function VendorDetailPage() {
     return formatCurrency(value);
   };
 
+  // Find the current status index for the progress bar
+  const getCurrentStatusIndex = () => {
+    if (!vendor || !accountStatuses.length) return -1;
+    return accountStatuses.findIndex(status =>
+      status.value.toLowerCase() === vendor.status.toLowerCase()
+    );
+  };
+
   const renderFeedItem = (feed: Feed, isReply = false) => {
     const isEditing = editingFeed?.id === feed.id;
     const isOwner = feed.created_by === vendor?.id;
@@ -432,7 +444,7 @@ export function VendorDetailPage() {
               </button>
               <button
                 onClick={() => handleUpdateComment(feed.id, editingFeed.content)}
-                className="px-4 py-2 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700"
+                className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700"
               >
                 Save
               </button>
@@ -480,266 +492,457 @@ export function VendorDetailPage() {
   }
 
   return (
-    <div className="flex flex-col lg:flex-row gap-4">
-      <div className="lg:w-3/4 space-y-6">
-        <div className="flex items-center justify-between">
+    <div className="px-4 py-6 max-w-7xl mx-auto">
+      {/* Header Section */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-4">
           <button
             onClick={() => navigate('/admin/vendors')}
-            className="inline-flex items-center text-gray-600 hover:text-gray-900"
+            className="inline-flex items-center text-gray-600 hover:text-gray-900 transition-colors"
           >
-            <ArrowLeft className="w-5 h-5 mr-2" />
-            Back to Accounts
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            <span>Back to Accounts</span>
           </button>
 
           {/* Right buttons group */}
           <div className="flex space-x-3">
             <Link
-              to={`/admin/vendors/${id}/edit`}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
-            >
-              <Edit className="w-4 h-4 mr-2" />
-              Edit Account
-            </Link>
-            <Link
               to={`/admin/tasks/new?module=vendors&recordId=${id}`}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700"
+              className="inline-flex items-center px-5 py-2.5 text-sm font-medium rounded-full text-white bg-green-600 hover:bg-green-700 transition-colors shadow-sm"
             >
               <Calendar className="w-4 h-4 mr-2" />
               Add Task
             </Link>
+            <Link
+              to={`/admin/vendors/${id}/edit`}
+              className="inline-flex items-center px-5 py-2.5 text-sm font-medium rounded-full text-white bg-primary-600 hover:bg-primary-700 transition-colors shadow-sm"
+            >
+              <Edit className="w-4 h-4 mr-2" />
+              Edit Account
+            </Link>
           </div>
         </div>
 
-
-        <div className="bg-white shadow rounded-lg overflow-hidden">
+        {/* Card Header with Title and Status */}
+        <div className="bg-white rounded-2xl shadow-sm overflow-hidden mb-6">
           <div className="p-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
-              <div>
-                <h1 className="text-2xl font-bold mb-2">{vendor.name}</h1>
-                <div className="flex items-center gap-4">
-                  <span
-                    className="px-2 py-1 text-xs font-medium rounded-full"
-                    style={getTypeStyle(vendor.type)}
-                  >
-                    {accountTypes.find(t => t.value === vendor.type)?.label || vendor.type}
-                  </span>
-                  <select
-                    value={vendor.status}
-                    onChange={(e) => handleStatusChange(e.target.value)}
-                    className="text-sm font-medium rounded-full px-3 py-1"
-                    style={getStatusStyle(vendor.status)}
-                  >
-                    {accountStatuses.map(status => (
-                      <option key={status.id} value={status.value}>
-                        {status.label}
-                      </option>
-                    ))}
-                  </select>
+              <div className="flex items-center space-x-3">
+                <div className="bg-primary-100 rounded-full p-2.5">
+                  <Building2 className="w-6 h-6 text-primary-600" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-900">{vendor.name}</h1>
+                  <div className="flex items-center mt-1.5 space-x-3">
+                    <span
+                      className="px-3 py-1 text-xs font-medium rounded-full"
+                      style={getTypeStyle(vendor.type)}
+                    >
+                      {accountTypes.find(t => t.value === vendor.type)?.label || vendor.type}
+                    </span>
+                    <span className="text-gray-500 text-sm">
+                      Created on {new Date(vendor.created_at).toLocaleDateString()}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {/* Contact Information */}
-              {vendor.customer && (
-                <div>
-                  <h2 className="text-lg font-semibold mb-4">Contact Information</h2>
-                  <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-                    <div className="flex items-center">
-                      <User className="w-5 h-5 text-gray-400 mr-3" />
-                      <div>
-                        <div className="font-medium">
-                          {vendor.customer.first_name} {vendor.customer.last_name}
+            {/* Status Bar styled like the second screenshot */}
+            <div className="mb-8 bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+              {accountStatuses.length > 0 && (
+                <div className="relative pt-2">
+                  {/* Progress bar track */}
+                  <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                    {/* Progress bar fill - width based on current status */}
+                    <div
+                      className="absolute top-2 left-0 h-2 bg-blue-500 rounded-full"
+                      style={{
+                        width: `${(getCurrentStatusIndex() + 1) * 100 / accountStatuses.length}%`,
+                        transition: 'width 0.3s ease-in-out'
+                      }}
+                    ></div>
+                  </div>
+
+                  {/* Status indicators with dots */}
+                  <div className="flex justify-between mt-1">
+                    {accountStatuses.map((status, index) => {
+                      // Determine if this status is active (current or passed)
+                      const isActive = index <= getCurrentStatusIndex();
+                      // Position dots evenly
+                      const position = index / (accountStatuses.length - 1) * 100;
+
+                      return (
+                        <div
+                          key={status.id}
+                          className="flex flex-col items-center"
+                          style={{ position: 'absolute', left: `${position}%`, transform: 'translateX(-50%)' }}
+                        >
+                          {/* Status dot */}
+                          <div
+                            className={`w-4 h-4 rounded-full border-2 border-white ${isActive ? 'bg-blue-500' : 'bg-gray-300'}`}
+                            style={{
+                              marginTop: '-10px',
+                              boxShadow: '0 0 0 2px white'
+                            }}
+                          ></div>
+
+                          {/* Status label */}
+                          <button
+                            onClick={() => handleStatusChange(status.value)}
+                            className={`text-sm font-medium mt-2 px-3 py-1 rounded-full transition-colors ${isActive ? 'text-blue-700' : 'text-gray-500 hover:text-gray-700'
+                              }`}
+                          >
+                            {status.label}
+                          </button>
                         </div>
-                        {vendor.customer.company && (
-                          <div className="text-sm text-gray-500">
-                            {vendor.customer.company}
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Tabs Navigation */}
+            <div className="border-b border-gray-200 mb-6">
+              <nav className="-mb-px flex space-x-8">
+                <button
+                  onClick={() => setActiveTab('details')}
+                  className={`py-4 px-1 inline-flex items-center text-sm font-medium border-b-2 ${activeTab === 'details'
+                      ? 'border-primary-500 text-primary-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                >
+                  <FileText className="w-4 h-4 mr-2" />
+                  Details
+                </button>
+                <button
+                  onClick={() => setActiveTab('related')}
+                  className={`py-4 px-1 inline-flex items-center text-sm font-medium border-b-2 ${activeTab === 'related'
+                      ? 'border-primary-500 text-primary-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                >
+                  <Briefcase className="w-4 h-4 mr-2" />
+                  Related
+                </button>
+                <button
+                  onClick={() => setActiveTab('comments')}
+                  className={`py-4 px-1 inline-flex items-center text-sm font-medium border-b-2 ${activeTab === 'comments'
+                      ? 'border-primary-500 text-primary-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                >
+                  <MessageSquare className="w-4 h-4 mr-2" />
+                  Comments
+                </button>
+              </nav>
+            </div>
+
+            {/* Details Tab Content */}
+            {activeTab === 'details' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Left Column */}
+                <div className="space-y-8">
+                  {/* Contact Information */}
+                  {vendor.customer && (
+                    <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                      <h2 className="text-lg font-semibold mb-4 flex items-center">
+                        <User className="w-5 h-5 text-primary-500 mr-2" />
+                        Contact Information
+                      </h2>
+                      <div className="space-y-4">
+                        <div className="flex items-start">
+                          <User className="w-5 h-5 text-gray-400 mr-3 mt-0.5" />
+                          <div>
+                            <div className="font-medium">
+                              {vendor.customer.first_name} {vendor.customer.last_name}
+                            </div>
+                            {vendor.customer.company && (
+                              <div className="text-sm text-gray-500">
+                                {vendor.customer.company}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center">
+                          <Mail className="w-5 h-5 text-gray-400 mr-3" />
+                          <a
+                            href={`mailto:${vendor.customer.email}`}
+                            className="text-primary-600 hover:text-primary-700"
+                          >
+                            {vendor.customer.email}
+                          </a>
+                        </div>
+                        {vendor.customer.phone && (
+                          <div className="flex items-center">
+                            <Phone className="w-5 h-5 text-gray-400 mr-3" />
+                            <a
+                              href={`tel:${vendor.customer.phone}`}
+                              className="text-primary-600 hover:text-primary-700"
+                            >
+                              {vendor.customer.phone}
+                            </a>
                           </div>
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center">
-                      <Mail className="w-5 h-5 text-gray-400 mr-3" />
-                      <a
-                        href={`mailto:${vendor.customer.email}`}
-                        className="text-primary-600 hover:text-primary-700"
-                      >
-                        {vendor.customer.email}
-                      </a>
+                  )}
+
+                  {/* Account Details */}
+                  <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                    <h2 className="text-lg font-semibold mb-4 flex items-center">
+                      <Bookmark className="w-5 h-5 text-primary-500 mr-2" />
+                      Account Details
+                    </h2>
+                    <div className="space-y-4">
+                      {vendor.payment_terms && (
+                        <div>
+                          <div className="text-sm font-medium text-gray-500 mb-1">Payment Terms</div>
+                          <div className="text-gray-700">{vendor.payment_terms}</div>
+                        </div>
+                      )}
+                      {/* Annual Revenue */}
+                      <div>
+                        <div className="text-sm font-medium text-gray-500 mb-1">Annual Revenue</div>
+                        <div className="text-gray-700 flex items-center">
+                          <DollarSign className="w-4 h-4 text-gray-400 mr-1" />
+                          {formatRevenueValue(vendor.annual_revenue)}
+                        </div>
+                      </div>
+                      {/* Website */}
+                      {vendor.website && (
+                        <div>
+                          <div className="text-sm font-medium text-gray-500 mb-1">Website</div>
+                          <div className="text-gray-700 flex items-center">
+                            <Globe className="w-4 h-4 text-gray-400 mr-1" />
+                            <a
+                              href={vendor.website.startsWith('http') ? vendor.website : `https://${vendor.website}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-primary-600 hover:text-primary-700 hover:underline"
+                            >
+                              {vendor.website}
+                            </a>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    {vendor.customer.phone && (
+                  </div>
+
+                  {/* Owner Information */}
+                  {vendor.owner && (
+                    <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                      <h2 className="text-lg font-semibold mb-4 flex items-center">
+                        <User className="w-5 h-5 text-primary-500 mr-2" />
+                        Account Owner
+                      </h2>
                       <div className="flex items-center">
-                        <Phone className="w-5 h-5 text-gray-400 mr-3" />
-                        <a
-                          href={`tel:${vendor.customer.phone}`}
-                          className="text-primary-600 hover:text-primary-700"
+                        <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center mr-3">
+                          <span className="text-primary-700 font-medium">
+                            {vendor.owner.name.charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                        <div className="font-medium">{vendor.owner.name}</div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Right Column */}
+                <div className="space-y-8">
+                  {/* Parent Account */}
+                  {vendor.parent && (
+                    <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                      <h2 className="text-lg font-semibold mb-4 flex items-center">
+                        <Users className="w-5 h-5 text-primary-500 mr-2" />
+                        Parent Account
+                      </h2>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <Building2 className="w-5 h-5 text-gray-400 mr-3" />
+                          <div className="font-medium">{vendor.parent.name}</div>
+                        </div>
+                        <Link
+                          to={`/admin/vendors/${vendor.parent.id}`}
+                          className="text-primary-600 hover:text-primary-700 hover:underline text-sm"
                         >
-                          {vendor.customer.phone}
-                        </a>
+                          View Details
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Addresses Group */}
+                  <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                    <h2 className="text-lg font-semibold mb-4 flex items-center">
+                      <MapPin className="w-5 h-5 text-primary-500 mr-2" />
+                      Addresses
+                    </h2>
+
+                    {/* Shipping Address */}
+                    {(vendor.shipping_address_line1 || vendor.shipping_city || vendor.shipping_state || vendor.shipping_country) && (
+                      <div className="mb-4">
+                        <h3 className="text-md font-medium mb-2 text-gray-700">Shipping Address</h3>
+                        <div className="pl-2 border-l-2 border-primary-100 py-1 space-y-1">
+                          {vendor.shipping_address_line1 && (
+                            <div className="text-gray-600">{vendor.shipping_address_line1}</div>
+                          )}
+                          {vendor.shipping_address_line2 && (
+                            <div className="text-gray-600">{vendor.shipping_address_line2}</div>
+                          )}
+                          <div className="text-gray-600">
+                            {[
+                              vendor.shipping_city,
+                              vendor.shipping_state,
+                              vendor.shipping_country
+                            ].filter(Boolean).join(', ')}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Billing Address */}
+                    {(vendor.billing_address_line1 || vendor.billing_city || vendor.billing_state || vendor.billing_country) && (
+                      <div>
+                        <h3 className="text-md font-medium mb-2 text-gray-700">Billing Address</h3>
+                        <div className="pl-2 border-l-2 border-primary-100 py-1 space-y-1">
+                          {vendor.billing_address_line1 && (
+                            <div className="text-gray-600">{vendor.billing_address_line1}</div>
+                          )}
+                          {vendor.billing_address_line2 && (
+                            <div className="text-gray-600">{vendor.billing_address_line2}</div>
+                          )}
+                          <div className="text-gray-600">
+                            {[
+                              vendor.billing_city,
+                              vendor.billing_state,
+                              vendor.billing_country
+                            ].filter(Boolean).join(', ')}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Payment Information */}
+                  <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                    <h2 className="text-lg font-semibold mb-4 flex items-center">
+                      <CreditCard className="w-5 h-5 text-primary-500 mr-2" />
+                      Payment Information
+                    </h2>
+                    {vendor.payment_terms && (
+                      <div>
+                        <div className="text-sm font-medium text-gray-500 mb-1">Payment Terms</div>
+                        <div className="text-gray-700">{vendor.payment_terms}</div>
                       </div>
                     )}
                   </div>
                 </div>
-              )}
 
-              {/* Account Details */}
-              <div>
-                <h2 className="text-lg font-semibold mb-4">Account Details</h2>
-                <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-                  {vendor.payment_terms && (
-                    <div>
-                      <div className="text-sm font-medium text-gray-500 mb-1">Payment Terms</div>
-                      <div className="text-gray-700">{vendor.payment_terms}</div>
-                    </div>
-                  )}
-                  {/* Annual Revenue - New Field */}
-                  <div>
-                    <div className="text-sm font-medium text-gray-500 mb-1">Annual Revenue</div>
-                    <div className="text-gray-700 flex items-center">
-                      <DollarSign className="w-4 h-4 text-gray-400 mr-1" />
-                      {formatRevenueValue(vendor.annual_revenue)}
-                    </div>
-                  </div>
-                  {/* Website - New Field */}
-                  {vendor.website && (
-                    <div>
-                      <div className="text-sm font-medium text-gray-500 mb-1">Website</div>
-                      <div className="text-gray-700 flex items-center">
-                        <Globe className="w-4 h-4 text-gray-400 mr-1" />
-                        <a
-                          href={vendor.website.startsWith('http') ? vendor.website : `https://${vendor.website}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-primary-600 hover:text-primary-700 hover:underline"
-                        >
-                          {vendor.website}
-                        </a>
-                      </div>
-                    </div>
-                  )}
-                  <div>
-                    <div className="text-sm font-medium text-gray-500 mb-1">Created</div>
-                    <div className="text-gray-700">
-                      {new Date(vendor.created_at).toLocaleDateString()}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Owner Information - New Section */}
-              {vendor.owner && (
-                <div>
-                  <h2 className="text-lg font-semibold mb-4">Account Owner</h2>
-                  <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-                    <div className="flex items-center">
-                      <User className="w-5 h-5 text-gray-400 mr-3" />
-                      <div>
-                        <div className="font-medium">{vendor.owner.name}</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Parent Account - New Section */}
-              {vendor.parent && (
-                <div>
-                  <h2 className="text-lg font-semibold mb-4">Parent Account</h2>
-                  <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <Users className="w-5 h-5 text-gray-400 mr-3" />
-                        <div className="font-medium">{vendor.parent.name}</div>
-                      </div>
-                      <Link
-                        to={`/admin/vendors/${vendor.parent.id}`}
-                        className="text-primary-600 hover:text-primary-700 text-sm"
-                      >
-                        View
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Shipping Address */}
-              {(vendor.shipping_address_line1 || vendor.shipping_city || vendor.shipping_state || vendor.shipping_country) && (
-                <div>
-                  <h2 className="text-lg font-semibold mb-4">Shipping Address</h2>
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <div className="space-y-1">
-                      {vendor.shipping_address_line1 && (
-                        <div>{vendor.shipping_address_line1}</div>
-                      )}
-                      {vendor.shipping_address_line2 && (
-                        <div>{vendor.shipping_address_line2}</div>
-                      )}
-                      <div>
-                        {[
-                          vendor.shipping_city,
-                          vendor.shipping_state,
-                          vendor.shipping_country
-                        ].filter(Boolean).join(', ')}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Billing Address */}
-              {(vendor.billing_address_line1 || vendor.billing_city || vendor.billing_state || vendor.billing_country) && (
-                <div>
-                  <h2 className="text-lg font-semibold mb-4">Billing Address</h2>
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <div className="space-y-1">
-                      {vendor.billing_address_line1 && (
-                        <div>{vendor.billing_address_line1}</div>
-                      )}
-                      {vendor.billing_address_line2 && (
-                        <div>{vendor.billing_address_line2}</div>
-                      )}
-                      <div>
-                        {[
-                          vendor.billing_city,
-                          vendor.billing_state,
-                          vendor.billing_country
-                        ].filter(Boolean).join(', ')}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Notes */}
-              {vendor.notes && (
-                <div className="md:col-span-2">
-                  <h2 className="text-lg font-semibold mb-4">Notes</h2>
-                  <div className="bg-gray-50 rounded-lg p-4">
+                {/* Notes - Full Width */}
+                {vendor.notes && (
+                  <div className="md:col-span-2 bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                    <h2 className="text-lg font-semibold mb-4 flex items-center">
+                      <FileText className="w-5 h-5 text-primary-500 mr-2" />
+                      Notes
+                    </h2>
                     <p className="text-gray-700 whitespace-pre-wrap">{vendor.notes}</p>
                   </div>
+                )}
+
+                {/* Custom Fields - Full Width */}
+                <div className="md:col-span-2 bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                  <h2 className="text-lg font-semibold mb-4 flex items-center">
+                    <Bookmark className="w-5 h-5 text-primary-500 mr-2" />
+                    Custom Fields
+                  </h2>
+                  <CustomFieldsSection
+                    entityType="vendors"
+                    entityId={id}
+                    organizationId={selectedOrganization?.id}
+                  />
                 </div>
-              )}
-
-              {/* Add Custom Fields section */}
-              <div className="md:col-span-2">
-                <CustomFieldsSection
-                  entityType="vendors"
-                  entityId={id}
-                  organizationId={selectedOrganization?.id}
-                  className="bg-gray-50 rounded-lg p-4"
-                />
               </div>
-            </div>
+            )}
 
-            {/* Add Feed Section */}
-            <div className="mt-8">
-              <h2 className="text-lg font-semibold mb-4">Comments</h2>
+            {/* Related Tab Content */}
+            {activeTab === 'related' && (
+              <div className="space-y-8">
+                {/* Tasks */}
+                <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                  <RelatedTasks
+                    recordId={id}
+                    organizationId={selectedOrganization?.id}
+                    refreshKey={refreshRecordsList}
+                    title="Tasks"
+                  />
+                </div>
 
-              <div className="space-y-4">
+                {/* Customers */}
+                <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                  <RelatedCustomers
+                    vendorId={id}
+                    organizationId={selectedOrganization?.id}
+                    refreshKey={refreshRecordsList}
+                    title="Customers"
+                  />
+                </div>
+
+                {/* Quotes */}
+                <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                  <RelatedQuotes
+                    recordId={id}
+                    vendorId={id}
+                    organizationId={selectedOrganization?.id}
+                    refreshKey={refreshRecordsList}
+                  />
+                </div>
+
+                {/* Orders */}
+                <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                  <RelatedOrders
+                    recordId={id}
+                    vendorId={id}
+                    organizationId={selectedOrganization?.id}
+                    refreshKey={refreshRecordsList}
+                  />
+                </div>
+
+                {/* Cases */}
+                <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                  <RelatedCases
+                    recordId={id}
+                    vendorId={id}
+                    organizationId={selectedOrganization?.id}
+                    refreshKey={refreshRecordsList}
+                  />
+                </div>
+
+                {/* Opportunities */}
+                <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                  <RelatedOpportunities
+                    recordId={id}
+                    vendorId={id}
+                    organizationId={selectedOrganization?.id}
+                    refreshKey={refreshRecordsList}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Comments Tab Content */}
+            {activeTab === 'comments' && (
+              <div className="space-y-6">
                 {/* Comment Form */}
-                <form onSubmit={handleSubmitComment} className="space-y-4">
+                <form onSubmit={handleSubmitComment} className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                  <h2 className="text-lg font-semibold mb-4 flex items-center">
+                    <MessageSquare className="w-5 h-5 text-primary-500 mr-2" />
+                    Add Comment
+                  </h2>
+
                   {replyTo && (
-                    <div className="flex items-center justify-between bg-gray-50 p-2 rounded-lg">
+                    <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg mb-4">
                       <span className="text-sm text-gray-600">
                         Replying to {replyTo.profile.name}'s comment
                       </span>
@@ -752,6 +955,7 @@ export function VendorDetailPage() {
                       </button>
                     </div>
                   )}
+
                   <div className="flex items-start space-x-4">
                     <div className="flex-1">
                       <textarea
@@ -759,13 +963,13 @@ export function VendorDetailPage() {
                         onChange={(e) => setNewComment(e.target.value)}
                         placeholder="Add a comment..."
                         rows={3}
-                        className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                        className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
                       />
                     </div>
                     <button
                       type="submit"
                       disabled={!newComment.trim()}
-                      className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                      className="px-5 py-3 bg-primary-600 text-white rounded-xl hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center shadow-sm"
                     >
                       <Send className="w-4 h-4 mr-2" />
                       Send
@@ -773,104 +977,14 @@ export function VendorDetailPage() {
                   </div>
                 </form>
 
-                {/* Feed Items */}
+                {/* Comment List */}
                 <div className="space-y-4">
                   {feeds
                     .filter(feed => !feed.parent_id)
                     .map(feed => renderFeedItem(feed))}
                 </div>
               </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Related Tabs Sidebar */}
-      <div className="lg:w-1/4">
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          {/* Tab Header */}
-          <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-            <h2 className="text-base font-semibold text-gray-800 flex items-center">
-              <svg
-                className="w-4 h-4 text-gray-500 mr-2"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-                />
-              </svg>
-              Related Records
-            </h2>
-          </div>
-
-          {/* Tab Content */}
-          <div className="divide-y divide-gray-200">
-            {/* Tasks */}
-            <div className="p-4">
-              <RelatedTasks
-                recordId={id}
-                organizationId={selectedOrganization?.id}
-                refreshKey={refreshRecordsList}
-                title="Tasks"
-              />
-            </div>
-
-            {/* Customers */}
-            <div className="p-4">
-              <RelatedCustomers
-                vendorId={id}
-                organizationId={selectedOrganization?.id}
-                refreshKey={refreshRecordsList}
-                title="Customers"
-              />
-            </div>
-
-            {/* Quotes Section */}
-            <div className="p-4">
-              <RelatedQuotes
-                recordId={id}
-                vendorId={id}
-                organizationId={selectedOrganization?.id}
-                refreshKey={refreshRecordsList}
-              />
-            </div>
-
-            {/* Orders Section */}
-            <div className="p-4">
-              <RelatedOrders
-                recordId={id}
-                vendorId={id}
-                organizationId={selectedOrganization?.id}
-                refreshKey={refreshRecordsList}
-              />
-            </div>
-
-            
-
-            {/* Cases Section */}
-            <div className="p-4">
-              <RelatedCases
-                recordId={id}
-                vendorId={id}
-                organizationId={selectedOrganization?.id}
-                refreshKey={refreshRecordsList}
-              />
-            </div>
-
-            {/* Opportunities Section */}
-            <div className="p-4">
-              <RelatedOpportunities
-                recordId={id}
-                vendorId={id}
-                organizationId={selectedOrganization?.id}
-                refreshKey={refreshRecordsList}
-              />
-            </div>
+            )}
           </div>
         </div>
       </div>

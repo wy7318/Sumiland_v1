@@ -3,8 +3,10 @@ import { useNavigate, useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft, Building2, Mail, Phone, Calendar,
-  Edit, AlertCircle, FileText, Download, Clock, Calendar as CalendarIcon,
-  CheckCircle, X, Send, Reply, User, AlertTriangle, CheckSquare
+  Edit, AlertCircle, FileText, Download, Clock,
+  CheckCircle, X, Send, Reply, User, AlertTriangle, CheckSquare,
+  Briefcase, MessageSquare, UserCheck, MapPin, Bookmark,
+  Users, Calendar as CalendarIcon
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { cn } from '../../lib/utils';
@@ -120,6 +122,9 @@ export function CaseDetailPage() {
   const [refreshEmailList, setRefreshEmailList] = useState(0);
   const [orgTimezone, setOrgTimezone] = useState('UTC'); // Default timezone
   const [showAccountModal, setShowAccountModal] = useState(false);
+
+  // New state for tabs
+  const [activeTab, setActiveTab] = useState('details');
 
   // Fetch organization timezone
   useEffect(() => {
@@ -463,7 +468,7 @@ export function CaseDetailPage() {
   };
 
   const handleEmailClick = async () => {
-    if (!user) return;
+    if (!user || !caseData?.contact) return;
 
     try {
       const config = await getEmailConfig(user.id);
@@ -488,22 +493,6 @@ export function CaseDetailPage() {
       setError(err instanceof Error ? err.message : 'Failed to check email configuration');
     }
   };
-
-  // const handleEmailClick = async () => {
-  //   if (!user) return;
-
-  //   try {
-  //     const config = await getEmailConfig(user.id);
-  //     if (!config) {
-  //       setShowEmailConfigModal(true);
-  //     } else {
-  //       setShowEmailModal(true);
-  //     }
-  //   } catch (err) {
-  //     console.error('Error checking email config:', err);
-  //     setError(err instanceof Error ? err.message : 'Failed to check email configuration');
-  //   }
-  // };
 
   // Get style for status badge
   const getStatusStyle = (status: string) => {
@@ -543,6 +532,14 @@ export function CaseDetailPage() {
       backgroundColor: originValue.color,
       color: originValue.text_color || '#FFFFFF'
     };
+  };
+
+  // Get current status index for the progress bar
+  const getCurrentStatusIndex = () => {
+    if (!caseData || !caseStatuses.length) return -1;
+    return caseStatuses.findIndex(status =>
+      status.value.toLowerCase() === caseData.status.toLowerCase()
+    );
   };
 
   const renderFeedItem = (feed: Feed, isReply = false) => {
@@ -618,7 +615,7 @@ export function CaseDetailPage() {
               </button>
               <button
                 onClick={() => handleUpdateComment(feed.id, editingFeed.content)}
-                className="px-4 py-2 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700"
+                className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700"
               >
                 Save
               </button>
@@ -666,69 +663,64 @@ export function CaseDetailPage() {
   }
 
   return (
-    <div className="flex flex-col lg:flex-row gap-4">
-      <div className="lg:w-3/4 space-y-6">
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <button
-              onClick={() => navigate('/admin/cases')}
-              className="inline-flex items-center text-gray-600 hover:text-gray-900"
-            >
-              <ArrowLeft className="w-5 h-5 mr-2" />
-              Back to Cases
-            </button>
-            <div className="flex space-x-3">
-              <Link
-                to={`/admin/cases/${id}/edit`}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
-              >
-                <Edit className="w-4 h-4 mr-2" />
-                Edit Case
-              </Link>
-              <Link
-                to={`/admin/tasks/new?module=cases&recordId=${id}`}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700"
-              >
-                <Calendar className="w-4 h-4 mr-2" />
-                Add Task
-              </Link>
-            </div>
-          </div>
+    <div className="px-4 py-6 max-w-7xl mx-auto">
+      {/* Header Section */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <button
+            onClick={() => navigate('/admin/cases')}
+            className="inline-flex items-center text-gray-600 hover:text-gray-900 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            <span>Back to Cases</span>
+          </button>
 
-          <div className="bg-white shadow rounded-lg overflow-hidden">
-            <div className="p-6">
-              <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
+          {/* Right buttons group */}
+          <div className="flex space-x-3">
+            <Link
+              to={`/admin/tasks/new?module=cases&recordId=${id}`}
+              className="inline-flex items-center px-5 py-2.5 text-sm font-medium rounded-full text-white bg-green-600 hover:bg-green-700 transition-colors shadow-sm"
+            >
+              <Calendar className="w-4 h-4 mr-2" />
+              Add Task
+            </Link>
+            <Link
+              to={`/admin/cases/${id}/edit`}
+              className="inline-flex items-center px-5 py-2.5 text-sm font-medium rounded-full text-white bg-primary-600 hover:bg-primary-700 transition-colors shadow-sm"
+            >
+              <Edit className="w-4 h-4 mr-2" />
+              Edit Case
+            </Link>
+          </div>
+        </div>
+
+        {/* Card Header with Title and Status */}
+        <div className="bg-white rounded-2xl shadow-sm overflow-hidden mb-6">
+          <div className="p-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
+              <div className="flex items-center space-x-3">
+                <div className="bg-primary-100 rounded-full p-2.5">
+                  <FileText className="w-6 h-6 text-primary-600" />
+                </div>
                 <div>
-                  <h1 className="text-2xl font-bold mb-2">{caseData.title}</h1>
-                  <div className="flex flex-wrap items-center gap-2 md:gap-4">
+                  <h1 className="text-2xl font-bold text-gray-900">{caseData.title}</h1>
+                  <div className="flex flex-wrap items-center mt-1.5 space-x-2">
                     <span
-                      className="px-2 py-1 text-xs font-medium rounded-full"
+                      className="px-3 py-1 text-xs font-medium rounded-full"
                       style={getTypeStyle(caseData.type)}
                     >
                       {caseTypes.find(t => t.value === caseData.type)?.label || caseData.type}
                       {caseData.sub_type && (
-                        <span className="ml-1 text-xs">
+                        <span className="ml-1">
                           / {caseData.sub_type.replace(/_/g, ' ')}
                         </span>
                       )}
                     </span>
-                    <select
-                      value={caseData.status}
-                      onChange={(e) => handleStatusChange(e.target.value)}
-                      className="text-sm font-medium rounded-full px-3 py-1"
-                      style={getStatusStyle(caseData.status)}
-                    >
-                      {caseStatuses.map(status => (
-                        <option key={status.id} value={status.value}>
-                          {status.label}
-                        </option>
-                      ))}
-                    </select>
 
-                    {/* Added Priority Badge */}
+                    {/* Priority Badge */}
                     {caseData.priority && (
                       <span
-                        className="px-2 py-1 text-xs font-medium rounded-full flex items-center"
+                        className="px-3 py-1 text-xs font-medium rounded-full flex items-center"
                         style={getPriorityStyle(caseData.priority)}
                       >
                         <AlertTriangle className="w-3 h-3 mr-1" />
@@ -736,28 +728,129 @@ export function CaseDetailPage() {
                       </span>
                     )}
 
-                    {/* Added Origin Badge */}
+                    {/* Origin Badge */}
                     {caseData.origin && (
                       <span
-                        className="px-2 py-1 text-xs font-medium rounded-full"
+                        className="px-3 py-1 text-xs font-medium rounded-full"
                         style={getOriginStyle(caseData.origin)}
                       >
                         {caseOrigins.find(o => o.value === caseData.origin)?.label || caseData.origin}
                       </span>
                     )}
+
+                    <span className="text-gray-500 text-sm">
+                      Created on {formatDateTime(caseData.created_at)}
+                    </span>
                   </div>
                 </div>
               </div>
+            </div>
 
+            {/* Status Bar */}
+            <div className="mb-8 bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+              {caseStatuses.length > 0 && (
+                <div className="relative pt-2">
+                  {/* Progress bar track */}
+                  <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                    {/* Progress bar fill - width based on current status */}
+                    <div
+                      className="absolute top-2 left-0 h-2 bg-blue-500 rounded-full"
+                      style={{
+                        width: `${(getCurrentStatusIndex() + 1) * 100 / caseStatuses.length}%`,
+                        transition: 'width 0.3s ease-in-out'
+                      }}
+                    ></div>
+                  </div>
+
+                  {/* Status indicators with dots */}
+                  <div className="flex justify-between mt-1">
+                    {caseStatuses.map((status, index) => {
+                      // Determine if this status is active (current or passed)
+                      const isActive = index <= getCurrentStatusIndex();
+                      // Position dots evenly
+                      const position = index / (caseStatuses.length - 1) * 100;
+
+                      return (
+                        <div
+                          key={status.id}
+                          className="flex flex-col items-center"
+                          style={{ position: 'absolute', left: `${position}%`, transform: 'translateX(-50%)' }}
+                        >
+                          {/* Status dot */}
+                          <div
+                            className={`w-4 h-4 rounded-full border-2 border-white ${isActive ? 'bg-blue-500' : 'bg-gray-300'}`}
+                            style={{
+                              marginTop: '-10px',
+                              boxShadow: '0 0 0 2px white'
+                            }}
+                          ></div>
+
+                          {/* Status label */}
+                          <button
+                            onClick={() => handleStatusChange(status.value)}
+                            className={`text-sm font-medium mt-2 px-3 py-1 rounded-full transition-colors ${isActive ? 'text-blue-700' : 'text-gray-500 hover:text-gray-700'
+                              }`}
+                          >
+                            {status.label}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Tabs Navigation */}
+            <div className="border-b border-gray-200 mb-6">
+              <nav className="-mb-px flex space-x-8">
+                <button
+                  onClick={() => setActiveTab('details')}
+                  className={`py-4 px-1 inline-flex items-center text-sm font-medium border-b-2 ${activeTab === 'details'
+                      ? 'border-primary-500 text-primary-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                >
+                  <FileText className="w-4 h-4 mr-2" />
+                  Details
+                </button>
+                <button
+                  onClick={() => setActiveTab('related')}
+                  className={`py-4 px-1 inline-flex items-center text-sm font-medium border-b-2 ${activeTab === 'related'
+                      ? 'border-primary-500 text-primary-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                >
+                  <Briefcase className="w-4 h-4 mr-2" />
+                  Related
+                </button>
+                <button
+                  onClick={() => setActiveTab('comments')}
+                  className={`py-4 px-1 inline-flex items-center text-sm font-medium border-b-2 ${activeTab === 'comments'
+                      ? 'border-primary-500 text-primary-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                >
+                  <MessageSquare className="w-4 h-4 mr-2" />
+                  Comments
+                </button>
+              </nav>
+            </div>
+
+            {/* Details Tab Content */}
+            {activeTab === 'details' && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {/* Contact Information */}
-                <div>
-                  <h2 className="text-lg font-semibold mb-4">Contact Information</h2>
-                  <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-                    {caseData.contact ? (
-                      <>
+                {/* Left Column */}
+                <div className="space-y-8">
+                  {/* Contact Information */}
+                  {caseData.contact && (
+                    <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                      <h2 className="text-lg font-semibold mb-4 flex items-center">
+                        <User className="w-5 h-5 text-primary-500 mr-2" />
+                        Contact Information
+                      </h2>
+                      <div className="space-y-4">
                         <div className="flex items-center">
-                          <User className="w-5 h-5 text-gray-400 mr-3" />
                           <div>
                             <div className="font-medium">
                               {caseData.contact.first_name} {caseData.contact.last_name}
@@ -769,24 +862,25 @@ export function CaseDetailPage() {
                             )}
                           </div>
                         </div>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center">
-                            <Mail className="w-5 h-5 text-gray-400 mr-3" />
-                            <a
-                              href={`mailto:${caseData.contact.email}`}
-                              className="text-primary-600 hover:text-primary-700"
-                            >
-                              {caseData.contact.email}
-                            </a>
-                          </div>
-                          <button
-                            onClick={handleEmailClick}
-                            className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
+
+                        <div className="flex items-center">
+                          <Mail className="w-5 h-5 text-gray-400 mr-3" />
+                          <a
+                            href={`mailto:${caseData.contact.email}`}
+                            className="text-primary-600 hover:text-primary-700"
                           >
-                            <Send className="w-4 h-4 mr-2" />
-                            Send Email
-                          </button>
+                            {caseData.contact.email}
+                          </a>
                         </div>
+
+                        <button
+                          onClick={handleEmailClick}
+                          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-full text-white bg-primary-600 hover:bg-primary-700 transition-colors shadow-sm"
+                        >
+                          <Send className="w-4 h-4 mr-2" />
+                          Send Email
+                        </button>
+
                         {caseData.contact.phone && (
                           <div className="flex items-center">
                             <Phone className="w-5 h-5 text-gray-400 mr-3" />
@@ -798,318 +892,360 @@ export function CaseDetailPage() {
                             </a>
                           </div>
                         )}
-                        {/* Vendor Information - ADD HERE */}
-                        {caseData.vendor && (
-                          <div className="mt-4 pt-4 border-t border-gray-200">
-                            <div className="font-medium mb-2">Vendor Information</div>
-                            <div className="flex items-center">
-                              <Building2 className="w-5 h-5 text-gray-400 mr-3" />
-                              <div className="font-medium">{caseData.vendor.name}</div>
-                            </div>
-                            <button
-                              onClick={() => setShowAccountModal(true)}
-                              className="text-primary-600 hover:text-primary-700 text-sm"
-                            >
-                              View Details
-                            </button>
-
-                          </div>
-                          
-                        )}
-                      </>
-                    ) : (
-                      <div className="text-sm text-gray-400">No contact information available</div>
-                    )}
-
-                    
-                  </div>
-
-                  
-                </div>
-
-                
-
-                {/* Assignment */}
-                <div>
-                  <h2 className="text-lg font-semibold mb-4">Assignment</h2>
-                  <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-                    <UserSearch
-                      organizationId={selectedOrganization?.id}
-                      selectedUserId={caseData.owner_id}
-                      onSelect={handleAssign}
-                    />
-
-                    {/* Escalation Information */}
-                    {caseData.escalated_at && (
-                      <div className="pt-3 mt-3 border-t border-gray-200">
-                        <div className="text-sm font-medium text-gray-500 mb-1 flex items-center">
-                          <AlertTriangle className="w-4 h-4 text-amber-500 mr-1" />
-                          Escalated
-                        </div>
-                        <div className="text-gray-700 flex items-center">
-                          <Clock className="w-4 h-4 text-gray-400 mr-1" />
-                          {formatDateTime(caseData.escalated_at)}
-                          {caseData.escalated_by_user ? (
-                            <span className="ml-2 text-sm text-gray-500 flex items-center">
-                              <User className="w-3 h-3 mr-1" />
-                              by {caseData.escalated_by_user.name}
-                            </span>
-                          ) : caseData.escalated_by && (
-                            <span className="ml-2 text-sm text-gray-500 flex items-center">
-                              <User className="w-3 h-3 mr-1" />
-                              by user ID: {caseData.escalated_by.substring(0, 8)}...
-                            </span>
-                          )}
-                        </div>
                       </div>
-                    )}
-
-                    {/* Closed Information */}
-                    {caseData.closed_at && (
-                      <div className="pt-3 mt-3 border-t border-gray-200">
-                        <div className="text-sm font-medium text-gray-500 mb-1 flex items-center">
-                          <CheckSquare className="w-4 h-4 text-green-500 mr-1" />
-                          Closed
-                        </div>
-                        <div className="text-gray-700 flex items-center">
-                          <Clock className="w-4 h-4 text-gray-400 mr-1" />
-                          {formatDateTime(caseData.closed_at)}
-                          {caseData.closed_by_user ? (
-                            <span className="ml-2 text-sm text-gray-500 flex items-center">
-                              <User className="w-3 h-3 mr-1" />
-                              by {caseData.closed_by_user.name}
-                            </span>
-                          ) : caseData.closed_by && (
-                            <span className="ml-2 text-sm text-gray-500 flex items-center">
-                              <User className="w-3 h-3 mr-1" />
-                              by user ID: {caseData.closed_by.substring(0, 8)}...
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Case Details */}
-                <div className="md:col-span-2">
-                  <h2 className="text-lg font-semibold mb-4">Case Details</h2>
-                  <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-                    <div>
-                      <div className="text-sm font-medium text-gray-500 mb-1">Description</div>
-                      <p className="text-gray-700 whitespace-pre-wrap">{caseData.description}</p>
                     </div>
+                  )}
 
-                    {/* Files Section */}
-                    <div className="flex flex-wrap gap-4">
-                      {caseData.resume_url && (
+                  {/* Vendor Information */}
+                  {caseData.vendor && (
+                    <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                      <h2 className="text-lg font-semibold mb-4 flex items-center">
+                        <Building2 className="w-5 h-5 text-primary-500 mr-2" />
+                        Vendor Information
+                      </h2>
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center">
+                            <Building2 className="w-5 h-5 text-gray-400 mr-3" />
+                            <div className="font-medium">{caseData.vendor.name}</div>
+                          </div>
+                          <button
+                            onClick={() => setShowAccountModal(true)}
+                            className="text-primary-600 hover:text-primary-700 hover:underline text-sm"
+                          >
+                            View Details
+                          </button>
+                        </div>
+
+                        {caseData.vendor.email && (
+                          <div className="flex items-center">
+                            <Mail className="w-5 h-5 text-gray-400 mr-3" />
+                            <a
+                              href={`mailto:${caseData.vendor.email}`}
+                              className="text-primary-600 hover:text-primary-700"
+                            >
+                              {caseData.vendor.email}
+                            </a>
+                          </div>
+                        )}
+
+                        {caseData.vendor.phone && (
+                          <div className="flex items-center">
+                            <Phone className="w-5 h-5 text-gray-400 mr-3" />
+                            <a
+                              href={`tel:${caseData.vendor.phone}`}
+                              className="text-primary-600 hover:text-primary-700"
+                            >
+                              {caseData.vendor.phone}
+                            </a>
+                          </div>
+                        )}
+
+                        {caseData.vendor.contact_person && (
+                          <div className="flex items-center">
+                            <User className="w-5 h-5 text-gray-400 mr-3" />
+                            <div className="text-gray-700">
+                              {caseData.vendor.contact_person}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Timestamps Section */}
+                  <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                    <h2 className="text-lg font-semibold mb-4 flex items-center">
+                      <Clock className="w-5 h-5 text-primary-500 mr-2" />
+                      Timeline
+                    </h2>
+                    <div className="space-y-4">
+                      <div className="flex items-center">
+                        <CalendarIcon className="w-5 h-5 text-gray-400 mr-3" />
                         <div>
-                          <div className="text-sm font-medium text-gray-500 mb-1">Resume</div>
+                          <div className="text-sm text-gray-500">Created on</div>
+                          <div className="font-medium">{formatDateTime(caseData.created_at)}</div>
+                        </div>
+                      </div>
+
+                      {/* Escalation Information */}
+                      {caseData.escalated_at && (
+                        <div className="flex items-center">
+                          <AlertTriangle className="w-5 h-5 text-amber-500 mr-3" />
+                          <div>
+                            <div className="text-sm text-gray-500">Escalated on</div>
+                            <div className="font-medium">
+                              {formatDateTime(caseData.escalated_at)}
+                              {caseData.escalated_by_user && (
+                                <span className="ml-2 text-sm text-gray-500">
+                                  by {caseData.escalated_by_user.name}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Closed Information */}
+                      {caseData.closed_at && (
+                        <div className="flex items-center">
+                          <CheckSquare className="w-5 h-5 text-green-500 mr-3" />
+                          <div>
+                            <div className="text-sm text-gray-500">Closed on</div>
+                            <div className="font-medium">
+                              {formatDateTime(caseData.closed_at)}
+                              {caseData.closed_by_user && (
+                                <span className="ml-2 text-sm text-gray-500">
+                                  by {caseData.closed_by_user.name}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Column */}
+                <div className="space-y-8">
+                  {/* Assignment */}
+                  <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                    <h2 className="text-lg font-semibold mb-4 flex items-center">
+                      <UserCheck className="w-5 h-5 text-primary-500 mr-2" />
+                      Case Assignment
+                    </h2>
+                    <div className="space-y-4">
+                      <UserSearch
+                        organizationId={selectedOrganization?.id}
+                        selectedUserId={caseData.owner_id}
+                        onSelect={handleAssign}
+                      />
+
+                      {caseData.owner && (
+                        <div className="flex items-center mt-4">
+                          <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center mr-3">
+                            <span className="text-primary-700 font-medium">
+                              {caseData.owner.name.charAt(0).toUpperCase()}
+                            </span>
+                          </div>
+                          <div className="text-gray-700">
+                            Currently assigned to <span className="font-medium">{caseData.owner.name}</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Files Section */}
+                  <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                    <h2 className="text-lg font-semibold mb-4 flex items-center">
+                      <FileText className="w-5 h-5 text-primary-500 mr-2" />
+                      Attachments
+                    </h2>
+                    <div className="space-y-4">
+                      {caseData.resume_url && (
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center">
+                            <FileText className="w-5 h-5 text-gray-400 mr-3" />
+                            <div className="text-gray-700">Resume</div>
+                          </div>
                           <a
                             href={caseData.resume_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                            className="inline-flex items-center px-4 py-2 text-sm font-medium rounded-full text-primary-600 border border-primary-200 hover:bg-primary-50 transition-colors"
                           >
-                            <FileText className="w-4 h-4 mr-2" />
-                            View Resume
-                            <Download className="w-4 h-4 ml-2" />
+                            <Download className="w-4 h-4 mr-2" />
+                            Download
                           </a>
                         </div>
                       )}
                       {caseData.attachment_url && (
-                        <div>
-                          <div className="text-sm font-medium text-gray-500 mb-1">Attachment</div>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center">
+                            <FileText className="w-5 h-5 text-gray-400 mr-3" />
+                            <div className="text-gray-700">Attachment</div>
+                          </div>
                           <a
                             href={caseData.attachment_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                            className="inline-flex items-center px-4 py-2 text-sm font-medium rounded-full text-primary-600 border border-primary-200 hover:bg-primary-50 transition-colors"
                           >
-                            <FileText className="w-4 h-4 mr-2" />
-                            View Attachment
-                            <Download className="w-4 h-4 ml-2" />
+                            <Download className="w-4 h-4 mr-2" />
+                            Download
                           </a>
                         </div>
+                      )}
+                      {!caseData.resume_url && !caseData.attachment_url && (
+                        <div className="text-gray-500 italic text-sm">No attachments available</div>
                       )}
                     </div>
                   </div>
                 </div>
 
-                {/* Add Custom Fields section */}
-                <div className="md:col-span-2">
+                {/* Case Description - Full Width */}
+                <div className="md:col-span-2 bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                  <h2 className="text-lg font-semibold mb-4 flex items-center">
+                    <FileText className="w-5 h-5 text-primary-500 mr-2" />
+                    Case Description
+                  </h2>
+                  <div className="text-gray-700 whitespace-pre-wrap">
+                    {caseData.description || "No description provided."}
+                  </div>
+                </div>
+
+                {/* Custom Fields - Full Width */}
+                <div className="md:col-span-2 bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                  <h2 className="text-lg font-semibold mb-4 flex items-center">
+                    <Bookmark className="w-5 h-5 text-primary-500 mr-2" />
+                    Custom Fields
+                  </h2>
                   <CustomFieldsSection
                     entityType="cases"
                     entityId={id}
                     organizationId={selectedOrganization?.id}
-                    className="bg-gray-50 rounded-lg p-4"
                   />
                 </div>
               </div>
+            )}
 
-              {/* Add Feed Section */}
-              <div className="mt-8">
-                <h2 className="text-lg font-semibold mb-4">Comments</h2>
+            {/* Related Tab Content */}
+            {activeTab === 'related' && (
+              <div className="space-y-8">
+                {/* Email Communications */}
+                <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                  <RelatedEmails
+                    recordId={caseData.id}
+                    organizationId={caseData.organization_id}
+                    refreshKey={refreshEmailList}
+                    title="Email Communications"
+                  />
+                </div>
 
-                <div className="space-y-4">
-                  {/* Comment Form */}
-                  <form onSubmit={handleSubmitComment} className="space-y-4">
-                    {replyTo && (
-                      <div className="flex items-center justify-between bg-gray-50 p-2 rounded-lg">
-                        <span className="text-sm text-gray-600">
-                          Replying to {replyTo.profile.name}'s comment
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setReplyTo(null)}
-                          className="p-1 hover:bg-gray-200 rounded-full"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                    )}
-                    <div className="flex items-start space-x-4">
-                      <div className="flex-1">
-                        <textarea
-                          value={newComment}
-                          onChange={(e) => setNewComment(e.target.value)}
-                          placeholder="Add a comment..."
-                          rows={3}
-                          className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-                        />
-                      </div>
-                      <button
-                        type="submit"
-                        disabled={!newComment.trim()}
-                        className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
-                      >
-                        <Send className="w-4 h-4 mr-2" />
-                        Send
-                      </button>
-                    </div>
-                  </form>
+                {/* Tasks */}
+                <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                  <RelatedTasks
+                    recordId={caseData.id}
+                    organizationId={caseData.organization_id}
+                    refreshKey={refreshEmailList}
+                    title="Tasks"
+                  />
+                </div>
 
-                  {/* Feed Items */}
-                  <div className="space-y-4">
-                    {feeds
-                      .filter(feed => !feed.parent_id)
-                      .map(feed => renderFeedItem(feed))}
+                {/* Additional related records */}
+                <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                  <h2 className="text-lg font-semibold mb-4 flex items-center">
+                    <Briefcase className="w-5 h-5 text-primary-500 mr-2" />
+                    Other Related Records
+                  </h2>
+                  <div className="text-sm text-gray-500 italic py-2">
+                    More related records would appear here
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
+            )}
 
-          {/* Email Modals */}
-          {/* {showEmailConfigModal && (
-            <EmailConfigModal
-              onClose={() => setShowEmailConfigModal(false)}
-              onSuccess={() => {
-                setShowEmailConfigModal(false);
-                setShowEmailModal(true);
-              }}
-            />
-          )} */}
+            {/* Comments Tab Content */}
+            {activeTab === 'comments' && (
+              <div className="space-y-6">
+                {/* Comment Form */}
+                <form onSubmit={handleSubmitComment} className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                  <h2 className="text-lg font-semibold mb-4 flex items-center">
+                    <MessageSquare className="w-5 h-5 text-primary-500 mr-2" />
+                    Add Comment
+                  </h2>
 
-          {showEmailConfigModal && (
-            <EmailConfigModal
-              onClose={() => setShowEmailConfigModal(false)}
-              onSuccess={() => {
-                setShowEmailConfigModal(false);
-                // After config is set up, open the email composer
-                openEmailComposer({
-                  to: caseData.contact.email,
-                  caseTitle: caseData.title,
-                  orgId: selectedOrganization?.id,
-                  caseId: id,
-                  onSuccess: () => {
-                    setRefreshEmailList(prev => prev + 1);
-                  }
-                });
-              }}
-            />
-          )}
+                  {replyTo && (
+                    <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg mb-4">
+                      <span className="text-sm text-gray-600">
+                        Replying to {replyTo.profile.name}'s comment
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setReplyTo(null)}
+                        className="p-1 hover:bg-gray-200 rounded-full"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
 
-          {showEmailModal && caseData.contact && (
-            <EmailModal
-              to={caseData.contact.email}
-              caseTitle={caseData.title}
-              orgId={selectedOrganization?.id}
-              caseId={id}
-              onClose={() => setShowEmailModal(false)}
-              onSuccess={() => {
-                setShowEmailModal(false);
-                setRefreshEmailList(prev => prev + 1); // 🔁 refresh RelatedEmails
-              }}
-            />
-          )}
+                  <div className="flex items-start space-x-4">
+                    <div className="flex-1">
+                      <textarea
+                        value={newComment}
+                        onChange={(e) => setNewComment(e.target.value)}
+                        placeholder="Add a comment..."
+                        rows={3}
+                        className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={!newComment.trim()}
+                      className="px-5 py-3 bg-primary-600 text-white rounded-xl hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center shadow-sm"
+                    >
+                      <Send className="w-4 h-4 mr-2" />
+                      Send
+                    </button>
+                  </div>
+                </form>
 
-          {showAccountModal && caseData.vendor && (
-            <AccountDetailsModal
-              vendor={caseData.vendor}
-              onClose={() => setShowAccountModal(false)}
-            />
-          )}
-        </div>
-      </div>
-
-      {/* Related Tabs */}
-      <div className="lg:w-1/4">
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          {/* Tab Header */}
-          <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-            <h2 className="text-base font-semibold text-gray-800 flex items-center">
-              <svg
-                className="w-4 h-4 text-gray-500 mr-2"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-                />
-              </svg>
-              Related Records
-            </h2>
-          </div>
-
-          {/* Tab Content */}
-          <div className="divide-y divide-gray-200">
-            <div className="p-4">
-              <RelatedEmails
-                recordId={caseData.id}
-                organizationId={caseData.organization_id}
-                refreshKey={refreshEmailList}
-                title="Email Communications"
-              />
-            </div>
-            <div className="p-4">
-              <RelatedTasks
-                recordId={caseData.id}
-                organizationId={caseData.organization_id}
-                refreshKey={refreshEmailList}
-                title="Tasks"
-              />
-            </div>
-
-            {/* You can add more related components here with the same styling */}
-            {/* Example placeholder for another related component */}
-            <div className="p-4">
-              <div className="text-sm text-gray-500 italic">More related records would appear here</div>
-            </div>
-          </div>
-
-          {/* Optional footer */}
-          <div className="bg-gray-50 px-4 py-2 border-t border-gray-200 text-right">
-            <button className="text-xs text-blue-600 hover:text-blue-800 font-medium">
-              View All Related Records
-            </button>
+                {/* Comment List */}
+                <div className="space-y-4">
+                  {feeds
+                    .filter(feed => !feed.parent_id)
+                    .map(feed => renderFeedItem(feed))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Email Modals */}
+      {showEmailConfigModal && (
+        <EmailConfigModal
+          onClose={() => setShowEmailConfigModal(false)}
+          onSuccess={() => {
+            setShowEmailConfigModal(false);
+            // After config is set up, open the email composer
+            openEmailComposer({
+              to: caseData.contact?.email,
+              caseTitle: caseData.title,
+              orgId: selectedOrganization?.id,
+              caseId: id,
+              onSuccess: () => {
+                setRefreshEmailList(prev => prev + 1);
+              }
+            });
+          }}
+        />
+      )}
+
+      {showEmailModal && caseData.contact && (
+        <EmailModal
+          to={caseData.contact.email}
+          caseTitle={caseData.title}
+          orgId={selectedOrganization?.id}
+          caseId={id}
+          onClose={() => setShowEmailModal(false)}
+          onSuccess={() => {
+            setShowEmailModal(false);
+            setRefreshEmailList(prev => prev + 1);
+          }}
+        />
+      )}
+
+      {/* Account Details Modal */}
+      {showAccountModal && caseData.vendor && (
+        <AccountDetailsModal
+          vendor={caseData.vendor}
+          onClose={() => setShowAccountModal(false)}
+        />
+      )}
     </div>
   );
 }

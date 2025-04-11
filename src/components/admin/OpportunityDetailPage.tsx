@@ -3,15 +3,22 @@ import { useNavigate, useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft, Building2, Mail, Phone, Calendar,
-  Edit, AlertCircle, Send, Reply, X, User,
-  DollarSign, Percent, Package, FileText, ShoppingBag, LinkIcon
+  Edit, AlertCircle, FileText, DollarSign, User,
+  ChevronDown, ChevronUp, Send, Reply, X,
+  UserCheck, Clock, Target, Globe, LinkIcon,
+  Briefcase, MessageSquare, Bookmark, Tag,
+  Flag, Star, Percent, MapPin, FileBarChart2
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { cn, formatCurrency } from '../../lib/utils';
 import { CustomFieldsSection } from './CustomFieldsSection';
-import { AccountDetailsModal } from './AccountDetailsModal';
 import { useAuth } from '../../contexts/AuthContext';
 import { useOrganization } from '../../contexts/OrganizationContext';
+import { RelatedTasks } from './RelatedTasks';
+import { RelatedQuotes } from './RelatedQuotes';
+import { RelatedOrders } from './RelatedOrders';
+import { RelatedEmails } from './RelatedEmails';
+import { AccountDetailsModal } from './AccountDetailsModal';
 import { DateTime } from 'luxon';
 
 type Opportunity = {
@@ -24,9 +31,6 @@ type Opportunity = {
   amount: number;
   probability: number;
   expected_close_date: string | null;
-  close_date: string | null; // New field
-  competitor: string | null; // New field
-  parent_id: string | null; // New field
   lead_source: string | null;
   lead_id: string | null;
   type: string | null;
@@ -34,12 +38,14 @@ type Opportunity = {
   status: string;
   created_at: string;
   organization_id: string;
-  opportunity_number: string; // Added this from the render code
+  parent_id: string | null; // Added parent_id field
   account: {
+    id: string;
     name: string;
     type: string;
   } | null;
   contact: {
+    customer_id: string;
     first_name: string;
     last_name: string;
     email: string;
@@ -47,26 +53,15 @@ type Opportunity = {
     company: string | null;
   } | null;
   owner: {
+    id: string;
     name: string;
   } | null;
-  parent: { // New field for parent opportunity data
+  parent: { // Added parent opportunity data
     id: string;
     name: string;
     stage: string;
     status: string;
   } | null;
-  products: {
-    id: string;
-    product_id: string;
-    quantity: number;
-    unit_price: number;
-    subtotal: number;
-    status: string;
-    product: {
-      name: string;
-      description: string | null;
-    };
-  }[];
 };
 
 type Feed = {
@@ -98,22 +93,26 @@ type PicklistValue = {
 export function OpportunityDetailPage() {
   const navigate = useNavigate();
   const { id } = useParams();
-  const [opportunity, setOpportunity] = useState<Opportunity | null>(null);
-  const [loading, setLoading] = useState(true);
   const { organizations, user } = useAuth();
   const { selectedOrganization } = useOrganization();
+  const [opportunity, setOpportunity] = useState<Opportunity | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [feeds, setFeeds] = useState<Feed[]>([]);
   const [newComment, setNewComment] = useState('');
   const [replyTo, setReplyTo] = useState<Feed | null>(null);
   const [editingFeed, setEditingFeed] = useState<Feed | null>(null);
-  const [showAccountModal, setShowAccountModal] = useState(false);
   const [opportunityStages, setOpportunityStages] = useState<PicklistValue[]>([]);
   const [opportunityTypes, setOpportunityTypes] = useState<PicklistValue[]>([]);
-  const [productStatuses, setProductStatuses] = useState<PicklistValue[]>([]);
+  const [leadSources, setLeadSources] = useState<PicklistValue[]>([]);
+  const [refreshRecordsList, setRefreshRecordsList] = useState(0);
+  const [showAccountModal, setShowAccountModal] = useState(false);
   const [orgTimezone, setOrgTimezone] = useState('UTC');
 
-  // Add this effect to fetch the organization timezone
+  // New state for tabs
+  const [activeTab, setActiveTab] = useState('details');
+
+  // Fetch organization timezone
   useEffect(() => {
     const fetchTimezone = async () => {
       if (!selectedOrganization?.id) return;
@@ -131,7 +130,6 @@ export function OpportunityDetailPage() {
 
       if (data?.timezone) {
         setOrgTimezone(data.timezone);
-        console.log('Opportunity page - Using timezone:', data.timezone);
       }
     };
 
@@ -143,39 +141,13 @@ export function OpportunityDetailPage() {
     if (id) {
       fetchOpportunity();
     }
-  }, [id]);
+  }, [id, orgTimezone]);
 
   useEffect(() => {
     if (opportunity) {
       fetchFeeds();
     }
   }, [opportunity]);
-
-  // Add this utility function for formatting dates
-  const formatDate = (dateStr, format = DateTime.DATE_MED) => {
-    if (!dateStr) return '';
-
-    try {
-      // Parse the date in the organization timezone
-      const dt = DateTime.fromISO(dateStr, { zone: orgTimezone });
-
-      if (!dt.isValid) {
-        console.error('Invalid date:', dateStr);
-        return 'Invalid date';
-      }
-
-      // Format as localized date string
-      return dt.toLocaleString(format);
-    } catch (error) {
-      console.error('Error formatting date:', error);
-      return 'Date error';
-    }
-  };
-
-  // Add this utility function for formatting date-times
-  const formatDateTime = (dateStr) => {
-    return formatDate(dateStr, DateTime.DATETIME_MED);
-  };
 
   const fetchPicklists = async () => {
     try {
@@ -203,17 +175,17 @@ export function OpportunityDetailPage() {
       if (typeError) throw typeError;
       setOpportunityTypes(typeData || []);
 
-      // Fetch product statuses
-      const { data: statusData, error: statusError } = await supabase
+      // Fetch lead sources
+      const { data: sourceData, error: sourceError } = await supabase
         .from('picklist_values')
         .select('id, value, label, is_default, is_active, color, text_color')
-        .eq('type', 'opportunity_product_status')
+        .eq('type', 'lead_source')
         .eq('is_active', true)
         .eq('organization_id', selectedOrganization?.id)
         .order('display_order', { ascending: true });
 
-      if (statusError) throw statusError;
-      setProductStatuses(statusData || []);
+      if (sourceError) throw sourceError;
+      setLeadSources(sourceData || []);
     } catch (err) {
       console.error('Error fetching picklists:', err);
       setError('Failed to load picklist values');
@@ -224,31 +196,13 @@ export function OpportunityDetailPage() {
     try {
       if (!id) return;
 
-      const { data: opportunity, error } = await supabase
+      const { data: opportunityData, error } = await supabase
         .from('opportunities')
         .select(`
           *,
-          account:vendors(name, type),
-          contact:customers(
-            first_name,
-            last_name,
-            email,
-            phone,
-            company
-          ),
-          owner:profiles!opportunities_owner_id_fkey(name),
-          products:opportunity_products(
-            id,
-            product_id,
-            quantity,
-            unit_price,
-            subtotal,
-            status,
-            product:products(
-              name,
-              description
-            )
-          )
+          account:vendors(id, name, type),
+          contact:customers(*),
+          owner:profiles!opportunities_owner_id_fkey(id, name)
         `)
         .eq('id', id)
         .single();
@@ -256,20 +210,20 @@ export function OpportunityDetailPage() {
       if (error) throw error;
 
       // If opportunity has a parent_id, fetch the parent opportunity in a separate query
-      if (opportunity && opportunity.parent_id) {
+      if (opportunityData && opportunityData.parent_id) {
         const { data: parentOpportunity, error: parentError } = await supabase
           .from('opportunities')
           .select('id, name, stage, status')
-          .eq('id', opportunity.parent_id)
+          .eq('id', opportunityData.parent_id)
           .single();
 
         if (!parentError && parentOpportunity) {
           // Add the parent data to the opportunity object
-          opportunity.parent = parentOpportunity;
+          opportunityData.parent = parentOpportunity;
         }
       }
 
-      setOpportunity(opportunity);
+      setOpportunity(opportunityData);
     } catch (err) {
       console.error('Error fetching opportunity:', err);
       setError(err instanceof Error ? err.message : 'Failed to load opportunity');
@@ -321,24 +275,6 @@ export function OpportunityDetailPage() {
     }
   };
 
-  const handleProductStatusChange = async (productId: string, newStatus: string) => {
-    try {
-      const { error } = await supabase
-        .from('opportunity_products')
-        .update({
-          status: newStatus,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', productId);
-
-      if (error) throw error;
-      await fetchOpportunity();
-    } catch (err) {
-      console.error('Error updating product status:', err);
-      setError(err instanceof Error ? err.message : 'Failed to update product status');
-    }
-  };
-
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newComment.trim() || !opportunity) return;
@@ -354,7 +290,7 @@ export function OpportunityDetailPage() {
           parent_id: replyTo?.id || null,
           parent_type: 'Opportunity',
           reference_id: id,
-          organization_id: selectedOrganization?.id,
+          organization_id: opportunity.organization_id,
           created_by: userData.user.id,
           created_at: new Date().toISOString(),
           status: 'Active'
@@ -422,6 +358,11 @@ export function OpportunityDetailPage() {
     };
   };
 
+  // Get stage label
+  const getStageLabel = (stage: string) => {
+    return opportunityStages.find(s => s.value === stage)?.label || stage;
+  };
+
   // Get style for type badge
   const getTypeStyle = (type: string | null) => {
     if (!type) return {};
@@ -433,71 +374,38 @@ export function OpportunityDetailPage() {
     };
   };
 
-  // Get style for product status badge
-  const getProductStatusStyle = (status: string) => {
-    const statusValue = productStatuses.find(s => s.value === status);
-    if (!statusValue?.color) return {};
-    return {
-      backgroundColor: statusValue.color,
-      color: statusValue.text_color || '#FFFFFF'
-    };
+  // Get type label
+  const getTypeLabel = (type: string | null) => {
+    if (!type) return '';
+    return opportunityTypes.find(t => t.value === type)?.label || type;
   };
 
-  const handleConvertToQuote = async () => {
-    if (!opportunity) return;
+  // Get source label
+  const getSourceLabel = (source: string | null) => {
+    if (!source) return '';
+    return leadSources.find(s => s.value === source)?.label || source;
+  };
+
+  // Get current stage index for the progress bar
+  const getCurrentStageIndex = () => {
+    if (!opportunity || !opportunityStages.length) return -1;
+    return opportunityStages.findIndex(stage =>
+      stage.value.toLowerCase() === opportunity.stage.toLowerCase()
+    );
+  };
+
+  // Format date with timezone
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '';
 
     try {
-      setLoading(true);
-
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) throw new Error('Not authenticated');
-
-      // Prepare the quote data based on the mapping
-      const quoteData = {
-        organization_id: opportunity.organization_id,
-        notes: `Converted from Opportunity ${opportunity.opportunity_number} ${opportunity.name}`,
-        vendor_id: opportunity.account_id,
-        customer_id: opportunity.contact_id,
-        status: 'New', // Default to New
-        tax_percent: 0,
-        tax_amount: 0,
-        discount_amount: 0,
-        currency: 'USD',
-
-        // Map products from opportunity to quote items
-        items: opportunity.products.map(product => ({
-          item_name: product.product.name,
-          item_desc: product.product.description || null,
-          quantity: product.quantity,
-          unit_price: product.unit_price,
-          line_total: product.quantity * product.unit_price // Add this line
-        })),
-
-        // Calculate subtotal based on products
-        subtotal: parseFloat(opportunity.products.reduce((sum, product) =>
-          sum + (product.quantity * product.unit_price), 0).toFixed(2)),
-
-        // Set total amount equal to subtotal since tax and discount are 0
-        total_amount: parseFloat(opportunity.products.reduce((sum, product) =>
-          sum + (product.quantity * product.unit_price), 0).toFixed(2))
-      };
-      console.log('quoteData ; ' + quoteData);
-
-
-      // Navigate to the QuoteForm with the data as state
-      navigate('/admin/quotes/new', {
-        state: {
-          convertedFromOpportunity: true,
-          opportunityId: id,
-          quoteData: quoteData
-        }
-      });
-
+      return DateTime
+        .fromISO(dateStr, { zone: 'UTC' })
+        .setZone(orgTimezone)
+        .toLocaleString(DateTime.DATE_MED);
     } catch (err) {
-      console.error('Error converting opportunity to quote:', err);
-      setError(err instanceof Error ? err.message : 'Failed to convert opportunity to quote');
-    } finally {
-      setLoading(false);
+      console.error('Error formatting date:', err);
+      return new Date(dateStr).toLocaleDateString();
     }
   };
 
@@ -525,7 +433,7 @@ export function OpportunityDetailPage() {
             <div>
               <div className="font-medium">{feed.profile.name}</div>
               <div className="text-sm text-gray-500">
-                {formatDateTime(feed.created_at)}
+                {new Date(feed.created_at).toLocaleString()}
                 {feed.updated_at && (
                   <span className="ml-2 text-xs">(edited)</span>
                 )}
@@ -574,7 +482,7 @@ export function OpportunityDetailPage() {
               </button>
               <button
                 onClick={() => handleUpdateComment(feed.id, editingFeed.content)}
-                className="px-4 py-2 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700"
+                className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700"
               >
                 Save
               </button>
@@ -607,7 +515,7 @@ export function OpportunityDetailPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-600"></div>
       </div>
     );
   }
@@ -622,364 +530,520 @@ export function OpportunityDetailPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <button
-          onClick={() => navigate('/admin/opportunities')}
-          className="inline-flex items-center text-gray-600 hover:text-gray-900"
-        >
-          <ArrowLeft className="w-5 h-5 mr-2" />
-          Back to Opportunities
-        </button>
-        <div className="flex items-center gap-4">
-          <Link
-            to={`/admin/opportunities/${id}/edit`}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
-          >
-            <Edit className="w-4 h-4 mr-2" />
-            Edit Opportunity
-          </Link>
+    <div className="px-4 py-6 max-w-7xl mx-auto">
+      {/* Header Section */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-4">
           <button
-            onClick={handleConvertToQuote}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+            onClick={() => navigate('/admin/opportunities')}
+            className="inline-flex items-center text-gray-600 hover:text-gray-900 transition-colors"
           >
-            <FileText className="w-4 h-4 mr-2" />
-            Convert to Quote
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            <span>Back to Opportunities</span>
           </button>
-          <Link
-            to={`/admin/tasks/new?module=opportunities&recordId=${id}`}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700"
-          >
-            <Calendar className="w-4 h-4 mr-2" />
-            Add Task
-          </Link>
-        </div>
-      </div>
 
-      <div className="bg-white shadow rounded-lg overflow-hidden">
-        <div className="p-6">
-          <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
-            <div>
-              <h1 className="text-2xl font-bold">{opportunity.opportunity_number}</h1>
-              <h2 className="text-lg text-gray-500">{opportunity.name}</h2>
-              <div className="flex items-center gap-4">
-                <select
-                  value={opportunity.stage}
-                  onChange={(e) => handleStageChange(e.target.value)}
-                  className="text-sm font-medium rounded-full px-3 py-1"
-                  style={getStageStyle(opportunity.stage)}
-                >
-                  {opportunityStages.map(stage => (
-                    <option key={stage.id} value={stage.value}>
-                      {stage.label}
-                    </option>
-                  ))}
-                </select>
-                {opportunity.type && (
-                  <span
-                    className="px-2 py-1 text-xs font-medium rounded-full"
-                    style={getTypeStyle(opportunity.type)}
-                  >
-                    {opportunityTypes.find(t => t.value === opportunity.type)?.label || opportunity.type}
-                  </span>
-                )}
-              </div>
-            </div>
-            <div className="mt-4 md:mt-0 text-right">
-              <div className="text-2xl font-bold text-gray-900">
-                {formatCurrency(opportunity.amount)}
-              </div>
-              <div className="text-sm text-gray-500">
-                Probability: {opportunity.probability}%
-              </div>
-              {opportunity.expected_close_date && (
-                <div className="text-sm text-gray-500">
-                  Expected Close: {formatDate(opportunity.expected_close_date)}
-                </div>
-              )}
-              {opportunity.close_date && (
-                <div className="text-sm text-gray-500 font-medium">
-                  Closed On: {formatDate(opportunity.close_date)}
-                </div>
-              )}
-            </div>
+          {/* Right buttons group */}
+          <div className="flex space-x-3">
+            <Link
+              to={`/admin/tasks/new?module=opportunities&recordId=${id}`}
+              className="inline-flex items-center px-5 py-2.5 text-sm font-medium rounded-full text-white bg-green-600 hover:bg-green-700 transition-colors shadow-sm"
+            >
+              <Calendar className="w-4 h-4 mr-2" />
+              Add Task
+            </Link>
+            <Link
+              to={`/admin/opportunities/${id}/edit`}
+              className="inline-flex items-center px-5 py-2.5 text-sm font-medium rounded-full text-white bg-purple-600 hover:bg-purple-700 transition-colors shadow-sm"
+            >
+              <Edit className="w-4 h-4 mr-2" />
+              Edit Opportunity
+            </Link>
           </div>
+        </div>
 
-          {/* Parent Opportunity Section - NEW */}
-          {opportunity.parent && (
-            <div className="mb-6 bg-blue-50 rounded-lg p-4">
-              <div className="flex items-center justify-between">
+        {/* Card Header with Title and Value */}
+        <div className="bg-white rounded-2xl shadow-sm overflow-hidden mb-6">
+          <div className="p-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
+              <div className="flex items-center space-x-3">
+                <div className="bg-purple-100 rounded-full p-2.5">
+                  <DollarSign className="w-6 h-6 text-purple-600" />
+                </div>
                 <div>
-                  <h3 className="text-sm font-semibold text-blue-800">Parent Opportunity</h3>
-                  <div className="flex items-center mt-1">
-                    <LinkIcon className="w-4 h-4 text-blue-600 mr-2" />
-                    <Link
-                      to={`/admin/opportunities/${opportunity.parent.id}`}
-                      className="text-blue-600 hover:text-blue-800 font-medium"
-                    >
-                      {opportunity.parent.name}
-                    </Link>
-                    <span
-                      className="ml-2 px-2 py-1 text-xs font-medium rounded-full"
-                      style={getStageStyle(opportunity.parent.stage)}
-                    >
-                      {opportunityStages.find(s => s.value === opportunity.parent.stage)?.label || opportunity.parent.stage}
+                  <h1 className="text-2xl font-bold text-gray-900">{opportunity.name}</h1>
+                  <div className="flex items-center mt-1.5 space-x-3">
+                    {opportunity.type && (
+                      <span
+                        className="px-3 py-1 text-xs font-medium rounded-full"
+                        style={getTypeStyle(opportunity.type)}
+                      >
+                        {getTypeLabel(opportunity.type)}
+                      </span>
+                    )}
+                    <span className="text-gray-500 text-sm">
+                      Created on {formatDate(opportunity.created_at)}
                     </span>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Account Information */}
-            {opportunity.account && (
-              <div>
-                <h2 className="text-lg font-semibold mb-4">Account Information</h2>
-                <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <Building2 className="w-5 h-5 text-gray-400 mr-3" />
-                      <div>
-                        <div className="font-medium">{opportunity.account.name}</div>
-                        <div className="text-sm text-gray-500">
-                          Type: {opportunity.account.type}
-                        </div>
-                      </div>
+              {/* Amount and Probability */}
+              <div className="mt-4 md:mt-0">
+                <div className="flex flex-col items-end">
+                  <span className="text-2xl font-bold text-purple-700">
+                    {formatCurrency(opportunity.amount)}
+                  </span>
+                  <span className="px-3 py-1 text-sm font-medium rounded-full bg-green-100 text-green-800 mt-1">
+                    {opportunity.probability}% Probability
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Parent Opportunity Section - Added from original design */}
+            {opportunity.parent && (
+              <div className="mb-6 bg-blue-50 rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold text-blue-800">Parent Opportunity</h3>
+                    <div className="flex items-center mt-1">
+                      <LinkIcon className="w-4 h-4 text-blue-600 mr-2" />
+                      <Link
+                        to={`/admin/opportunities/${opportunity.parent.id}`}
+                        className="text-blue-600 hover:text-blue-800 font-medium"
+                      >
+                        {opportunity.parent.name}
+                      </Link>
+                      <span
+                        className="ml-2 px-2 py-1 text-xs font-medium rounded-full"
+                        style={getStageStyle(opportunity.parent.stage)}
+                      >
+                        {opportunityStages.find(s => s.value === opportunity.parent.stage)?.label || opportunity.parent.stage}
+                      </span>
                     </div>
-                    <button
-                      onClick={() => setShowAccountModal(true)}
-                      className="text-primary-600 hover:text-primary-700 text-sm"
-                    >
-                      View Details
-                    </button>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Contact Information */}
-            {opportunity.contact && (
-              <div>
-                <h2 className="text-lg font-semibold mb-4">Contact Information</h2>
-                <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-                  <div className="flex items-center">
-                    <User className="w-5 h-5 text-gray-400 mr-3" />
-                    <div>
-                      <div className="font-medium">
-                        {opportunity.contact.first_name} {opportunity.contact.last_name}
+            {/* Status Bar */}
+            <div className="mb-8 bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+              {opportunityStages.length > 0 && (
+                <div className="relative pt-2">
+                  {/* Progress bar track */}
+                  <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                    {/* Progress bar fill - width based on current status */}
+                    <div
+                      className="absolute top-2 left-0 h-2 bg-purple-500 rounded-full"
+                      style={{
+                        width: `${(getCurrentStageIndex() + 1) * 100 / opportunityStages.length}%`,
+                        transition: 'width 0.3s ease-in-out'
+                      }}
+                    ></div>
+                  </div>
+
+                  {/* Status indicators with dots */}
+                  <div className="flex justify-between mt-1">
+                    {opportunityStages.map((stage, index) => {
+                      // Determine if this status is active (current or passed)
+                      const isActive = index <= getCurrentStageIndex();
+                      // Position dots evenly
+                      const position = index / (opportunityStages.length - 1) * 100;
+
+                      return (
+                        <div
+                          key={stage.id}
+                          className="flex flex-col items-center"
+                          style={{ position: 'absolute', left: `${position}%`, transform: 'translateX(-50%)' }}
+                        >
+                          {/* Status dot */}
+                          <div
+                            className={`w-4 h-4 rounded-full border-2 border-white ${isActive ? 'bg-purple-500' : 'bg-gray-300'}`}
+                            style={{
+                              marginTop: '-10px',
+                              boxShadow: '0 0 0 2px white'
+                            }}
+                          ></div>
+
+                          {/* Status label */}
+                          <button
+                            onClick={() => handleStageChange(stage.value)}
+                            className={`text-sm font-medium mt-2 px-3 py-1 rounded-full transition-colors ${isActive ? 'text-purple-700' : 'text-gray-500 hover:text-gray-700'
+                              }`}
+                          >
+                            {stage.label}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Tabs Navigation */}
+            <div className="border-b border-gray-200 mb-6">
+              <nav className="-mb-px flex space-x-8">
+                <button
+                  onClick={() => setActiveTab('details')}
+                  className={`py-4 px-1 inline-flex items-center text-sm font-medium border-b-2 ${activeTab === 'details'
+                      ? 'border-purple-500 text-purple-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                >
+                  <FileText className="w-4 h-4 mr-2" />
+                  Details
+                </button>
+                <button
+                  onClick={() => setActiveTab('related')}
+                  className={`py-4 px-1 inline-flex items-center text-sm font-medium border-b-2 ${activeTab === 'related'
+                      ? 'border-purple-500 text-purple-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                >
+                  <Briefcase className="w-4 h-4 mr-2" />
+                  Related
+                </button>
+                <button
+                  onClick={() => setActiveTab('comments')}
+                  className={`py-4 px-1 inline-flex items-center text-sm font-medium border-b-2 ${activeTab === 'comments'
+                      ? 'border-purple-500 text-purple-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                >
+                  <MessageSquare className="w-4 h-4 mr-2" />
+                  Comments
+                </button>
+              </nav>
+            </div>
+
+            {/* Details Tab Content */}
+            {activeTab === 'details' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Left Column */}
+                <div className="space-y-8">
+                  {/* Key Information */}
+                  <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                    <h2 className="text-lg font-semibold mb-4 flex items-center">
+                      <DollarSign className="w-5 h-5 text-purple-500 mr-2" />
+                      Opportunity Information
+                    </h2>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-600">Amount:</span>
+                        <span className="font-bold text-gray-900">{formatCurrency(opportunity.amount)}</span>
                       </div>
-                      {opportunity.contact.company && (
-                        <div className="text-sm text-gray-500">
-                          {opportunity.contact.company}
+
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-600">Probability:</span>
+                        <div className="flex items-center">
+                          <Percent className="w-4 h-4 text-green-500 mr-1" />
+                          <span className="font-medium">{opportunity.probability}%</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-600">Expected Close:</span>
+                        <div className="flex items-center">
+                          <Calendar className="w-4 h-4 text-gray-400 mr-1" />
+                          <span>{opportunity.expected_close_date ?
+                            formatDate(opportunity.expected_close_date) :
+                            'Not set'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {opportunity.type && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-gray-600">Type:</span>
+                          <span
+                            className="px-3 py-1 text-xs font-medium rounded-full"
+                            style={getTypeStyle(opportunity.type)}
+                          >
+                            {getTypeLabel(opportunity.type)}
+                          </span>
+                        </div>
+                      )}
+
+                      {opportunity.lead_source && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-gray-600">Lead Source:</span>
+                          <span className="font-medium">{getSourceLabel(opportunity.lead_source)}</span>
                         </div>
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center">
-                    <Mail className="w-5 h-5 text-gray-400 mr-3" />
-                    <a
-                      href={`mailto:${opportunity.contact.email}`}
-                      className="text-primary-600 hover:text-primary-700"
-                    >
-                      {opportunity.contact.email}
-                    </a>
-                  </div>
-                  {opportunity.contact.phone && (
-                    <div className="flex items-center">
-                      <Phone className="w-5 h-5 text-gray-400 mr-3" />
-                      <a
-                        href={`tel:${opportunity.contact.phone}`}
-                        className="text-primary-600 hover:text-primary-700"
-                      >
-                        {opportunity.contact.phone}
-                      </a>
+
+                  {/* Account Information */}
+                  {opportunity.account && (
+                    <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                      <h2 className="text-lg font-semibold mb-4 flex items-center">
+                        <Building2 className="w-5 h-5 text-purple-500 mr-2" />
+                        Account Information
+                      </h2>
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center">
+                            <Building2 className="w-5 h-5 text-gray-400 mr-3" />
+                            <div>
+                              <div className="font-medium">{opportunity.account.name}</div>
+                              <div className="text-sm text-gray-500">
+                                Type: {opportunity.account.type}
+                              </div>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => setShowAccountModal(true)}
+                            className="text-purple-600 hover:text-purple-700 hover:underline text-sm"
+                          >
+                            View Details
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Owner Information */}
+                  {opportunity.owner && (
+                    <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                      <h2 className="text-lg font-semibold mb-4 flex items-center">
+                        <UserCheck className="w-5 h-5 text-purple-500 mr-2" />
+                        Owner Information
+                      </h2>
+                      <div className="flex items-center">
+                        <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center mr-3">
+                          <span className="text-purple-700 font-medium">
+                            {opportunity.owner.name.charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                        <div className="font-medium">{opportunity.owner.name}</div>
+                      </div>
                     </div>
                   )}
                 </div>
-              </div>
-            )}
 
-            {/* Description */}
-            {opportunity.description && (
-              <div className="md:col-span-2">
-                <h2 className="text-lg font-semibold mb-4">Description</h2>
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <p className="text-gray-600 whitespace-pre-wrap">
-                    {opportunity.description}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Competitor Information - NEW */}
-            {opportunity.competitor && (
-              <div className="md:col-span-2">
-                <h2 className="text-lg font-semibold mb-4">Competition</h2>
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="flex items-start">
-                    <ShoppingBag className="w-5 h-5 text-gray-400 mr-3 mt-1" />
-                    <p className="text-gray-600 whitespace-pre-wrap">
-                      {opportunity.competitor}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Custom Fields */}
-            <div className="md:col-span-2">
-              <CustomFieldsSection
-                entityType="opportunities"
-                entityId={id}
-                organizationId={selectedOrganization?.id}
-                className="bg-gray-50 rounded-lg p-4"
-              />
-            </div>
-          </div>
-
-          {/* Products Section */}
-          <div className="mt-8">
-            <h2 className="text-lg font-semibold mb-4">Products</h2>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Product
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Quantity
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Unit Price
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Total
-                    </th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {opportunity.products.map((product) => (
-                    <tr key={product.id}>
-                      <td className="px-6 py-4">
+                {/* Right Column */}
+                <div className="space-y-8">
+                  {/* Contact Information */}
+                  {opportunity.contact && (
+                    <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                      <h2 className="text-lg font-semibold mb-4 flex items-center">
+                        <User className="w-5 h-5 text-purple-500 mr-2" />
+                        Contact Information
+                      </h2>
+                      <div className="space-y-4">
                         <div className="flex items-center">
-                          <Package className="w-5 h-5 text-gray-400 mr-3" />
+                          <User className="w-5 h-5 text-gray-400 mr-3" />
                           <div>
-                            <div className="font-medium text-gray-900">
-                              {product.product.name}
+                            <div className="font-medium">
+                              {opportunity.contact.first_name} {opportunity.contact.last_name}
                             </div>
-                            {product.product.description && (
+                            {opportunity.contact.company && (
                               <div className="text-sm text-gray-500">
-                                {product.product.description}
+                                {opportunity.contact.company}
                               </div>
                             )}
                           </div>
                         </div>
-                      </td>
-                      <td className="px-6 py-4 text-right whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{product.quantity}</div>
-                      </td>
-                      <td className="px-6 py-4 text-right whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {formatCurrency(product.unit_price)}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-right whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          {formatCurrency(product.subtotal)}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <select
-                          value={product.status}
-                          onChange={(e) => handleProductStatusChange(product.id, e.target.value)}
-                          className="text-sm font-medium rounded-full px-3 py-1"
-                          style={getProductStatusStyle(product.status)}
-                        >
-                          {productStatuses.map(status => (
-                            <option key={status.id} value={status.value}>
-                              {status.label}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                    </tr>
-                  ))}
-                  <tr className="bg-gray-50">
-                    <td colSpan={3} className="px-6 py-4 text-right font-medium">
-                      Total Amount:
-                    </td>
-                    <td className="px-6 py-4 text-right whitespace-nowrap">
-                      <div className="text-lg font-bold text-gray-900">
-                        {formatCurrency(opportunity.amount)}
-                      </div>
-                    </td>
-                    <td></td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
 
-          {/* Comments Section */}
-          <div className="mt-8">
-            <h2 className="text-lg font-semibold mb-4">Comments</h2>
-            <div className="space-y-4">
-              {/* Comment Form */}
-              <form onSubmit={handleSubmitComment} className="space-y-4">
-                {replyTo && (
-                  <div className="flex items-center justify-between bg-gray-50 p-2 rounded-lg">
-                    <span className="text-sm text-gray-600">
-                      Replying to {replyTo.profile.name}'s comment
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setReplyTo(null)}
-                      className="p-1 hover:bg-gray-200 rounded-full"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
+                        {opportunity.contact.email && (
+                          <div className="flex items-center">
+                            <Mail className="w-5 h-5 text-gray-400 mr-3" />
+                            <a
+                              href={`mailto:${opportunity.contact.email}`}
+                              className="text-purple-600 hover:text-purple-700"
+                            >
+                              {opportunity.contact.email}
+                            </a>
+                          </div>
+                        )}
+
+                        {opportunity.contact.phone && (
+                          <div className="flex items-center">
+                            <Phone className="w-5 h-5 text-gray-400 mr-3" />
+                            <a
+                              href={`tel:${opportunity.contact.phone}`}
+                              className="text-purple-600 hover:text-purple-700"
+                            >
+                              {opportunity.contact.phone}
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Timeline */}
+                  <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                    <h2 className="text-lg font-semibold mb-4 flex items-center">
+                      <Clock className="w-5 h-5 text-purple-500 mr-2" />
+                      Timeline
+                    </h2>
+                    <div className="space-y-4">
+                      <div className="flex items-start">
+                        <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center mt-0.5 mr-3">
+                          <Calendar className="w-4 h-4 text-purple-700" />
+                        </div>
+                        <div>
+                          <div className="font-medium">Created</div>
+                          <div className="text-sm text-gray-500">
+                            {formatDate(opportunity.created_at)}
+                          </div>
+                        </div>
+                      </div>
+
+                      {opportunity.expected_close_date && (
+                        <div className="flex items-start">
+                          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center mt-0.5 mr-3">
+                            <Flag className="w-4 h-4 text-blue-700" />
+                          </div>
+                          <div>
+                            <div className="font-medium">Expected Close Date</div>
+                            <div className="text-sm text-gray-500">
+                              {formatDate(opportunity.expected_close_date)}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Description - Full Width */}
+                {opportunity.description && (
+                  <div className="md:col-span-2 bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                    <h2 className="text-lg font-semibold mb-4 flex items-center">
+                      <FileText className="w-5 h-5 text-purple-500 mr-2" />
+                      Description
+                    </h2>
+                    <p className="text-gray-700 whitespace-pre-wrap">{opportunity.description}</p>
                   </div>
                 )}
-                <div className="flex items-start space-x-4">
-                  <div className="flex-1">
-                    <textarea
-                      value={newComment}
-                      onChange={(e) => setNewComment(e.target.value)}
-                      placeholder="Add a comment..."
-                      rows={3}
-                      className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-                    />
-                  </div>
-                  <button
-                    type="submit"
-                    disabled={!newComment.trim()}
-                    className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
-                  >
-                    <Send className="w-4 h-4 mr-2" />
-                    Send
-                  </button>
-                </div>
-              </form>
 
-              {/* Feed Items */}
-              <div className="space-y-4">
-                {feeds
-                  .filter(feed => !feed.parent_id)
-                  .map(feed => renderFeedItem(feed))}
+                {/* Custom Fields - Full Width */}
+                <div className="md:col-span-2 bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                  <h2 className="text-lg font-semibold mb-4 flex items-center">
+                    <Bookmark className="w-5 h-5 text-purple-500 mr-2" />
+                    Custom Fields
+                  </h2>
+                  <CustomFieldsSection
+                    entityType="opportunities"
+                    entityId={id || ''}
+                    organizationId={selectedOrganization?.id}
+                  />
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* Related Tab Content */}
+            {activeTab === 'related' && (
+              <div className="space-y-8">
+                {/* Tasks */}
+                <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                  <RelatedTasks
+                    recordId={id}
+                    organizationId={selectedOrganization?.id}
+                    refreshKey={refreshRecordsList}
+                    title="Tasks"
+                  />
+                </div>
+
+                {/* Quotes */}
+                <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                  <RelatedQuotes
+                    recordId={id}
+                    organizationId={selectedOrganization?.id}
+                    refreshKey={refreshRecordsList}
+                  />
+                </div>
+
+                {/* Orders */}
+                <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                  <RelatedOrders
+                    recordId={id}
+                    organizationId={selectedOrganization?.id}
+                    refreshKey={refreshRecordsList}
+                  />
+                </div>
+
+                {/* Emails */}
+                <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                  <RelatedEmails
+                    recordId={id}
+                    organizationId={selectedOrganization?.id}
+                    refreshKey={refreshRecordsList}
+                    title="Email Communications"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Comments Tab Content */}
+            {activeTab === 'comments' && (
+              <div className="space-y-6">
+                {/* Comment Form */}
+                <form onSubmit={handleSubmitComment} className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                  <h2 className="text-lg font-semibold mb-4 flex items-center">
+                    <MessageSquare className="w-5 h-5 text-purple-500 mr-2" />
+                    Add Comment
+                  </h2>
+
+                  {replyTo && (
+                    <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg mb-4">
+                      <span className="text-sm text-gray-600">
+                        Replying to {replyTo.profile.name}'s comment
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setReplyTo(null)}
+                        className="p-1 hover:bg-gray-200 rounded-full"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="flex items-start space-x-4">
+                    <div className="flex-1">
+                      <textarea
+                        value={newComment}
+                        onChange={(e) => setNewComment(e.target.value)}
+                        placeholder="Add a comment..."
+                        rows={3}
+                        className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 outline-none"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={!newComment.trim()}
+                      className="px-5 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center shadow-sm"
+                    >
+                      <Send className="w-4 h-4 mr-2" />
+                      Send
+                    </button>
+                  </div>
+                </form>
+
+                {/* Comment List */}
+                <div className="space-y-4">
+                  {feeds
+                    .filter(feed => !feed.parent_id)
+                    .map(feed => renderFeedItem(feed))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
+      {/* Account Modal */}
       {showAccountModal && opportunity.account && (
         <AccountDetailsModal
-          vendor={opportunity.account}
+          vendor={{
+            id: opportunity.account.id,
+            name: opportunity.account.name,
+            type: opportunity.account.type
+          }}
           onClose={() => setShowAccountModal(false)}
         />
       )}
