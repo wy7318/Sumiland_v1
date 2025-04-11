@@ -84,7 +84,7 @@ export function AdminLayout() {
     { path: '/admin/inventory', icon: BoxSeam, label: 'Inventory' },
     { path: '/admin/posts', icon: FileText, label: 'Blog Posts' },
     { path: '/admin/portfolio', icon: Image, label: 'Portfolio' },
-    { path: '/admin/ReportFolderList', icon: BarChart2, label: 'Reports' },
+    { path: '/admin/reports', icon: BarChart2, label: 'Reports' },
     ...(hasAdminAccess ? [
       { path: '/admin/products', icon: Package, label: 'Products' },
       { path: '/admin/customflows', icon: Package, label: 'Custom Flows' }
