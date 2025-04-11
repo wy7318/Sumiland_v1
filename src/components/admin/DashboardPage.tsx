@@ -1,9 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
-  Plus, Search, Filter, ChevronDown, ChevronUp, Edit, Trash2,
-  Eye, BarChart2, LineChart, PieChart, Star, StarOff, FolderPlus,
-  AlertCircle, Settings, Share2, RefreshCw
+  RefreshCw
 } from 'lucide-react';
 import { useSpring, animated } from '@react-spring/web';
 import { Link } from 'react-router-dom';
@@ -11,50 +9,11 @@ import { supabase } from '../../lib/supabase';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
 import { useOrganization } from '../../contexts/OrganizationContext';
-import { ReportBuilder } from './reports/ReportBuilder';
-import { ReportViewer } from './reports/ReportViewer';
-import { ReportFolderList } from './reports/ReportFolderList';
-import { ResponsiveLine } from '@nivo/line'; // Install: npm i @nivo/line @nivo/core
-import { ResponsiveBar } from '@nivo/bar'; // Install: npm i @nivo/bar @nivo/core
-import { ResponsivePie } from '@nivo/pie'; // Import npm i @nivo/pie @nivo/core
+import { ResponsiveLine } from '@nivo/line';
+import { ResponsiveBar } from '@nivo/bar';
+import { ResponsivePie } from '@nivo/pie';
 import { MiniTaskCalendar } from './MiniTaskCalendar';
 import { DateTime } from 'luxon';
-
-
-
-
-
-type Report = {
-  id: string;
-  name: string;
-  description: string | null;
-  object_type: string;
-  filters: any[];
-  grouping: string[];
-  sorting: { field: string; direction: 'asc' | 'desc' }[];
-  date_range?: {
-    field: string;
-    start: string | null;
-    end: string | null;
-  };
-  charts: {
-    type: 'bar' | 'line' | 'pie';
-    title: string;
-    x_field: string;
-    y_field: string;
-    group_by?: string;
-    aggregation?: 'count' | 'sum' | 'avg';
-  }[];
-  is_favorite: boolean;
-  is_shared: boolean;
-  folder_id: string | null;
-  created_at: string;
-  created_by: string;
-  organization_id: string;
-  selected_fields: string[];
-  is_template: boolean;
-  template_id: string | null;
-};
 
 const MODULES = [
   { name: 'Cases', table: 'cases', icon: '📋', color: 'bg-blue-100 text-blue-800', idField: 'id', nameField: 'title', route: 'cases' },
@@ -81,29 +40,20 @@ function formatDateToOrgTimezone(date: string | Date, timezone: string = 'UTC') 
 
   try {
     const iso = typeof date === 'string' ? date : date.toISOString();
-
-    // Log the incoming date for debugging
-    // console.log("Original date:", iso, "Converting to timezone:", timezone);
-
-    // First create a DateTime object from the ISO string, specifying it's in UTC
     const dateTime = DateTime.fromISO(iso, { zone: 'utc' });
 
-    // Check if valid before proceeding
     if (!dateTime.isValid) {
       console.error("Invalid DateTime created:", dateTime.invalidReason, dateTime.invalidExplanation);
       return 'Invalid date';
     }
 
-    // Set the zone to the target timezone
     const converted = dateTime.setZone(timezone);
 
-    // Check if timezone conversion worked correctly
     if (!converted.isValid) {
       console.error("Invalid timezone conversion:", converted.invalidReason, converted.invalidExplanation);
       return 'Timezone error';
     }
 
-    // Format the date and return
     return converted.toFormat('MMM dd, yyyy, h:mm:ss a');
   } catch (error) {
     console.error("Error formatting date:", error);
@@ -111,27 +61,18 @@ function formatDateToOrgTimezone(date: string | Date, timezone: string = 'UTC') 
   }
 }
 
-
-
-
 export function DashboardPage() {
   const { user } = useAuth();
   const { selectedOrganization } = useOrganization();
   const [orgTimezone, setOrgTimezone] = useState<string>('UTC');
   const [timezoneLoaded, setTimezoneLoaded] = useState(false);
 
-  const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [showReportBuilder, setShowReportBuilder] = useState(false);
-  const [selectedReport, setSelectedReport] = useState<Report | null>(null);
-  const [editingReport, setEditingReport] = useState<Report | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
   const [data, setData] = useState<any>({});
   const [rangeType, setRangeType] = useState<'daily' | 'monthly' | 'yearly' | 'custom'>('daily');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
-  
+
   const chartColors = {
     Opportunities: '#8b5cf6',
     Quotes: '#ec4899',
@@ -180,20 +121,12 @@ export function DashboardPage() {
     fetchOrgTimezone();
   }, [selectedOrganization?.id]);
 
-
-
   useEffect(() => {
     if (timezoneLoaded) {
       console.log("Organization timezone loaded:", orgTimezone);
       fetchData(rangeType);
-      fetchReports();
     }
   }, [timezoneLoaded, orgTimezone]);
-
-  // Remove the initial fetchData call that ran immediately
-  // useEffect(() => {
-  //   fetchData();
-  // }, []);
 
   const fetchData = async (range: 'daily' | 'monthly' | 'yearly' | 'custom' = 'daily') => {
     setLoading(true);
@@ -250,8 +183,6 @@ export function DashboardPage() {
         break;
     }
 
-    // const endDate = range === 'custom' ? new Date(customEndDate).toISOString() : today.toISOString();
-
     const results: any = {};
 
     for (const module of MODULES) {
@@ -307,8 +238,6 @@ export function DashboardPage() {
         count: count || 0
       };
     }
-
-
 
     // Fetch total amounts in range
     const [oppTotalRes, quoteTotalRes, orderTotalRes] = await Promise.all([
@@ -415,7 +344,6 @@ export function DashboardPage() {
       </div>
     );
   }
-
 
   function ChartWithToggle({
     records,
@@ -526,8 +454,6 @@ export function DashboardPage() {
     );
   }
 
-
-
   function prepareLineChartData(records: any[], rangeType: string, moduleName: string) {
     if (!records || records.length === 0) return [];
 
@@ -598,92 +524,6 @@ export function DashboardPage() {
     ];
   }
 
-
-
-
-  const fetchReports = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('reports')
-        .select('*')
-        .eq('organization_id', selectedOrganization?.id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setReports(data || []);
-    } catch (err) {
-      console.error('Error fetching reports:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load reports');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleFavoriteToggle = async (reportId: string) => {
-    try {
-      const report = reports.find(r => r.id === reportId);
-      if (!report) return;
-
-      const { error } = await supabase
-        .from('reports')
-        .update({ is_favorite: !report.is_favorite })
-        .eq('id', reportId);
-
-      if (error) throw error;
-      await fetchReports();
-    } catch (err) {
-      console.error('Error toggling favorite:', err);
-      setError(err instanceof Error ? err.message : 'Failed to update report');
-    }
-  };
-
-  const handleShareToggle = async (reportId: string) => {
-    try {
-      const report = reports.find(r => r.id === reportId);
-      if (!report) return;
-
-      const { error } = await supabase
-        .from('reports')
-        .update({ is_shared: !report.is_shared })
-        .eq('id', reportId);
-
-      if (error) throw error;
-      await fetchReports();
-    } catch (err) {
-      console.error('Error toggling share:', err);
-      setError(err instanceof Error ? err.message : 'Failed to update report');
-    }
-  };
-
-  const handleDelete = async (reportId: string) => {
-    try {
-      const { error } = await supabase
-        .from('reports')
-        .delete()
-        .eq('id', reportId);
-
-      if (error) throw error;
-      await fetchReports();
-    } catch (err) {
-      console.error('Error deleting report:', err);
-      setError(err instanceof Error ? err.message : 'Failed to delete report');
-    }
-  };
-
-  const handleEdit = (report: Report) => {
-    setEditingReport(report);
-    setShowReportBuilder(true);
-  };
-
-  const filteredReports = reports.filter(report =>
-    report.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    report.description?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const favoriteReports = filteredReports.filter(report => report.is_favorite);
-  const otherReports = filteredReports.filter(report => !report.is_favorite);
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -691,7 +531,6 @@ export function DashboardPage() {
       </div>
     );
   }
-
 
   return (
     <div className="space-y-6">
@@ -932,119 +771,18 @@ export function DashboardPage() {
         </div>
       </div>
 
-      {/* Rest of the Dashboard Content */}
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Reports</h1>
-        <button
-          onClick={() => {
-            setEditingReport(null);
-            setShowReportBuilder(true);
-          }}
-          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
+      {/* Add a link to the Reports page */}
+      <div className="mt-8 flex justify-center">
+        <Link
+          to="/admin/reports"
+          className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 shadow-md transition-colors"
         >
-          <Plus className="w-4 h-4 mr-2" />
-          Create Report
-        </button>
+          Go to Reports
+        </Link>
       </div>
-
-      {error && (
-        <div className="bg-red-50 text-red-600 p-4 rounded-lg flex items-center">
-          <AlertCircle className="w-5 h-5 mr-2" />
-          {error}
-        </div>
-      )}
-
-      <div className="flex flex-wrap gap-4 mb-6">
-        <div className="flex-1 min-w-[300px]">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <input
-              type="text"
-              placeholder="Search reports..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Favorite Reports */}
-      {favoriteReports.length > 0 && (
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold flex items-center">
-            <Star className="w-5 h-5 text-yellow-500 mr-2" />
-            Favorite Reports
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {favoriteReports.map(report => (
-              <ReportCard
-                key={report.id}
-                report={report}
-                onFavorite={handleFavoriteToggle}
-                onShare={handleShareToggle}
-                onDelete={handleDelete}
-                onSelect={setSelectedReport}
-                onEdit={handleEdit}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Other Reports */}
-      <div className="space-y-4">
-        <h2 className="text-lg font-semibold">All Reports</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {otherReports.map(report => (
-            <ReportCard
-              key={report.id}
-              report={report}
-              onFavorite={handleFavoriteToggle}
-              onShare={handleShareToggle}
-              onDelete={handleDelete}
-              onSelect={setSelectedReport}
-              onEdit={handleEdit}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* Report Builder Modal */}
-      {showReportBuilder && (
-        <ReportBuilder
-          onClose={() => {
-            setShowReportBuilder(false);
-            setEditingReport(null);
-          }}
-          onSave={fetchReports}
-          editingReport={editingReport}
-        />
-      )}
-
-      {/* Report Viewer Modal */}
-      {selectedReport && (
-        <ReportViewer
-          report={selectedReport}
-          onClose={() => setSelectedReport(null)}
-          onEdit={() => {
-            setSelectedReport(null);
-            handleEdit(selectedReport);
-          }}
-        />
-      )}
     </div>
   );
 }
-
-type ReportCardProps = {
-  report: Report;
-  onFavorite: (id: string) => void;
-  onShare: (id: string) => void;
-  onDelete: (id: string) => void;
-  onSelect: (report: Report) => void;
-  onEdit: (report: Report) => void;
-};
 
 function SkeletonLoader() {
   return (
@@ -1067,99 +805,6 @@ function SkeletonLoader() {
             <div className="h-3 w-24 bg-gray-200 rounded mt-1 animate-pulse"></div>
           </div>
         ))}
-      </div>
-    </motion.div>
-  );
-}
-
-function ReportCard({ report, onFavorite, onShare, onDelete, onSelect, onEdit }: ReportCardProps) {
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="bg-white rounded-lg shadow-md overflow-hidden"
-    >
-      <div className="p-4">
-        <div className="flex justify-between items-start mb-2">
-          <h3 className="text-lg font-medium">{report.name}</h3>
-          <div className="flex space-x-2">
-            <button
-              onClick={() => onFavorite(report.id)}
-              className={cn(
-                "p-1 rounded-full",
-                report.is_favorite
-                  ? "text-yellow-500 hover:bg-yellow-50"
-                  : "text-gray-400 hover:bg-gray-50"
-              )}
-            >
-              {report.is_favorite ? (
-                <Star className="w-5 h-5" />
-              ) : (
-                <StarOff className="w-5 h-5" />
-              )}
-            </button>
-            <button
-              onClick={() => onShare(report.id)}
-              className={cn(
-                "p-1 rounded-full",
-                report.is_shared
-                  ? "text-primary-500 hover:bg-primary-50"
-                  : "text-gray-400 hover:bg-gray-50"
-              )}
-            >
-              <Share2 className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-
-        {report.description && (
-          <p className="text-sm text-gray-600 mb-4">{report.description}</p>
-        )}
-
-        <div className="flex items-center text-sm text-gray-500 mb-4">
-          <Settings className="w-4 h-4 mr-1" />
-          {report.object_type}
-          {report.charts.length > 0 && (
-            <>
-              <span className="mx-2">•</span>
-              {report.charts.map(chart => {
-                switch (chart.type) {
-                  case 'bar':
-                    return <BarChart2 key={chart.title} className="w-4 h-4 text-primary-500" />;
-                  case 'line':
-                    return <LineChart key={chart.title} className="w-4 h-4 text-green-500" />;
-                  case 'pie':
-                    return <PieChart key={chart.title} className="w-4 h-4 text-purple-500" />;
-                  default:
-                    return null;
-                }
-              })}
-            </>
-          )}
-        </div>
-
-        <div className="flex justify-between items-center">
-          <button
-            onClick={() => onSelect(report)}
-            className="text-primary-600 hover:text-primary-700 text-sm font-medium"
-          >
-            View Report
-          </button>
-          <div className="flex space-x-2">
-            <button
-              onClick={() => onEdit(report)}
-              className="p-1 text-blue-600 hover:bg-blue-50 rounded-full"
-            >
-              <Edit className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => onDelete(report.id)}
-              className="p-1 text-red-600 hover:bg-red-50 rounded-full"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
       </div>
     </motion.div>
   );

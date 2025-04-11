@@ -60,6 +60,7 @@ import { TaskFormPage } from './components/admin/TaskFormPage';
 import { FullTaskCalendar } from './components/admin/FullTaskCalendar';
 import FAQPage from './components/FAQPage';
 import { EmailProvider } from './components/admin/EmailProvider';
+import { ReportsPage } from './components/admin/ReportsPage';
 
 
 
@@ -170,6 +171,8 @@ function App() {
                                 <Route path="opportunities/:id" element={<OpportunityDetailPage />} />
                                 <Route path="opportunities/:id/edit" element={<OpportunityForm />} />
                                 <Route path="ReportFolderList" element={<ReportFolderList />} />
+                                <Route path="reports" element={<ReportsPage />} />
+                                
                                     
                                 <Route path="products" element={<ProductsPage />} />
                                 <Route path="products/new" element={<ProductForm />} />
