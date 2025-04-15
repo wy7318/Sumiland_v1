@@ -387,8 +387,8 @@ export function VendorDetailPage() {
       >
         <div className="flex justify-between items-start">
           <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center">
-              <span className="text-primary-700 font-medium">
+            <div className="w-8 h-8 rounded-full bg-rose-100 flex items-center justify-center">
+              <span className="text-rose-700 font-medium">
                 {feed.profile.name.charAt(0).toUpperCase()}
               </span>
             </div>
@@ -432,7 +432,7 @@ export function VendorDetailPage() {
             <textarea
               value={editingFeed.content}
               onChange={(e) => setEditingFeed({ ...editingFeed, content: e.target.value })}
-              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-rose-500 focus:ring-2 focus:ring-rose-200 outline-none"
               rows={3}
             />
             <div className="flex justify-end space-x-2 mt-2">
@@ -444,7 +444,7 @@ export function VendorDetailPage() {
               </button>
               <button
                 onClick={() => handleUpdateComment(feed.id, editingFeed.content)}
-                className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                className="px-4 py-2 text-sm bg-rose-600 text-white rounded-lg hover:bg-rose-700"
               >
                 Save
               </button>
@@ -477,7 +477,7 @@ export function VendorDetailPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-rose-500"></div>
       </div>
     );
   }
@@ -515,7 +515,7 @@ export function VendorDetailPage() {
             </Link>
             <Link
               to={`/admin/vendors/${id}/edit`}
-              className="inline-flex items-center px-5 py-2.5 text-sm font-medium rounded-full text-white bg-primary-600 hover:bg-primary-700 transition-colors shadow-sm"
+              className="inline-flex items-center px-5 py-2.5 text-sm font-medium rounded-full text-white bg-rose-600 hover:bg-rose-700 transition-colors shadow-sm"
             >
               <Edit className="w-4 h-4 mr-2" />
               Edit Account
@@ -528,8 +528,8 @@ export function VendorDetailPage() {
           <div className="p-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
               <div className="flex items-center space-x-3">
-                <div className="bg-primary-100 rounded-full p-2.5">
-                  <Building2 className="w-6 h-6 text-primary-600" />
+                <div className="bg-rose-100 rounded-full p-2.5">
+                  <Building2 className="w-6 h-6 text-rose-600" />
                 </div>
                 <div>
                   <h1 className="text-2xl font-bold text-gray-900">{vendor.name}</h1>
@@ -556,7 +556,7 @@ export function VendorDetailPage() {
                   <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                     {/* Progress bar fill - width based on current status */}
                     <div
-                      className="absolute top-2 left-0 h-2 bg-blue-500 rounded-full"
+                      className="absolute top-2 left-0 h-2 bg-rose-500 rounded-full"
                       style={{
                         width: `${(getCurrentStatusIndex() + 1) * 100 / accountStatuses.length}%`,
                         transition: 'width 0.3s ease-in-out'
@@ -580,7 +580,7 @@ export function VendorDetailPage() {
                         >
                           {/* Status dot */}
                           <div
-                            className={`w-4 h-4 rounded-full border-2 border-white ${isActive ? 'bg-blue-500' : 'bg-gray-300'}`}
+                            className={`w-4 h-4 rounded-full border-2 border-white ${isActive ? 'bg-rose-500' : 'bg-gray-300'}`}
                             style={{
                               marginTop: '-10px',
                               boxShadow: '0 0 0 2px white'
@@ -590,7 +590,7 @@ export function VendorDetailPage() {
                           {/* Status label */}
                           <button
                             onClick={() => handleStatusChange(status.value)}
-                            className={`text-sm font-medium mt-2 px-3 py-1 rounded-full transition-colors ${isActive ? 'text-blue-700' : 'text-gray-500 hover:text-gray-700'
+                            className={`text-sm font-medium mt-2 px-3 py-1 rounded-full transition-colors ${isActive ? 'text-rose-700' : 'text-gray-500 hover:text-gray-700'
                               }`}
                           >
                             {status.label}
@@ -609,7 +609,7 @@ export function VendorDetailPage() {
                 <button
                   onClick={() => setActiveTab('details')}
                   className={`py-4 px-1 inline-flex items-center text-sm font-medium border-b-2 ${activeTab === 'details'
-                      ? 'border-primary-500 text-primary-600'
+                      ? 'border-rose-500 text-rose-600'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                     }`}
                 >
@@ -619,7 +619,7 @@ export function VendorDetailPage() {
                 <button
                   onClick={() => setActiveTab('related')}
                   className={`py-4 px-1 inline-flex items-center text-sm font-medium border-b-2 ${activeTab === 'related'
-                      ? 'border-primary-500 text-primary-600'
+                      ? 'border-rose-500 text-rose-600'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                     }`}
                 >
@@ -629,7 +629,7 @@ export function VendorDetailPage() {
                 <button
                   onClick={() => setActiveTab('comments')}
                   className={`py-4 px-1 inline-flex items-center text-sm font-medium border-b-2 ${activeTab === 'comments'
-                      ? 'border-primary-500 text-primary-600'
+                      ? 'border-rose-500 text-rose-600'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                     }`}
                 >
@@ -648,7 +648,7 @@ export function VendorDetailPage() {
                   {vendor.customer && (
                     <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                       <h2 className="text-lg font-semibold mb-4 flex items-center">
-                        <User className="w-5 h-5 text-primary-500 mr-2" />
+                        <User className="w-5 h-5 text-rose-500 mr-2" />
                         Contact Information
                       </h2>
                       <div className="space-y-4">
@@ -669,7 +669,7 @@ export function VendorDetailPage() {
                           <Mail className="w-5 h-5 text-gray-400 mr-3" />
                           <a
                             href={`mailto:${vendor.customer.email}`}
-                            className="text-primary-600 hover:text-primary-700"
+                            className="text-rose-600 hover:text-rose-700"
                           >
                             {vendor.customer.email}
                           </a>
@@ -679,7 +679,7 @@ export function VendorDetailPage() {
                             <Phone className="w-5 h-5 text-gray-400 mr-3" />
                             <a
                               href={`tel:${vendor.customer.phone}`}
-                              className="text-primary-600 hover:text-primary-700"
+                              className="text-rose-600 hover:text-rose-700"
                             >
                               {vendor.customer.phone}
                             </a>
@@ -692,7 +692,7 @@ export function VendorDetailPage() {
                   {/* Account Details */}
                   <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                     <h2 className="text-lg font-semibold mb-4 flex items-center">
-                      <Bookmark className="w-5 h-5 text-primary-500 mr-2" />
+                      <Bookmark className="w-5 h-5 text-rose-500 mr-2" />
                       Account Details
                     </h2>
                     <div className="space-y-4">
@@ -720,7 +720,7 @@ export function VendorDetailPage() {
                               href={vendor.website.startsWith('http') ? vendor.website : `https://${vendor.website}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-primary-600 hover:text-primary-700 hover:underline"
+                              className="text-rose-600 hover:text-rose-700 hover:underline"
                             >
                               {vendor.website}
                             </a>
@@ -734,12 +734,12 @@ export function VendorDetailPage() {
                   {vendor.owner && (
                     <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                       <h2 className="text-lg font-semibold mb-4 flex items-center">
-                        <User className="w-5 h-5 text-primary-500 mr-2" />
+                        <User className="w-5 h-5 text-rose-500 mr-2" />
                         Account Owner
                       </h2>
                       <div className="flex items-center">
-                        <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center mr-3">
-                          <span className="text-primary-700 font-medium">
+                        <div className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center mr-3">
+                          <span className="text-rose-700 font-medium">
                             {vendor.owner.name.charAt(0).toUpperCase()}
                           </span>
                         </div>
@@ -755,7 +755,7 @@ export function VendorDetailPage() {
                   {vendor.parent && (
                     <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                       <h2 className="text-lg font-semibold mb-4 flex items-center">
-                        <Users className="w-5 h-5 text-primary-500 mr-2" />
+                        <Users className="w-5 h-5 text-rose-500 mr-2" />
                         Parent Account
                       </h2>
                       <div className="flex items-center justify-between">
@@ -765,7 +765,7 @@ export function VendorDetailPage() {
                         </div>
                         <Link
                           to={`/admin/vendors/${vendor.parent.id}`}
-                          className="text-primary-600 hover:text-primary-700 hover:underline text-sm"
+                          className="text-rose-600 hover:text-rose-700 hover:underline text-sm"
                         >
                           View Details
                         </Link>
@@ -776,7 +776,7 @@ export function VendorDetailPage() {
                   {/* Addresses Group */}
                   <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                     <h2 className="text-lg font-semibold mb-4 flex items-center">
-                      <MapPin className="w-5 h-5 text-primary-500 mr-2" />
+                      <MapPin className="w-5 h-5 text-rose-500 mr-2" />
                       Addresses
                     </h2>
 
@@ -784,7 +784,7 @@ export function VendorDetailPage() {
                     {(vendor.shipping_address_line1 || vendor.shipping_city || vendor.shipping_state || vendor.shipping_country) && (
                       <div className="mb-4">
                         <h3 className="text-md font-medium mb-2 text-gray-700">Shipping Address</h3>
-                        <div className="pl-2 border-l-2 border-primary-100 py-1 space-y-1">
+                        <div className="pl-2 border-l-2 border-rose-100 py-1 space-y-1">
                           {vendor.shipping_address_line1 && (
                             <div className="text-gray-600">{vendor.shipping_address_line1}</div>
                           )}
@@ -806,7 +806,7 @@ export function VendorDetailPage() {
                     {(vendor.billing_address_line1 || vendor.billing_city || vendor.billing_state || vendor.billing_country) && (
                       <div>
                         <h3 className="text-md font-medium mb-2 text-gray-700">Billing Address</h3>
-                        <div className="pl-2 border-l-2 border-primary-100 py-1 space-y-1">
+                        <div className="pl-2 border-l-2 border-rose-100 py-1 space-y-1">
                           {vendor.billing_address_line1 && (
                             <div className="text-gray-600">{vendor.billing_address_line1}</div>
                           )}
@@ -828,7 +828,7 @@ export function VendorDetailPage() {
                   {/* Payment Information */}
                   <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                     <h2 className="text-lg font-semibold mb-4 flex items-center">
-                      <CreditCard className="w-5 h-5 text-primary-500 mr-2" />
+                      <CreditCard className="w-5 h-5 text-rose-500 mr-2" />
                       Payment Information
                     </h2>
                     {vendor.payment_terms && (
@@ -844,7 +844,7 @@ export function VendorDetailPage() {
                 {vendor.notes && (
                   <div className="md:col-span-2 bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                     <h2 className="text-lg font-semibold mb-4 flex items-center">
-                      <FileText className="w-5 h-5 text-primary-500 mr-2" />
+                      <FileText className="w-5 h-5 text-rose-500 mr-2" />
                       Notes
                     </h2>
                     <p className="text-gray-700 whitespace-pre-wrap">{vendor.notes}</p>
@@ -854,7 +854,7 @@ export function VendorDetailPage() {
                 {/* Custom Fields - Full Width */}
                 <div className="md:col-span-2 bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                   <h2 className="text-lg font-semibold mb-4 flex items-center">
-                    <Bookmark className="w-5 h-5 text-primary-500 mr-2" />
+                    <Bookmark className="w-5 h-5 text-rose-500 mr-2" />
                     Custom Fields
                   </h2>
                   <CustomFieldsSection
@@ -937,7 +937,7 @@ export function VendorDetailPage() {
                 {/* Comment Form */}
                 <form onSubmit={handleSubmitComment} className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                   <h2 className="text-lg font-semibold mb-4 flex items-center">
-                    <MessageSquare className="w-5 h-5 text-primary-500 mr-2" />
+                    <MessageSquare className="w-5 h-5 text-rose-500 mr-2" />
                     Add Comment
                   </h2>
 
@@ -963,13 +963,13 @@ export function VendorDetailPage() {
                         onChange={(e) => setNewComment(e.target.value)}
                         placeholder="Add a comment..."
                         rows={3}
-                        className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                        className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-rose-500 focus:ring-2 focus:ring-rose-200 outline-none"
                       />
                     </div>
                     <button
                       type="submit"
                       disabled={!newComment.trim()}
-                      className="px-5 py-3 bg-primary-600 text-white rounded-xl hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center shadow-sm"
+                      className="px-5 py-3 bg-rose-600 text-white rounded-xl hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center shadow-sm"
                     >
                       <Send className="w-4 h-4 mr-2" />
                       Send

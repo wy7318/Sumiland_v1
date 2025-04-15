@@ -145,7 +145,7 @@ export function ReportsPage() {
     if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-lime-500"></div>
             </div>
         );
     }
@@ -159,7 +159,7 @@ export function ReportsPage() {
                         setEditingReport(null);
                         setShowReportBuilder(true);
                     }}
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-lime-600 hover:bg-lime-700"
                 >
                     <Plus className="w-4 h-4 mr-2" />
                     Create Report
@@ -182,7 +182,7 @@ export function ReportsPage() {
                             placeholder="Search reports..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                            className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-lime-500 focus:ring-2 focus:ring-lime-200 outline-none"
                         />
                     </div>
                 </div>
@@ -296,7 +296,7 @@ function ReportCard({ report, onFavorite, onShare, onDelete, onSelect, onEdit }:
                             className={cn(
                                 "p-1 rounded-full",
                                 report.is_shared
-                                    ? "text-primary-500 hover:bg-primary-50"
+                                    ? "text-lime-500 hover:bg-lime-50"
                                     : "text-gray-400 hover:bg-gray-50"
                             )}
                         >
@@ -318,7 +318,7 @@ function ReportCard({ report, onFavorite, onShare, onDelete, onSelect, onEdit }:
                             {report.charts.map(chart => {
                                 switch (chart.type) {
                                     case 'bar':
-                                        return <BarChart2 key={chart.title} className="w-4 h-4 text-primary-500" />;
+                                        return <BarChart2 key={chart.title} className="w-4 h-4 text-lime-500" />;
                                     case 'line':
                                         return <LineChart key={chart.title} className="w-4 h-4 text-green-500" />;
                                     case 'pie':
@@ -334,7 +334,7 @@ function ReportCard({ report, onFavorite, onShare, onDelete, onSelect, onEdit }:
                 <div className="flex justify-between items-center">
                     <button
                         onClick={() => onSelect(report)}
-                        className="text-primary-600 hover:text-primary-700 text-sm font-medium"
+                        className="text-lime-600 hover:text-lime-700 text-sm font-medium"
                     >
                         View Report
                     </button>

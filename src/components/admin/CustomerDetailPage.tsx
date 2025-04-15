@@ -306,8 +306,8 @@ export function CustomerDetailPage() {
       >
         <div className="flex justify-between items-start">
           <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center">
-              <span className="text-primary-700 font-medium">
+            <div className="w-8 h-8 rounded-full bg-cyan-100 flex items-center justify-center">
+              <span className="text-cyan-700 font-medium">
                 {feed.profile.name.charAt(0).toUpperCase()}
               </span>
             </div>
@@ -351,7 +351,7 @@ export function CustomerDetailPage() {
             <textarea
               value={editingFeed.content}
               onChange={(e) => setEditingFeed({ ...editingFeed, content: e.target.value })}
-              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200 outline-none"
               rows={3}
             />
             <div className="flex justify-end space-x-2 mt-2">
@@ -363,7 +363,7 @@ export function CustomerDetailPage() {
               </button>
               <button
                 onClick={() => handleUpdateComment(feed.id, editingFeed.content)}
-                className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                className="px-4 py-2 text-sm bg-cyan-600 text-white rounded-lg hover:bg-cyan-700"
               >
                 Save
               </button>
@@ -396,7 +396,7 @@ export function CustomerDetailPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-cyan-500"></div>
       </div>
     );
   }
@@ -434,7 +434,7 @@ export function CustomerDetailPage() {
             </Link>
             <Link
               to={`/admin/customers/${id}/edit`}
-              className="inline-flex items-center px-5 py-2.5 text-sm font-medium rounded-full text-white bg-primary-600 hover:bg-primary-700 transition-colors shadow-sm"
+              className="inline-flex items-center px-5 py-2.5 text-sm font-medium rounded-full text-white bg-cyan-600 hover:bg-cyan-700 transition-colors shadow-sm"
             >
               <Edit className="w-4 h-4 mr-2" />
               Edit Customer
@@ -447,8 +447,8 @@ export function CustomerDetailPage() {
           <div className="p-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
               <div className="flex items-center space-x-3">
-                <div className="bg-primary-100 rounded-full p-2.5">
-                  <User className="w-6 h-6 text-primary-600" />
+                <div className="bg-cyan-100 rounded-full p-2.5">
+                  <User className="w-6 h-6 text-cyan-600" />
                 </div>
                 <div>
                   <h1 className="text-2xl font-bold text-gray-900">
@@ -476,7 +476,7 @@ export function CustomerDetailPage() {
                 <button
                   onClick={() => setActiveTab('details')}
                   className={`py-4 px-1 inline-flex items-center text-sm font-medium border-b-2 ${activeTab === 'details'
-                      ? 'border-primary-500 text-primary-600'
+                      ? 'border-cyan-500 text-cyan-600'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                     }`}
                 >
@@ -486,7 +486,7 @@ export function CustomerDetailPage() {
                 <button
                   onClick={() => setActiveTab('related')}
                   className={`py-4 px-1 inline-flex items-center text-sm font-medium border-b-2 ${activeTab === 'related'
-                      ? 'border-primary-500 text-primary-600'
+                      ? 'border-cyan-500 text-cyan-600'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                     }`}
                 >
@@ -496,7 +496,7 @@ export function CustomerDetailPage() {
                 <button
                   onClick={() => setActiveTab('comments')}
                   className={`py-4 px-1 inline-flex items-center text-sm font-medium border-b-2 ${activeTab === 'comments'
-                      ? 'border-primary-500 text-primary-600'
+                      ? 'border-cyan-500 text-cyan-600'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                     }`}
                 >
@@ -514,7 +514,7 @@ export function CustomerDetailPage() {
                   {/* Contact Information */}
                   <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                     <h2 className="text-lg font-semibold mb-4 flex items-center">
-                      <User className="w-5 h-5 text-primary-500 mr-2" />
+                      <User className="w-5 h-5 text-cyan-500 mr-2" />
                       Contact Information
                     </h2>
                     <div className="space-y-4">
@@ -522,7 +522,7 @@ export function CustomerDetailPage() {
                         <Mail className="w-5 h-5 text-gray-400 mr-3" />
                         <a
                           href={`mailto:${customer.email}`}
-                          className="text-primary-600 hover:text-primary-700"
+                          className="text-cyan-600 hover:text-cyan-700"
                         >
                           {customer.email}
                         </a>
@@ -533,7 +533,7 @@ export function CustomerDetailPage() {
                           <Phone className="w-5 h-5 text-gray-400 mr-3" />
                           <a
                             href={`tel:${customer.phone}`}
-                            className="text-primary-600 hover:text-primary-700"
+                            className="text-cyan-600 hover:text-cyan-700"
                           >
                             {customer.phone}
                           </a>
@@ -566,12 +566,12 @@ export function CustomerDetailPage() {
                   {customer.owner && (
                     <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                       <h2 className="text-lg font-semibold mb-4 flex items-center">
-                        <UserCheck className="w-5 h-5 text-primary-500 mr-2" />
+                        <UserCheck className="w-5 h-5 text-cyan-500 mr-2" />
                         Owner Information
                       </h2>
                       <div className="flex items-center">
-                        <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center mr-3">
-                          <span className="text-primary-700 font-medium">
+                        <div className="w-10 h-10 rounded-full bg-cyan-100 flex items-center justify-center mr-3">
+                          <span className="text-cyan-700 font-medium">
                             {customer.owner.name.charAt(0).toUpperCase()}
                           </span>
                         </div>
@@ -592,7 +592,7 @@ export function CustomerDetailPage() {
                   {customer.vendor && (
                     <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                       <h2 className="text-lg font-semibold mb-4 flex items-center">
-                        <Building2 className="w-5 h-5 text-primary-500 mr-2" />
+                        <Building2 className="w-5 h-5 text-cyan-500 mr-2" />
                         Account Information
                       </h2>
                       <div className="flex items-center justify-between">
@@ -607,7 +607,7 @@ export function CustomerDetailPage() {
                         </div>
                         <Link
                           to={`/admin/vendors/${customer.vendor.id}`}
-                          className="text-primary-600 hover:text-primary-700 hover:underline text-sm"
+                          className="text-cyan-600 hover:text-cyan-700 hover:underline text-sm"
                         >
                           View Account
                         </Link>
@@ -619,10 +619,10 @@ export function CustomerDetailPage() {
                   {(customer.address_line1 || customer.city || customer.state || customer.country) && (
                     <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                       <h2 className="text-lg font-semibold mb-4 flex items-center">
-                        <MapPin className="w-5 h-5 text-primary-500 mr-2" />
+                        <MapPin className="w-5 h-5 text-cyan-500 mr-2" />
                         Address
                       </h2>
-                      <div className="pl-2 border-l-2 border-primary-100 py-1 space-y-1">
+                      <div className="pl-2 border-l-2 border-cyan-100 py-1 space-y-1">
                         {customer.address_line1 && (
                           <div className="text-gray-600">{customer.address_line1}</div>
                         )}
@@ -645,7 +645,7 @@ export function CustomerDetailPage() {
                 {/* Custom Fields - Full Width */}
                 <div className="md:col-span-2 bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                   <h2 className="text-lg font-semibold mb-4 flex items-center">
-                    <Bookmark className="w-5 h-5 text-primary-500 mr-2" />
+                    <Bookmark className="w-5 h-5 text-cyan-500 mr-2" />
                     Custom Fields
                   </h2>
                   <CustomFieldsSection
@@ -735,7 +735,7 @@ export function CustomerDetailPage() {
                 {/* Comment Form */}
                 <form onSubmit={handleSubmitComment} className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                   <h2 className="text-lg font-semibold mb-4 flex items-center">
-                    <MessageSquare className="w-5 h-5 text-primary-500 mr-2" />
+                    <MessageSquare className="w-5 h-5 text-cyan-500 mr-2" />
                     Add Comment
                   </h2>
 
@@ -761,13 +761,13 @@ export function CustomerDetailPage() {
                         onChange={(e) => setNewComment(e.target.value)}
                         placeholder="Add a comment..."
                         rows={3}
-                        className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                        className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200 outline-none"
                       />
                     </div>
                     <button
                       type="submit"
                       disabled={!newComment.trim()}
-                      className="px-5 py-3 bg-primary-600 text-white rounded-xl hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center shadow-sm"
+                      className="px-5 py-3 bg-cyan-600 text-white rounded-xl hover:bg-cyan-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center shadow-sm"
                     >
                       <Send className="w-4 h-4 mr-2" />
                       Send

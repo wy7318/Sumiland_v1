@@ -280,7 +280,7 @@ export function ProductForm() {
                 required
                 value={formData.name}
                 onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200 outline-none"
               />
             </div>
 
@@ -292,7 +292,7 @@ export function ProductForm() {
                 id="category"
                 value={formData.category}
                 onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
-                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200 outline-none"
               >
                 <option value="">Select a category</option>
                 {categories.map(category => (
@@ -315,7 +315,7 @@ export function ProductForm() {
                 step="0.01"
                 value={formData.price}
                 onChange={(e) => setFormData(prev => ({ ...prev, price: e.target.value }))}
-                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200 outline-none"
               />
             </div>
 
@@ -328,7 +328,7 @@ export function ProductForm() {
                 required
                 value={formData.status}
                 onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value as 'active' | 'inactive' }))}
-                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200 outline-none"
               >
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
@@ -355,7 +355,7 @@ export function ProductForm() {
                   stock_unit: e.target.value,
                   weight_unit: e.target.value === 'weight' ? weightUnits[0]?.value || null : null
                 }))}
-                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200 outline-none"
               >
                 <option value="">Select Unit Type</option>
                 {stockUnits.map(unit => (
@@ -374,7 +374,7 @@ export function ProductForm() {
                 <select
                   value={formData.weight_unit || ''}
                   onChange={(e) => setFormData(prev => ({ ...prev, weight_unit: e.target.value }))}
-                  className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                  className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200 outline-none"
                 >
                   <option value="">Select Weight Unit</option>
                   {weightUnits.map(unit => (
@@ -396,7 +396,7 @@ export function ProductForm() {
                 step={formData.stock_unit === 'weight' ? '0.001' : '1'}
                 value={formData.min_stock_level}
                 onChange={(e) => setFormData(prev => ({ ...prev, min_stock_level: e.target.value }))}
-                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200 outline-none"
               />
               <p className="mt-1 text-sm text-gray-500">
                 Alert will be triggered when stock falls below this level
@@ -413,7 +413,7 @@ export function ProductForm() {
                 step={formData.stock_unit === 'weight' ? '0.001' : '1'}
                 value={formData.max_stock_level}
                 onChange={(e) => setFormData(prev => ({ ...prev, max_stock_level: e.target.value }))}
-                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200 outline-none"
               />
               <p className="mt-1 text-sm text-gray-500">
                 Optional. Alert will be triggered when stock exceeds this level
@@ -430,7 +430,7 @@ export function ProductForm() {
                 step="0.01"
                 value={formData.avg_cost}
                 onChange={(e) => setFormData(prev => ({ ...prev, avg_cost: e.target.value }))}
-                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200 outline-none"
               />
               <p className="mt-1 text-sm text-gray-500">
                 This will be automatically updated based on purchase orders
@@ -462,7 +462,7 @@ export function ProductForm() {
                 rows={5}
                 value={formData.description}
                 onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200 outline-none"
               />
             </div>
           </div>
@@ -493,7 +493,7 @@ export function ProductForm() {
           <button
             type="submit"
             disabled={loading}
-            className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center"
+            className="px-6 py-2 bg-fuchsia-600 text-white rounded-lg hover:bg-fuchsia-700 disabled:opacity-50 flex items-center"
           >
             <Save className="w-4 h-4 mr-2" />
             {loading ? 'Saving...' : 'Save Product'}

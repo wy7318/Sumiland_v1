@@ -3,7 +3,7 @@ import { useNavigate, useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft, Building2, Mail, Phone, Calendar,
-  Edit, AlertCircle, FileText, DollarSign, User,
+  Edit, AlertCircle, FileText, Package, DollarSign, User,
   ChevronDown, ChevronUp, Send, Reply, X,
   UserCheck, Clock, Target, Globe, LinkIcon,
   Briefcase, MessageSquare, Bookmark, Tag,
@@ -62,6 +62,27 @@ type Opportunity = {
     stage: string;
     status: string;
   } | null;
+  products: OpportunityProduct[];
+};
+
+type OpportunityProduct = {
+  id: string;
+  opportunity_id: string;
+  product_id: string;
+  product: {
+    id: string;
+    name: string;
+    description: string | null;
+    price: number;
+    stock_unit: 'weight' | 'quantity';
+    weight_unit: string | null;
+  } | null;
+  quantity: number;
+  unit_price: number;
+  subtotal: number;
+  status: string;
+  notes: string | null;
+  created_at: string;
 };
 
 type Feed = {
@@ -105,6 +126,7 @@ export function OpportunityDetailPage() {
   const [opportunityStages, setOpportunityStages] = useState<PicklistValue[]>([]);
   const [opportunityTypes, setOpportunityTypes] = useState<PicklistValue[]>([]);
   const [leadSources, setLeadSources] = useState<PicklistValue[]>([]);
+  const [productStatuses, setProductStatuses] = useState<PicklistValue[]>([]);
   const [refreshRecordsList, setRefreshRecordsList] = useState(0);
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [orgTimezone, setOrgTimezone] = useState('UTC');
@@ -202,7 +224,18 @@ export function OpportunityDetailPage() {
           *,
           account:vendors(id, name, type),
           contact:customers(*),
-          owner:profiles!opportunities_owner_id_fkey(id, name)
+          owner:profiles!opportunities_owner_id_fkey(id, name),
+          products:opportunity_products(
+            id,
+            product_id, 
+            quantity, 
+            unit_price, 
+            subtotal, 
+            status,
+            notes,
+            created_at,
+            product:products(*)
+          )
         `)
         .eq('id', id)
         .single();
@@ -230,6 +263,21 @@ export function OpportunityDetailPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Get style for status badge
+  const getProductStatusStyle = (status: string) => {
+    const statusValue = productStatuses.find(s => s.value === status);
+    if (!statusValue?.color) return {};
+    return {
+      backgroundColor: statusValue.color,
+      color: statusValue.text_color || '#FFFFFF'
+    };
+  };
+
+  // Get status label
+  const getProductStatusLabel = (status: string) => {
+    return productStatuses.find(s => s.value === status)?.label || status;
   };
 
   const fetchFeeds = async () => {
@@ -512,6 +560,12 @@ export function OpportunityDetailPage() {
     );
   };
 
+  // Calculate the total for all products
+  const calculateTotal = () => {
+    if (!opportunity?.products) return 0;
+    return opportunity.products.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -693,6 +747,16 @@ export function OpportunityDetailPage() {
                 >
                   <FileText className="w-4 h-4 mr-2" />
                   Details
+                </button>
+                <button
+                  onClick={() => setActiveTab('products')}
+                  className={`py-4 px-1 inline-flex items-center text-sm font-medium border-b-2 ${activeTab === 'products'
+                    ? 'border-purple-500 text-purple-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                >
+                  <Package className="w-4 h-4 mr-2" />
+                  Products
                 </button>
                 <button
                   onClick={() => setActiveTab('related')}
@@ -935,6 +999,175 @@ export function OpportunityDetailPage() {
               </div>
             )}
 
+            {/* Products Tab Content */}
+            {activeTab === 'products' && (
+              <div className="space-y-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-lg font-semibold flex items-center">
+                    <Package className="w-5 h-5 text-purple-500 mr-2" />
+                    Products
+                  </h2>
+                  <Link
+                    to={`/admin/opportunities/${id}/edit`}
+                    className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50"
+                  >
+                    <Edit className="w-4 h-4 mr-2" />
+                    Edit Products
+                  </Link>
+                </div>
+
+                {opportunity.products && opportunity.products.length > 0 ? (
+                  <div className="space-y-4">
+                    <div className="overflow-hidden bg-white rounded-lg border border-gray-200 shadow-sm">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Product
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Quantity
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Unit Price
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Subtotal
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Status
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {opportunity.products.map((product) => (
+                            <tr key={product.id} className="hover:bg-gray-50">
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="flex items-center">
+                                  {product.product?.stock_unit === 'quantity' ? (
+                                    <Package className="flex-shrink-0 h-5 w-5 text-gray-400 mr-3" />
+                                  ) : (
+                                    <Scale className="flex-shrink-0 h-5 w-5 text-gray-400 mr-3" />
+                                  )}
+                                  <div>
+                                    <div className="text-sm font-medium text-gray-900">
+                                      {product.product?.name || 'Unknown Product'}
+                                    </div>
+                                    {product.product?.description && (
+                                      <div className="text-sm text-gray-500 max-w-xs truncate">
+                                        {product.product.description}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {product.quantity}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {formatCurrency(product.unit_price)}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                {formatCurrency(product.quantity * product.unit_price)}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span
+                                  className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
+                                  style={getProductStatusStyle(product.status)}
+                                >
+                                  {getProductStatusLabel(product.status)}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot className="bg-gray-50">
+                          <tr>
+                            <td colSpan={3} className="px-6 py-4 text-right font-medium text-gray-700">
+                              Total:
+                            </td>
+                            <td className="px-6 py-4 text-sm font-bold text-gray-900">
+                              {formatCurrency(calculateTotal())}
+                            </td>
+                            <td></td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+
+                    {/* Product Details Cards */}
+                    <div className="mt-8 space-y-4">
+                      <h3 className="text-md font-medium text-gray-700 mb-3">Product Details</h3>
+                      {opportunity.products.map((product) => (
+                        <div key={`detail-${product.id}`} className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+                          <div className="p-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+                            <div className="flex items-center">
+                              {product.product?.stock_unit === 'quantity' ? (
+                                <Package className="w-5 h-5 text-purple-500 mr-2" />
+                              ) : (
+                                <Scale className="w-5 h-5 text-purple-500 mr-2" />
+                              )}
+                              <span className="font-medium text-gray-900">{product.product?.name || 'Unknown Product'}</span>
+                            </div>
+                            <span
+                              className="px-2 py-1 text-xs leading-5 font-semibold rounded-full"
+                              style={getProductStatusStyle(product.status)}
+                            >
+                              {getProductStatusLabel(product.status)}
+                            </span>
+                          </div>
+                          <div className="p-4">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                              <div>
+                                <div className="text-sm font-medium text-gray-500">Quantity</div>
+                                <div className="mt-1 text-sm text-gray-900">{product.quantity}</div>
+                              </div>
+                              <div>
+                                <div className="text-sm font-medium text-gray-500">Unit Price</div>
+                                <div className="mt-1 text-sm text-gray-900">{formatCurrency(product.unit_price)}</div>
+                              </div>
+                              <div>
+                                <div className="text-sm font-medium text-gray-500">Subtotal</div>
+                                <div className="mt-1 text-sm font-bold text-gray-900">
+                                  {formatCurrency(product.quantity * product.unit_price)}
+                                </div>
+                              </div>
+                            </div>
+
+                            {product.notes && (
+                              <div className="mt-4">
+                                <div className="text-sm font-medium text-gray-500 mb-1">Notes</div>
+                                <div className="text-sm text-gray-700 bg-gray-50 p-3 rounded-md">
+                                  {product.notes}
+                                </div>
+                              </div>
+                            )}
+
+                            <div className="mt-4 text-xs text-gray-500">
+                              Added on {formatDate(product.created_at)}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-gray-50 p-8 rounded-lg text-center">
+                    <Package className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                    <h3 className="text-lg font-medium text-gray-700 mb-1">No Products Added</h3>
+                    <p className="text-gray-500 mb-4">This opportunity doesn't have any products yet</p>
+                    <Link
+                      to={`/admin/opportunities/${id}/edit`}
+                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700"
+                    >
+                      <Package className="w-4 h-4 mr-2" />
+                      Add Products
+                    </Link>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Related Tab Content */}
             {activeTab === 'related' && (
               <div className="space-y-8">
@@ -1050,3 +1283,12 @@ export function OpportunityDetailPage() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+

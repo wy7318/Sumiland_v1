@@ -56,12 +56,14 @@ type KanbanOrder = Order & {
   id: string; // Required for KanbanBoard
 };
 
-type StatusOption = {
+type PicklistValue = {
   id: string;
   value: string;
   label: string;
-  color: string;
-  text_color: string;
+  is_default: boolean;
+  is_active: boolean;
+  color: string | null;
+  text_color: string | null;
 };
 
 type ViewMode = 'list' | 'kanban';
@@ -70,7 +72,7 @@ type ViewMode = 'list' | 'kanban';
 function OrderCard({ order, onStatusChange, statuses, handleDelete }: {
   order: KanbanOrder;
   onStatusChange: (id: string, status: string) => void;
-  statuses: StatusOption[];
+  statuses: PicklistValue[];
   handleDelete: (id: string) => void;
 }) {
   const [showActions, setShowActions] = useState(false);
@@ -237,6 +239,7 @@ export function OrdersPage() {
   const { selectedOrganization } = useOrganization();
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [orderStatuses, setOrderStatuses] = useState<PicklistValue[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [paymentStatusFilter, setPaymentStatusFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'created_at' | 'order_number' | 'total_amount'>('created_at');
@@ -247,18 +250,29 @@ export function OrdersPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
 
-  // Define status options for Kanban board and dropdowns
-  const orderStatuses: StatusOption[] = [
-    { id: '1', value: 'New', label: 'New', color: '#DBEAFE', text_color: '#1E40AF' },
-    { id: '2', value: 'In Progress', label: 'In Progress', color: '#FEF3C7', text_color: '#92400E' },
-    { id: '3', value: 'In Review', label: 'In Review', color: '#F3E8FF', text_color: '#6B21A8' },
-    { id: '4', value: 'Completed', label: 'Completed', color: '#DCFCE7', text_color: '#166534' },
-    { id: '5', value: 'Cancelled', label: 'Cancelled', color: '#FEE2E2', text_color: '#991B1B' }
-  ];
 
   useEffect(() => {
+    fetchPicklists();
     fetchOrders();
   }, [selectedOrganization]);
+
+  const fetchPicklists = async () => {
+    try {
+      const { data: statusData, error: statusError } = await supabase
+        .from('picklist_values')
+        .select('id, value, label, is_default, is_active, color, text_color')
+        .eq('type', 'order_status')
+        .eq('is_active', true)
+        .eq('organization_id', selectedOrganization?.id)
+        .order('display_order', { ascending: true });
+
+      if (statusError) throw statusError;
+      setOrderStatuses(statusData || []);
+    } catch (err) {
+      console.error('Error fetching picklists:', err);
+      setError('Failed to load picklist values');
+    }
+  };
 
   const fetchOrders = async () => {
     try {
@@ -367,6 +381,10 @@ export function OrdersPage() {
       backgroundColor: statusValue.color,
       color: statusValue.text_color
     };
+  };
+
+  const getStatusLabel = (status: string) => {
+    return orderStatuses.find(s => s.value === status)?.label || status;
   };
 
   // Get payment status badge styling
@@ -748,7 +766,7 @@ export function OrdersPage() {
           <div className="p-6">
             <KanbanBoard
               items={kanbanOrders}
-              statuses={orderStatuses}
+                statuses={orderStatuses}
               onStatusChange={handleKanbanStatusChange}
               renderCard={(order) => (
                 <OrderCard

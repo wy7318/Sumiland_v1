@@ -267,7 +267,7 @@ export function ProductsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-fuchsia-500"></div>
       </div>
     );
   }
@@ -285,7 +285,7 @@ export function ProductsPage() {
           </button>
           <Link
             to="/admin/products/new"
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-fuchsia-600 hover:bg-fuchsia-700"
           >
             <Plus className="w-4 h-4 mr-2" />
             New Product
@@ -307,13 +307,13 @@ export function ProductsPage() {
             placeholder="Search products..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+            className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200 outline-none"
           />
         </div>
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+          className="px-4 py-2 rounded-lg border border-gray-300 focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200 outline-none"
         >
           <option value="all">All Status</option>
           {productStatuses.map(status => (
@@ -325,7 +325,7 @@ export function ProductsPage() {
         <select
           value={categoryFilter}
           onChange={(e) => setCategoryFilter(e.target.value)}
-          className="px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+          className="px-4 py-2 rounded-lg border border-gray-300 focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200 outline-none"
         >
           <option value="all">All Categories</option>
           {categories.map(category => (
@@ -337,7 +337,7 @@ export function ProductsPage() {
         <select
           value={stockFilter}
           onChange={(e) => setStockFilter(e.target.value as typeof stockFilter)}
-          className="px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+          className="px-4 py-2 rounded-lg border border-gray-300 focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200 outline-none"
         >
           <option value="all">All Stock Levels</option>
           <option value="low">Low Stock</option>

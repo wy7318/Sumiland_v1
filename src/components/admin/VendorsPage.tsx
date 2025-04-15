@@ -356,7 +356,7 @@ export function VendorsPage() {
     if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-600"></div>
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-rose-600"></div>
             </div>
         );
     }
@@ -366,7 +366,7 @@ export function VendorsPage() {
             {/* Header Section */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
                 <div>
-                    <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-700 to-purple-500 bg-clip-text text-transparent">
+                    <h1 className="text-3xl font-bold bg-gradient-to-r from-rose-700 to-pink-500 bg-clip-text text-transparent">
                         Account Management
                     </h1>
                     <p className="text-gray-500 mt-1">Manage and organize your business accounts</p>
@@ -374,14 +374,14 @@ export function VendorsPage() {
                 <div className="flex flex-wrap gap-3">
                     <button
                         onClick={exportToCSV}
-                        className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white border border-gray-200 text-gray-700 font-medium shadow-sm hover:shadow-md transition-all duration-200 hover:border-indigo-300"
+                        className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white border border-gray-200 text-gray-700 font-medium shadow-sm hover:shadow-md transition-all duration-200 hover:border-rose-300"
                     >
                         <FileDown className="w-4 h-4" />
                         <span>Export CSV</span>
                     </button>
                     <Link
                         to="/admin/vendors/new"
-                        className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-indigo-600 to-indigo-700 text-white font-medium shadow-md hover:shadow-lg transition-all duration-200 hover:from-indigo-700 hover:to-indigo-800"
+                        className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-rose-600 to-rose-700 text-white font-medium shadow-md hover:shadow-lg transition-all duration-200 hover:from-rose-700 hover:to-rose-800"
                     >
                         <Plus className="w-4 h-4" />
                         <span>Add Account</span>
@@ -401,7 +401,7 @@ export function VendorsPage() {
                 <div className="p-6">
                     <div className="flex items-center justify-between mb-4">
                         <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-                            <Filter className="w-5 h-5 text-indigo-500" />
+                            <Filter className="w-5 h-5 text-rose-500" />
                             Search & Filters
                         </h2>
                         <button
@@ -423,7 +423,7 @@ export function VendorsPage() {
                                     placeholder="Search accounts by name, contact, owner..."
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-full pl-12 pr-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all duration-200"
+                                    className="w-full pl-12 pr-4 py-3 rounded-xl border border-gray-200 focus:border-rose-500 focus:ring-2 focus:ring-rose-200 outline-none transition-all duration-200"
                                 />
                             </div>
 
@@ -433,7 +433,7 @@ export function VendorsPage() {
                                     <select
                                         value={statusFilter}
                                         onChange={(e) => setStatusFilter(e.target.value)}
-                                        className="px-4 py-2.5 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all duration-200 bg-white"
+                                        className="px-4 py-2.5 rounded-xl border border-gray-200 focus:border-rose-500 focus:ring-2 focus:ring-rose-200 outline-none transition-all duration-200 bg-white"
                                     >
                                         <option value="all">All Status</option>
                                         {accountStatuses.map(status => (
@@ -449,7 +449,7 @@ export function VendorsPage() {
                                     <select
                                         value={typeFilter}
                                         onChange={(e) => setTypeFilter(e.target.value)}
-                                        className="px-4 py-2.5 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all duration-200 bg-white"
+                                        className="px-4 py-2.5 rounded-xl border border-gray-200 focus:border-rose-500 focus:ring-2 focus:ring-rose-200 outline-none transition-all duration-200 bg-white"
                                     >
                                         <option value="all">All Types</option>
                                         {accountTypes.map(type => (
@@ -471,14 +471,14 @@ export function VendorsPage() {
                                                         e.target.value = '';
                                                     }
                                                 }}
-                                                className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all duration-200 bg-white"
+                                                className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 focus:border-rose-500 focus:ring-2 focus:ring-rose-200 outline-none transition-all duration-200 bg-white"
                                             >
                                                 <option value="">Select Action</option>
                                                 <option value="active">Mark as Active</option>
                                                 <option value="inactive">Mark as Inactive</option>
                                                 <option value="delete">Delete Selected</option>
                                             </select>
-                                            <span className="rounded-full bg-indigo-100 text-indigo-800 px-3 py-1 text-sm font-medium">
+                                            <span className="rounded-full bg-rose-100 text-rose-800 px-3 py-1 text-sm font-medium">
                                                 {selectedVendors.length} selected
                                             </span>
                                         </div>
@@ -507,7 +507,7 @@ export function VendorsPage() {
                                                 setSelectedVendors([]);
                                             }
                                         }}
-                                        className="rounded-md border-gray-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4"
+                                        className="rounded-md border-gray-300 text-rose-600 focus:ring-rose-500 h-4 w-4"
                                     />
                                 </th>
                                 <th
@@ -523,8 +523,8 @@ export function VendorsPage() {
                                         <span>Name</span>
                                         {sortConfig.key === 'name' && (
                                             sortConfig.direction === 'asc' ?
-                                                <ChevronUp className="w-4 h-4 ml-1 text-indigo-500" /> :
-                                                <ChevronDown className="w-4 h-4 ml-1 text-indigo-500" />
+                                                <ChevronUp className="w-4 h-4 ml-1 text-rose-500" /> :
+                                                <ChevronDown className="w-4 h-4 ml-1 text-rose-500" />
                                         )}
                                     </div>
                                 </th>
@@ -541,8 +541,8 @@ export function VendorsPage() {
                                         <span>Type</span>
                                         {sortConfig.key === 'type' && (
                                             sortConfig.direction === 'asc' ?
-                                                <ChevronUp className="w-4 h-4 ml-1 text-indigo-500" /> :
-                                                <ChevronDown className="w-4 h-4 ml-1 text-indigo-500" />
+                                                <ChevronUp className="w-4 h-4 ml-1 text-rose-500" /> :
+                                                <ChevronDown className="w-4 h-4 ml-1 text-rose-500" />
                                         )}
                                     </div>
                                 </th>
@@ -559,8 +559,8 @@ export function VendorsPage() {
                                         <span>Owner</span>
                                         {sortConfig.key === 'owner.name' && (
                                             sortConfig.direction === 'asc' ?
-                                                <ChevronUp className="w-4 h-4 ml-1 text-indigo-500" /> :
-                                                <ChevronDown className="w-4 h-4 ml-1 text-indigo-500" />
+                                                <ChevronUp className="w-4 h-4 ml-1 text-rose-500" /> :
+                                                <ChevronDown className="w-4 h-4 ml-1 text-rose-500" />
                                         )}
                                     </div>
                                 </th>
@@ -577,8 +577,8 @@ export function VendorsPage() {
                                         <span>Contact</span>
                                         {sortConfig.key === 'customer.name' && (
                                             sortConfig.direction === 'asc' ?
-                                                <ChevronUp className="w-4 h-4 ml-1 text-indigo-500" /> :
-                                                <ChevronDown className="w-4 h-4 ml-1 text-indigo-500" />
+                                                <ChevronUp className="w-4 h-4 ml-1 text-rose-500" /> :
+                                                <ChevronDown className="w-4 h-4 ml-1 text-rose-500" />
                                         )}
                                     </div>
                                 </th>
@@ -601,8 +601,8 @@ export function VendorsPage() {
                                         <span>Created</span>
                                         {sortConfig.key === 'created_at' && (
                                             sortConfig.direction === 'asc' ?
-                                                <ChevronUp className="w-4 h-4 ml-1 text-indigo-500" /> :
-                                                <ChevronDown className="w-4 h-4 ml-1 text-indigo-500" />
+                                                <ChevronUp className="w-4 h-4 ml-1 text-rose-500" /> :
+                                                <ChevronDown className="w-4 h-4 ml-1 text-rose-500" />
                                         )}
                                     </div>
                                 </th>
@@ -636,12 +636,12 @@ export function VendorsPage() {
                                                         setSelectedVendors(prev => prev.filter(id => id !== vendor.id));
                                                     }
                                                 }}
-                                                className="rounded-md border-gray-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4"
+                                                className="rounded-md border-gray-300 text-rose-600 focus:ring-rose-500 h-4 w-4"
                                             />
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="flex items-center">
-                                                <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center mr-3 flex-shrink-0">
+                                                <div className="w-10 h-10 rounded-full bg-rose-100 text-rose-700 flex items-center justify-center mr-3 flex-shrink-0">
                                                     <Building2 className="w-5 h-5" />
                                                 </div>
                                                 <div>
@@ -689,7 +689,7 @@ export function VendorsPage() {
                                                         <Mail className="w-4 h-4 text-gray-400 mr-1.5" />
                                                         <a
                                                             href={`mailto:${vendor.customer.email}`}
-                                                            className="text-indigo-600 hover:text-indigo-800 transition-colors"
+                                                            className="text-rose-600 hover:text-rose-800 transition-colors"
                                                         >
                                                             {vendor.customer.email}
                                                         </a>
@@ -699,7 +699,7 @@ export function VendorsPage() {
                                                             <Phone className="w-4 h-4 text-gray-400 mr-1.5" />
                                                             <a
                                                                 href={`tel:${vendor.customer.phone}`}
-                                                                className="text-indigo-600 hover:text-indigo-800 transition-colors"
+                                                                className="text-rose-600 hover:text-rose-800 transition-colors"
                                                             >
                                                                 {vendor.customer.phone}
                                                             </a>
@@ -764,7 +764,7 @@ export function VendorsPage() {
                                             <div className="flex justify-end items-center gap-2">
                                                 <Link
                                                     to={`/admin/vendors/${vendor.id}`}
-                                                    className="p-1.5 bg-indigo-50 text-indigo-600 rounded-full hover:bg-indigo-100 transition-colors"
+                                                    className="p-1.5 bg-rose-50 text-rose-600 rounded-full hover:bg-rose-100 transition-colors"
                                                     title="View details"
                                                 >
                                                     <Eye className="w-4 h-4" />
@@ -798,7 +798,7 @@ export function VendorsPage() {
                             Showing <span className="font-medium text-gray-700">{sortedVendors.length}</span> of <span className="font-medium text-gray-700">{vendors.length}</span> accounts
                         </div>
                         <div className="flex items-center gap-2">
-                            <Users className="w-5 h-5 text-indigo-500" />
+                            <Users className="w-5 h-5 text-rose-500" />
                             <span className="text-gray-700 font-medium">{vendors.length} total accounts</span>
                         </div>
                     </div>
