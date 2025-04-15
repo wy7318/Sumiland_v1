@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Save, X, AlertCircle, Package, Scale } from 'lucide-react';
+import {
+  Save, X, AlertCircle, Package, Scale,
+  ArrowLeft, ChevronRight, Image, FileText
+} from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { ImageUpload } from './ImageUpload';
 import { useAuth } from '../../contexts/AuthContext';
@@ -121,7 +124,7 @@ export function ProductForm() {
         .eq('is_active', true)
         .eq('organization_id', selectedOrganization?.id)
         .order('display_order', { ascending: true });
-  
+
       if (error) throw error;
       setCategories(data || []);
     } catch (err) {
@@ -233,273 +236,320 @@ export function ProductForm() {
 
   if (organizations.length === 0) {
     return (
-      <div className="bg-yellow-50 text-yellow-800 p-4 rounded-lg">
-        You need to be part of an organization to manage products.
+      <div className="bg-yellow-50 text-yellow-800 p-4 rounded-xl flex items-center border border-yellow-200 shadow-sm">
+        <AlertCircle className="w-5 h-5 mr-3 flex-shrink-0" />
+        <span>You need to be part of an organization to manage products.</span>
       </div>
     );
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="bg-white rounded-lg shadow-md p-6"
-    >
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">{id ? 'Edit Product' : 'Create New Product'}</h1>
-        <button
-          onClick={() => navigate('/admin/products')}
-          className="p-2 text-gray-500 hover:text-gray-700 rounded-full hover:bg-gray-100"
-        >
-          <X className="w-6 h-6" />
-        </button>
+    <div className="space-y-8 p-6 bg-gray-50 min-h-screen font-sans">
+      {/* Header Section */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+        <div>
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-fuchsia-700 to-purple-500 bg-clip-text text-transparent">
+            {id ? 'Edit Product' : 'Create New Product'}
+          </h1>
+          <p className="text-gray-500 mt-1">
+            {id ? 'Update product details and inventory information' : 'Add a new product to your inventory'}
+          </p>
+        </div>
+        <div className="flex gap-3">
+          <button
+            onClick={() => navigate('/admin/products')}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white border border-gray-200 text-gray-700 font-medium shadow-sm hover:shadow-md transition-all duration-200 hover:border-fuchsia-300"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Back to Products</span>
+          </button>
+        </div>
       </div>
 
       {error && (
-        <div className="mb-6 bg-red-50 text-red-600 p-4 rounded-lg flex items-center">
-          <AlertCircle className="w-5 h-5 mr-2" />
-          {error}
+        <div className="bg-red-50 text-red-600 p-4 rounded-xl flex items-center border border-red-100 shadow-sm mb-6">
+          <AlertCircle className="w-5 h-5 mr-3 flex-shrink-0" />
+          <span>{error}</span>
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-8">
         {/* Basic Information Section */}
-        <div className="border-b border-gray-200 pb-6">
-          <h2 className="text-lg font-semibold mb-4 flex items-center">
-            <Package className="w-5 h-5 mr-2" />
-            Basic Information
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
-                Product Name
-              </label>
-              <input
-                type="text"
-                id="name"
-                required
-                value={formData.name}
-                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200 outline-none"
-              />
-            </div>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="p-6 border-b border-gray-100">
+            <h2 className="text-lg font-semibold text-gray-800 flex items-center">
+              <Package className="w-5 h-5 text-fuchsia-500 mr-2" />
+              Basic Information
+            </h2>
+          </div>
+          <div className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label htmlFor="name" className="block text-sm font-medium text-gray-600 mb-1.5">
+                  Product Name
+                </label>
+                <input
+                  type="text"
+                  id="name"
+                  required
+                  value={formData.name}
+                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200 outline-none transition-all duration-200"
+                  placeholder="Enter product name"
+                />
+              </div>
 
-            <div>
-              <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1">
-                Category
-              </label>
-              <select
-                id="category"
-                value={formData.category}
-                onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
-                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200 outline-none"
-              >
-                <option value="">Select a category</option>
-                {categories.map(category => (
-                  <option key={category.id} value={category.value}>
-                    {category.label} 
-                  </option>
-                ))}
-              </select>
-            </div>
+              <div>
+                <label htmlFor="category" className="block text-sm font-medium text-gray-600 mb-1.5">
+                  Category
+                </label>
+                <select
+                  id="category"
+                  value={formData.category}
+                  onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200 outline-none transition-all duration-200 bg-white"
+                >
+                  <option value="">Select a category</option>
+                  {categories.map(category => (
+                    <option key={category.id} value={category.value}>
+                      {category.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-            <div>
-              <label htmlFor="price" className="block text-sm font-medium text-gray-700 mb-1">
-                Price
-              </label>
-              <input
-                type="number"
-                id="price"
-                required
-                min="0"
-                step="0.01"
-                value={formData.price}
-                onChange={(e) => setFormData(prev => ({ ...prev, price: e.target.value }))}
-                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200 outline-none"
-              />
-            </div>
+              <div>
+                <label htmlFor="price" className="block text-sm font-medium text-gray-600 mb-1.5">
+                  Price
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <span className="text-gray-500">$</span>
+                  </div>
+                  <input
+                    type="number"
+                    id="price"
+                    required
+                    min="0"
+                    step="0.01"
+                    value={formData.price}
+                    onChange={(e) => setFormData(prev => ({ ...prev, price: e.target.value }))}
+                    className="w-full pl-8 pr-4 py-3 rounded-xl border border-gray-200 focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200 outline-none transition-all duration-200"
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
 
-            <div>
-              <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-1">
-                Status
-              </label>
-              <select
-                id="status"
-                required
-                value={formData.status}
-                onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value as 'active' | 'inactive' }))}
-                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200 outline-none"
-              >
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
+              <div>
+                <label htmlFor="status" className="block text-sm font-medium text-gray-600 mb-1.5">
+                  Status
+                </label>
+                <select
+                  id="status"
+                  required
+                  value={formData.status}
+                  onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value as 'active' | 'inactive' }))}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200 outline-none transition-all duration-200 bg-white"
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
             </div>
           </div>
         </div>
 
         {/* Inventory Management Section */}
-        <div className="border-b border-gray-200 pb-6">
-          <h2 className="text-lg font-semibold mb-4 flex items-center">
-            <Scale className="w-5 h-5 mr-2" />
-            Inventory Management
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Stock Unit Type
-              </label>
-              <select
-                value={formData.stock_unit}
-                onChange={(e) => setFormData(prev => ({ 
-                  ...prev, 
-                  stock_unit: e.target.value,
-                  weight_unit: e.target.value === 'weight' ? weightUnits[0]?.value || null : null
-                }))}
-                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200 outline-none"
-              >
-                <option value="">Select Unit Type</option>
-                {stockUnits.map(unit => (
-                  <option key={unit.id} value={unit.value}>
-                    {unit.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {formData.stock_unit === 'weight' && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="p-6 border-b border-gray-100">
+            <h2 className="text-lg font-semibold text-gray-800 flex items-center">
+              <Scale className="w-5 h-5 text-fuchsia-500 mr-2" />
+              Inventory Management
+            </h2>
+          </div>
+          <div className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Weight Unit
+                <label className="block text-sm font-medium text-gray-600 mb-1.5">
+                  Stock Unit Type
                 </label>
                 <select
-                  value={formData.weight_unit || ''}
-                  onChange={(e) => setFormData(prev => ({ ...prev, weight_unit: e.target.value }))}
-                  className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200 outline-none"
+                  value={formData.stock_unit}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    stock_unit: e.target.value,
+                    weight_unit: e.target.value === 'weight' ? weightUnits[0]?.value || null : null
+                  }))}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200 outline-none transition-all duration-200 bg-white"
                 >
-                  <option value="">Select Weight Unit</option>
-                  {weightUnits.map(unit => (
+                  <option value="">Select Unit Type</option>
+                  {stockUnits.map(unit => (
                     <option key={unit.id} value={unit.value}>
                       {unit.label}
                     </option>
                   ))}
                 </select>
               </div>
-            )}
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Minimum Stock Level
-              </label>
-              <input
-                type="number"
-                min="0"
-                step={formData.stock_unit === 'weight' ? '0.001' : '1'}
-                value={formData.min_stock_level}
-                onChange={(e) => setFormData(prev => ({ ...prev, min_stock_level: e.target.value }))}
-                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200 outline-none"
-              />
-              <p className="mt-1 text-sm text-gray-500">
-                Alert will be triggered when stock falls below this level
-              </p>
-            </div>
+              {formData.stock_unit === 'weight' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-1.5">
+                    Weight Unit
+                  </label>
+                  <select
+                    value={formData.weight_unit || ''}
+                    onChange={(e) => setFormData(prev => ({ ...prev, weight_unit: e.target.value }))}
+                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200 outline-none transition-all duration-200 bg-white"
+                  >
+                    <option value="">Select Weight Unit</option>
+                    {weightUnits.map(unit => (
+                      <option key={unit.id} value={unit.value}>
+                        {unit.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Maximum Stock Level
-              </label>
-              <input
-                type="number"
-                min="0"
-                step={formData.stock_unit === 'weight' ? '0.001' : '1'}
-                value={formData.max_stock_level}
-                onChange={(e) => setFormData(prev => ({ ...prev, max_stock_level: e.target.value }))}
-                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200 outline-none"
-              />
-              <p className="mt-1 text-sm text-gray-500">
-                Optional. Alert will be triggered when stock exceeds this level
-              </p>
-            </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-600 mb-1.5">
+                  Minimum Stock Level
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step={formData.stock_unit === 'weight' ? '0.001' : '1'}
+                  value={formData.min_stock_level}
+                  onChange={(e) => setFormData(prev => ({ ...prev, min_stock_level: e.target.value }))}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200 outline-none transition-all duration-200"
+                />
+                <p className="mt-2 text-sm text-gray-500">
+                  Alert will be triggered when stock falls below this level
+                </p>
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Average Cost
-              </label>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={formData.avg_cost}
-                onChange={(e) => setFormData(prev => ({ ...prev, avg_cost: e.target.value }))}
-                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200 outline-none"
-              />
-              <p className="mt-1 text-sm text-gray-500">
-                This will be automatically updated based on purchase orders
-              </p>
+              <div>
+                <label className="block text-sm font-medium text-gray-600 mb-1.5">
+                  Maximum Stock Level
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step={formData.stock_unit === 'weight' ? '0.001' : '1'}
+                  value={formData.max_stock_level}
+                  onChange={(e) => setFormData(prev => ({ ...prev, max_stock_level: e.target.value }))}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200 outline-none transition-all duration-200"
+                />
+                <p className="mt-2 text-sm text-gray-500">
+                  Optional. Alert will be triggered when stock exceeds this level
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-600 mb-1.5">
+                  Average Cost
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <span className="text-gray-500">$</span>
+                  </div>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={formData.avg_cost}
+                    onChange={(e) => setFormData(prev => ({ ...prev, avg_cost: e.target.value }))}
+                    className="w-full pl-8 pr-4 py-3 rounded-xl border border-gray-200 focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200 outline-none transition-all duration-200"
+                  />
+                </div>
+                <p className="mt-2 text-sm text-gray-500">
+                  This will be automatically updated based on purchase orders
+                </p>
+              </div>
             </div>
           </div>
         </div>
 
         {/* Image and Description Section */}
-        <div>
-          <h2 className="text-lg font-semibold mb-4">Additional Information</h2>
-          <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Product Image
-              </label>
-              <ImageUpload
-                onImageUploaded={(url) => setFormData(prev => ({ ...prev, image_url: url }))}
-                currentImage={formData.image_url}
-              />
-            </div>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="p-6 border-b border-gray-100">
+            <h2 className="text-lg font-semibold text-gray-800 flex items-center">
+              <Image className="w-5 h-5 text-fuchsia-500 mr-2" />
+              Additional Information
+            </h2>
+          </div>
+          <div className="p-6">
+            <div className="space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-600 mb-1.5">
+                  Product Image
+                </label>
+                <div className="border-2 border-dashed border-gray-200 rounded-xl p-6 bg-gray-50">
+                  <ImageUpload
+                    onImageUploaded={(url) => setFormData(prev => ({ ...prev, image_url: url }))}
+                    currentImage={formData.image_url}
+                  />
+                </div>
+              </div>
 
-            <div>
-              <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
-                Description
-              </label>
-              <textarea
-                id="description"
-                rows={5}
-                value={formData.description}
-                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200 outline-none"
-              />
+              <div>
+                <label htmlFor="description" className="block text-sm font-medium text-gray-600 mb-1.5">
+                  Description
+                </label>
+                <textarea
+                  id="description"
+                  rows={5}
+                  value={formData.description}
+                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200 outline-none transition-all duration-200"
+                  placeholder="Enter product description..."
+                />
+              </div>
             </div>
           </div>
         </div>
 
         {/* Custom Fields Section */}
-        <CustomFieldsForm
-          entityType="products"
-          entityId={id}
-          organizationId={selectedOrganization?.id}
-          onChange={(customFieldValues) => {
-            setFormData(prev => ({
-              ...prev,
-              custom_fields: customFieldValues
-            }));
-          }}
-          className="border-t border-gray-200 pt-6"
-        />
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="p-6 border-b border-gray-100">
+            <h2 className="text-lg font-semibold text-gray-800 flex items-center">
+              <FileText className="w-5 h-5 text-fuchsia-500 mr-2" />
+              Custom Fields
+            </h2>
+          </div>
+          <div className="p-6">
+            <CustomFieldsForm
+              entityType="products"
+              entityId={id}
+              organizationId={selectedOrganization?.id}
+              onChange={(customFieldValues) => {
+                setFormData(prev => ({
+                  ...prev,
+                  custom_fields: customFieldValues
+                }));
+              }}
+            />
+          </div>
+        </div>
 
-        <div className="flex justify-end space-x-4">
+        <div className="flex justify-end space-x-4 mt-8">
           <button
             type="button"
             onClick={() => navigate('/admin/products')}
-            className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+            className="px-6 py-3 rounded-full border border-gray-300 text-gray-700 font-medium bg-white hover:bg-gray-50 transition-colors duration-200"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={loading}
-            className="px-6 py-2 bg-fuchsia-600 text-white rounded-lg hover:bg-fuchsia-700 disabled:opacity-50 flex items-center"
+            className="px-8 py-3 rounded-full bg-gradient-to-r from-fuchsia-600 to-fuchsia-700 text-white font-medium shadow-md hover:shadow-lg transition-all duration-200 hover:from-fuchsia-700 hover:to-fuchsia-800 disabled:opacity-50 flex items-center"
           >
             <Save className="w-4 h-4 mr-2" />
             {loading ? 'Saving...' : 'Save Product'}
           </button>
         </div>
       </form>
-    </motion.div>
+    </div>
   );
 }

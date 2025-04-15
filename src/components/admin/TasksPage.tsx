@@ -129,7 +129,7 @@ export function TasksPage() {
     if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-600"></div>
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-yellow-600"></div>
             </div>
         );
     }
@@ -139,7 +139,7 @@ export function TasksPage() {
             {/* Header Section */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
                 <div>
-                    <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-700 to-violet-500 bg-clip-text text-transparent">
+                    <h1 className="text-3xl font-bold bg-gradient-to-r from-yellow-700 to-violet-500 bg-clip-text text-transparent">
                         Task Management
                     </h1>
                     <p className="text-gray-500 mt-1">Create and track your tasks and deadlines</p>
@@ -147,14 +147,14 @@ export function TasksPage() {
                 <div className="flex flex-wrap gap-3">
                     <Link
                         to="/admin/tasks/calendar"
-                        className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white border border-gray-200 text-gray-700 font-medium shadow-sm hover:shadow-md transition-all duration-200 hover:border-indigo-300"
+                        className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white border border-gray-200 text-gray-700 font-medium shadow-sm hover:shadow-md transition-all duration-200 hover:border-yellow-300"
                     >
                         <LayoutGrid className="w-4 h-4" />
                         <span>Full Calendar</span>
                     </Link>
                     <Link
                         to="/admin/tasks/new"
-                        className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-medium shadow-md hover:shadow-lg transition-all duration-200 hover:from-indigo-700 hover:to-violet-700"
+                        className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-yellow-600 to-violet-600 text-white font-medium shadow-md hover:shadow-lg transition-all duration-200 hover:from-yellow-700 hover:to-violet-700"
                     >
                         <Plus className="w-4 h-4" />
                         <span>New Task</span>
@@ -174,7 +174,7 @@ export function TasksPage() {
                 <div className="p-6">
                     <div className="flex items-center justify-between mb-4">
                         <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-                            <Filter className="w-5 h-5 text-indigo-500" />
+                            <Filter className="w-5 h-5 text-yellow-500" />
                             Search & Filters
                         </h2>
                         <button
@@ -196,7 +196,7 @@ export function TasksPage() {
                                     placeholder="Search tasks by title..."
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-full pl-12 pr-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all duration-200"
+                                    className="w-full pl-12 pr-4 py-3 rounded-xl border border-gray-200 focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200 outline-none transition-all duration-200"
                                 />
                             </div>
 
@@ -212,7 +212,7 @@ export function TasksPage() {
                                                 isDone: value === 'all' ? null : value === 'done'
                                             }));
                                         }}
-                                        className="px-4 py-2.5 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all duration-200 bg-white"
+                                        className="px-4 py-2.5 rounded-xl border border-gray-200 focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200 outline-none transition-all duration-200 bg-white"
                                     >
                                         <option value="all">All Tasks</option>
                                         <option value="done">Completed</option>
@@ -231,7 +231,7 @@ export function TasksPage() {
                                                 isPersonal: value === 'all' ? null : value === 'personal'
                                             }));
                                         }}
-                                        className="px-4 py-2.5 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all duration-200 bg-white"
+                                        className="px-4 py-2.5 rounded-xl border border-gray-200 focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200 outline-none transition-all duration-200 bg-white"
                                     >
                                         <option value="all">All Tasks</option>
                                         <option value="personal">Personal</option>
@@ -247,7 +247,7 @@ export function TasksPage() {
                                             setItemsPerPage(Number(e.target.value));
                                             setCurrentPage(1);
                                         }}
-                                        className="px-4 py-2.5 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all duration-200 bg-white"
+                                        className="px-4 py-2.5 rounded-xl border border-gray-200 focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200 outline-none transition-all duration-200 bg-white"
                                     >
                                         <option value={5}>5 per page</option>
                                         <option value={10}>10 per page</option>
@@ -261,7 +261,7 @@ export function TasksPage() {
                                 <div className="flex justify-end">
                                     <button
                                         onClick={() => setFilters({ isDone: null, isPersonal: null })}
-                                        className="flex items-center gap-1 text-sm text-indigo-600 hover:text-indigo-800 transition-colors"
+                                        className="flex items-center gap-1 text-sm text-yellow-600 hover:text-yellow-800 transition-colors"
                                     >
                                         <X className="w-4 h-4" />
                                         Clear Filters
@@ -280,12 +280,12 @@ export function TasksPage() {
                     <div className="p-6">
                         <div className="flex justify-between items-center mb-4">
                             <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-                                <CalendarIcon className="w-5 h-5 text-indigo-500" />
+                                <CalendarIcon className="w-5 h-5 text-yellow-500" />
                                 Calendar View
                             </h2>
                             <Link
                                 to="/admin/tasks/calendar"
-                                className="text-sm font-medium text-indigo-600 hover:text-indigo-800 transition-colors flex items-center gap-1"
+                                className="text-sm font-medium text-yellow-600 hover:text-yellow-800 transition-colors flex items-center gap-1"
                             >
                                 Full View
                                 <ArrowRight className="w-4 h-4" />
@@ -305,7 +305,7 @@ export function TasksPage() {
                                             due.day === date.getDate()
                                         );
                                     });
-                                    return hasTask ? <div className="task-dot bg-indigo-500" /> : null;
+                                    return hasTask ? <div className="task-dot bg-yellow-500" /> : null;
                                 }}
                                 className="custom-calendar"
                                 selectRange={false}
@@ -318,8 +318,8 @@ export function TasksPage() {
                         </div>
 
                         {selectedDate && (
-                            <div className="mt-6 bg-indigo-50 p-4 rounded-xl relative z-10 selected-tasks-container">
-                                <h3 className="text-md font-semibold mb-3 text-indigo-800 flex items-center gap-2">
+                            <div className="mt-6 bg-yellow-50 p-4 rounded-xl relative z-10 selected-tasks-container">
+                                <h3 className="text-md font-semibold mb-3 text-yellow-800 flex items-center gap-2">
                                     <CalendarIcon className="w-4 h-4" />
                                     Tasks on {selectedDate.toDateString()}
                                 </h3>
@@ -329,7 +329,7 @@ export function TasksPage() {
                                             <li
                                                 key={task.id}
                                                 onClick={() => navigate(`/admin/tasks/${task.id}/edit`)}
-                                                className="p-3 rounded-lg bg-white shadow-sm border border-indigo-100 hover:bg-indigo-100 transition-colors cursor-pointer text-sm flex items-center gap-2"
+                                                className="p-3 rounded-lg bg-white shadow-sm border border-yellow-100 hover:bg-yellow-100 transition-colors cursor-pointer text-sm flex items-center gap-2"
                                             >
                                                 {task.is_done ? (
                                                     <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
@@ -341,7 +341,7 @@ export function TasksPage() {
                                         ))}
                                     </ul>
                                 ) : (
-                                    <p className="text-indigo-600 text-sm">No tasks scheduled for this date.</p>
+                                    <p className="text-yellow-600 text-sm">No tasks scheduled for this date.</p>
                                 )}
                             </div>
                         )}
@@ -352,7 +352,7 @@ export function TasksPage() {
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden lg:w-2/3 xl:w-3/4">
                     <div className="p-6">
                         <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                            <CalendarCheck className="w-5 h-5 text-indigo-500" />
+                            <CalendarCheck className="w-5 h-5 text-yellow-500" />
                             {filteredTasks.length} Tasks
                         </h2>
 
@@ -367,7 +367,7 @@ export function TasksPage() {
                                 currentTasks.map(task => (
                                     <div
                                         key={task.id}
-                                        className="p-4 rounded-xl border border-gray-100 hover:border-indigo-200 transition-colors shadow-sm hover:shadow"
+                                        className="p-4 rounded-xl border border-gray-100 hover:border-yellow-200 transition-colors shadow-sm hover:shadow"
                                     >
                                         <div className="flex justify-between items-start">
                                             <div className="space-y-1">
@@ -392,7 +392,7 @@ export function TasksPage() {
                                                     </span>
 
                                                     {task.is_personal ? (
-                                                        <span className="flex items-center gap-1 text-xs px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-full">
+                                                        <span className="flex items-center gap-1 text-xs px-2 py-0.5 bg-yellow-50 text-yellow-700 rounded-full">
                                                             <User className="w-3.5 h-3.5" />
                                                             Personal
                                                         </span>
@@ -414,7 +414,7 @@ export function TasksPage() {
                                             <div className="flex gap-2">
                                                 <Link
                                                     to={`/admin/tasks/${task.id}/edit`}
-                                                    className="p-1.5 bg-indigo-50 text-indigo-600 rounded-full hover:bg-indigo-100 transition-colors"
+                                                    className="p-1.5 bg-yellow-50 text-yellow-600 rounded-full hover:bg-yellow-100 transition-colors"
                                                     title="Edit task"
                                                 >
                                                     <Edit className="w-4 h-4" />
@@ -485,7 +485,7 @@ export function TasksPage() {
                                                     key={pageNum}
                                                     onClick={() => paginate(pageNum)}
                                                     className={`px-4 py-2 text-sm font-medium rounded-full ${currentPage === pageNum
-                                                            ? 'bg-indigo-600 text-white'
+                                                            ? 'bg-yellow-600 text-white'
                                                             : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
                                                         } transition-colors`}
                                                 >

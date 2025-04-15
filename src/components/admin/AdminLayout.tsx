@@ -94,7 +94,7 @@ export function AdminLayout() {
       case 'Orders':
         return "bg-amber-50 text-amber-600 border-l-4 border-amber-500";
       case 'Tasks':
-        return "bg-indigo-50 text-indigo-600 border-l-4 border-indigo-500";
+        return "bg-yellow-50 text-yellow-600 border-l-4 border-yellow-500";
       case 'Reports':
         return "bg-lime-50 text-lime-600 border-l-4 border-lime-500";
       case 'Products':

@@ -216,7 +216,7 @@ export function TaskFormPage() {
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
                         required
-                        className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-primary-500 focus:border-primary-500"
+                        className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-yellow-500 focus:border-yellow-500"
                     />
                 </div>
 
@@ -226,7 +226,7 @@ export function TaskFormPage() {
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
                         rows={3}
-                        className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-primary-500 focus:border-primary-500"
+                        className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-yellow-500 focus:border-yellow-500"
                     />
                 </div>
 
@@ -239,7 +239,7 @@ export function TaskFormPage() {
                             value={dueDate}
                             onChange={(e) => setDueDate(e.target.value)}
                             required
-                            className="w-full pl-10 py-2 rounded-lg border border-gray-300 focus:ring-primary-500 focus:border-primary-500"
+                            className="w-full pl-10 py-2 rounded-lg border border-gray-300 focus:ring-yellow-500 focus:border-yellow-500"
                         />
                     </div>
                 </div>
@@ -262,7 +262,7 @@ export function TaskFormPage() {
                             setSelectedModule(mod || null);
                             setRecordId('');
                         }}
-                        className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-primary-500 focus:border-primary-500"
+                        className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-yellow-500 focus:border-yellow-500"
                     >
                         <option value="">Select Module</option>
                         {moduleOptions.map(mod => (
@@ -281,14 +281,14 @@ export function TaskFormPage() {
                                 placeholder={`Search ${selectedModule.name}...`}
                                 value={recordSearch}
                                 onChange={(e) => setRecordSearch(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:ring-primary-500 focus:border-primary-500"
+                                className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:ring-yellow-500 focus:border-yellow-500"
                             />
                         </div>
 
                         <select
                             value={recordId}
                             onChange={(e) => setRecordId(e.target.value)}
-                            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-primary-500 focus:border-primary-500"
+                            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-yellow-500 focus:border-yellow-500"
                         >
                             <option value="">Select Record</option>
                             {moduleRecords.map(record => (
@@ -314,7 +314,7 @@ export function TaskFormPage() {
                     <button
                         type="submit"
                         disabled={loading}
-                        className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 flex items-center disabled:opacity-50"
+                        className="bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 flex items-center disabled:opacity-50"
                     >
                         <Save className="w-4 h-4 mr-2" /> {loading ? 'Saving...' : 'Save Task'}
                     </button>
