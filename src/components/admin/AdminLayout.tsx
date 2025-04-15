@@ -65,7 +65,50 @@ export function AdminLayout() {
     navigate('/');
   };
 
-  const isActive = (path) => location.pathname.startsWith(path);
+  const isActive = (path) => {
+    // Special case for Dashboard which is at the root admin path
+    if (path === '/admin') {
+      return location.pathname === '/admin' || location.pathname === '/admin/';
+    }
+    // For all other paths, use the startsWith check
+    return location.pathname.startsWith(path);
+  };
+
+  // Add this function before your return statement
+  const getMenuHighlightColors = (label) => {
+    switch (label) {
+      case 'Dashboard':
+        return "bg-blue-50 text-blue-600 border-l-4 border-blue-500";
+      case 'Accounts':
+        return "bg-rose-50 text-rose-600 border-l-4 border-rose-500";
+      case 'Contacts':
+        return "bg-cyan-50 text-cyan-600 border-l-4 border-cyan-500";
+      case 'Leads':
+        return "bg-indigo-50 text-indigo-600 border-l-4 border-indigo-500";
+      case 'Cases':
+        return "bg-blue-50 text-blue-600 border-l-4 border-blue-500";
+      case 'Opportunities':
+        return "bg-purple-50 text-purple-600 border-l-4 border-purple-500";
+      case 'Quotes':
+        return "bg-teal-50 text-teal-600 border-l-4 border-teal-500";
+      case 'Orders':
+        return "bg-amber-50 text-amber-600 border-l-4 border-amber-500";
+      case 'Tasks':
+        return "bg-indigo-50 text-indigo-600 border-l-4 border-indigo-500";
+      case 'Reports':
+        return "bg-lime-50 text-lime-600 border-l-4 border-lime-500";
+      case 'Products':
+        return "bg-fuchsia-50 text-fuchsia-600 border-l-4 border-fuchsia-500";
+      // Add more cases for other menu items
+      default:
+        return "bg-primary-100 text-primary-700 border-l-4 border-primary-500";
+    }
+  };
+
+  const getMenuBgColor = (label) => {
+    const colorClass = getMenuHighlightColors(label).split(' ')[0]; // get bg-xxx-50
+    return colorClass;
+  };
 
   const hasAdminAccess = organizations.some(org => org.role === 'admin' || org.role === 'owner');
 
@@ -95,6 +138,10 @@ export function AdminLayout() {
     ] : [])
   ];
 
+  const currentMenuItem = menuItems.find(item => isActive(item.path));
+  const currentBgColor = currentMenuItem ? getMenuBgColor(currentMenuItem.label) : "bg-white";
+
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -102,6 +149,13 @@ export function AdminLayout() {
       </div>
     );
   }
+
+  
+
+  
+
+
+  
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -139,11 +193,12 @@ export function AdminLayout() {
         </button>
 
         {/* Navigation Menu Items */}
+        {/* Navigation Menu Items */}
         <div className={cn(
-          "py-2 flex flex-col h-[calc(100%-8rem)]",
+          "py-2 flex flex-col h-[calc(100%-10rem)]", // Increase the subtracted height to leave more room for Settings
           sidebarCollapsed ? "items-center" : ""
         )}>
-          <div className="flex-grow overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 pr-1">
+          <div className="flex-grow overflow-y-auto hide-scrollbar pr-1">
             {menuItems.map((item) => (
               <Link
                 key={item.path}
@@ -152,7 +207,7 @@ export function AdminLayout() {
                   "flex items-center py-3 mb-1 text-sm font-medium transition-colors",
                   sidebarCollapsed ? "justify-center mx-2" : "px-4",
                   isActive(item.path)
-                    ? "bg-blue-50 text-blue-600 border-l-4 border-blue-500 font-semibold"
+                    ? getMenuHighlightColors(item.label) + " font-semibold"
                     : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                 )}
               >
@@ -163,8 +218,8 @@ export function AdminLayout() {
           </div>
         </div>
 
-        {/* Settings Bottom Section */}
-        <div className="absolute bottom-0 w-full border-t border-gray-200 p-4">
+        {/* Settings Bottom Section with white background and shadow separation */}
+        <div className="absolute bottom-0 w-full border-t border-gray-200 bg-white py-3 px-4 shadow-inner">
           <Link
             to="/admin/settings"
             className={cn(
@@ -185,9 +240,10 @@ export function AdminLayout() {
       )}>
         {/* Top Header Bar */}
         <header className={cn(
-          "fixed top-0 right-0 bg-white z-20 transition-all duration-300 border-b border-gray-200 shadow-sm",
+          "fixed top-0 right-0 z-20 transition-all duration-300 border-b border-gray-200 shadow-sm",
           sidebarCollapsed ? "left-20" : "left-64",
-          scrolled ? "py-2" : "py-3"
+          scrolled ? "py-2" : "py-3",
+          currentBgColor
         )}>
           <div className="px-6 flex items-center justify-between">
             {/* Search Bar */}

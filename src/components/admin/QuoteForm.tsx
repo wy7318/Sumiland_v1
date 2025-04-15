@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate, useParams, useLocation } from 'react-router-dom';
+import { useNavigate, useParams, useLocation, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Save,
@@ -16,14 +16,24 @@ import {
   MapPin,
   ClipboardList,
   Box,
-  CheckCircle
+  CheckCircle,
+  ArrowLeft,
+  Mail,
+  Phone,
+  FileText,
+  DollarSign,
+  CreditCard,
+  Tag,
+  UserCheck,
+  Bookmark,
+  Clock
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { cn } from '../../lib/utils';
+import { cn, formatCurrency } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
 import { CustomFieldsForm } from './CustomFieldsForm';
 import { useOrganization } from '../../contexts/OrganizationContext';
-import { UserSearch } from './UserSearch'; // Import UserSearch component
+import { UserSearch } from './UserSearch';
 import { Loader } from '@googlemaps/js-api-loader';
 
 // Types
@@ -64,6 +74,9 @@ type PicklistValue = {
   id: string;
   value: string;
   is_default: boolean;
+  label?: string;
+  color?: string | null;
+  text_color?: string | null;
 };
 
 type FormData = {
@@ -146,6 +159,14 @@ export function QuoteForm() {
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [customFields, setCustomFields] = useState<Record<string, any>>({});
   const location = useLocation();
+  const [quoteNumber, setQuoteNumber] = useState<string>('New Quote');
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState('details');
+
+  // Status and picklists
+  const [quoteStatuses, setQuoteStatuses] = useState<PicklistValue[]>([]);
+  const [approvalStatuses, setApprovalStatuses] = useState<PicklistValue[]>([]);
 
   // Search states
   const [customerSearch, setCustomerSearch] = useState('');
@@ -189,6 +210,49 @@ export function QuoteForm() {
   // Add state to track if this is from an opportunity conversion
   const [convertedFromOpportunity, setConvertedFromOpportunity] = useState(false);
   const [opportunityId, setOpportunityId] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchPicklists();
+    if (id) {
+      fetchQuote();
+    } else if (selectedOrganization) {
+      setFormData(prev => ({
+        ...prev,
+        organization_id: selectedOrganization.id
+      }));
+    }
+  }, [id, selectedOrganization]);
+
+  const fetchPicklists = async () => {
+    try {
+      // Fetch quote statuses
+      const { data: statusData, error: statusError } = await supabase
+        .from('picklist_values')
+        .select('id, value, label, is_default, is_active, color, text_color')
+        .eq('type', 'quote_status')
+        .eq('is_active', true)
+        .eq('organization_id', selectedOrganization?.id)
+        .order('display_order', { ascending: true });
+
+      if (statusError) throw statusError;
+      setQuoteStatuses(statusData || []);
+
+      // Fetch approval statuses
+      const { data: approvalData, error: approvalError } = await supabase
+        .from('picklist_values')
+        .select('id, value, label, is_default, is_active, color, text_color')
+        .eq('type', 'quote_approval_status')
+        .eq('is_active', true)
+        .eq('organization_id', selectedOrganization?.id)
+        .order('display_order', { ascending: true });
+
+      if (approvalError) throw approvalError;
+      setApprovalStatuses(approvalData || []);
+    } catch (err) {
+      console.error('Error fetching picklists:', err);
+      setError('Failed to load picklist values');
+    }
+  };
 
   // Load Google Maps API
   useEffect(() => {
@@ -311,17 +375,6 @@ export function QuoteForm() {
       [`${type}_country`]: country
     }));
   };
-
-  useEffect(() => {
-    if (id) {
-      fetchQuote();
-    } else if (selectedOrganization) {
-      setFormData(prev => ({
-        ...prev,
-        organization_id: selectedOrganization.id
-      }));
-    }
-  }, [id, selectedOrganization]);
 
   useEffect(() => {
     if (selectedOrganization) {
@@ -484,6 +537,8 @@ export function QuoteForm() {
             return null;
           }
         };
+
+        setQuoteNumber(quote.quote_number || 'New Quote');
 
         setFormData({
           customer_id: quote.customer_id,
@@ -954,7 +1009,7 @@ export function QuoteForm() {
 
         if (itemsError) throw itemsError;
 
-        // ✅ NEW CODE: If this quote was converted from an opportunity, update the opportunity
+        // If this quote was converted from an opportunity, update the opportunity
         if (convertedFromOpportunity && opportunityId) {
           console.log("🟢 Debug - Updating Opportunity as Converted");
           const { error: opportunityError } = await supabase
@@ -1009,928 +1064,1152 @@ export function QuoteForm() {
     }
   };
 
+  // Get style for status badge
+  const getStatusStyle = (status: string) => {
+    const statusValue = quoteStatuses.find(s => s.value === status);
+    if (!statusValue?.color) return {};
+    return {
+      backgroundColor: statusValue.color,
+      color: statusValue.text_color || '#FFFFFF'
+    };
+  };
+
+  // Get approval status style
+  const getApprovalStatusStyle = (status: string) => {
+    const statusValue = approvalStatuses.find(s => s.value === status);
+    if (!statusValue?.color) {
+      // Default colors if not found in picklist
+      if (status === 'Approved') return { backgroundColor: '#10B981', color: '#FFFFFF' };
+      if (status === 'Rejected') return { backgroundColor: '#EF4444', color: '#FFFFFF' };
+      if (status === 'Pending') return { backgroundColor: '#F59E0B', color: '#FFFFFF' };
+      return {};
+    }
+    return {
+      backgroundColor: statusValue.color,
+      color: statusValue.text_color || '#FFFFFF'
+    };
+  };
+
+  // Get current status index for the progress bar
+  const getCurrentStatusIndex = () => {
+    if (!formData.status || !quoteStatuses.length) return -1;
+    return quoteStatuses.findIndex(status =>
+      status.value.toLowerCase() === formData.status.toLowerCase()
+    );
+  };
+
+  // Format a full address from components
+  const formatAddress = (line1: string | null, line2: string | null, city: string | null, state: string | null, country: string | null) => {
+    const parts = [];
+    if (line1) parts.push(line1);
+    if (line2) parts.push(line2);
+
+    const cityStateCountry = [];
+    if (city) cityStateCountry.push(city);
+    if (state) cityStateCountry.push(state);
+    if (cityStateCountry.length > 0) parts.push(cityStateCountry.join(', '));
+
+    if (country) parts.push(country);
+
+    return parts.length > 0 ? parts.join(', ') : 'No address provided';
+  };
+
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="bg-white rounded-lg shadow-md p-6"
-    >
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">
-          {id ? 'Edit Quote' : (convertedFromOpportunity ? 'Convert Opportunity to Quote' : 'Create New Quote')}
-        </h1>
-        {/* Show a badge if this is from an opportunity conversion */}
-        {convertedFromOpportunity && (
-          <div className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm">
-            Converted from Opportunity
-          </div>
-        )}
-        <button
-          onClick={() => navigate('/admin/quotes')}
-          className="p-2 text-gray-500 hover:text-gray-700 rounded-full hover:bg-gray-100"
-        >
-          <X className="w-6 h-6" />
-        </button>
-      </div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">
-          {id ? 'Edit Quote' : 'Create New Quote'}
-        </h1>
-        <button
-          onClick={() => navigate('/admin/quotes')}
-          className="p-2 text-gray-500 hover:text-gray-700 rounded-full hover:bg-gray-100"
-        >
-          <X className="w-6 h-6" />
-        </button>
-      </div>
-
-      {error && (
-        <div className="mb-6 bg-red-50 text-red-600 p-4 rounded-lg flex items-center">
-          <AlertCircle className="w-5 h-5 mr-2" />
-          {error}
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div ref={customerSearchRef} className="relative">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Customer *
-            </label>
-            {selectedCustomer ? (
-              <div className="flex items-center justify-between p-2 border rounded-lg">
-                <div>
-                  <p className="font-medium">
-                    {selectedCustomer.first_name} {selectedCustomer.last_name}
-                  </p>
-                  <p className="text-sm text-gray-500">{selectedCustomer.email}</p>
-                  {selectedCustomer.company && (
-                    <p className="text-sm text-gray-500">{selectedCustomer.company}</p>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedCustomer(null);
-                    setFormData(prev => ({ ...prev, customer_id: '' }));
-                  }}
-                  className="p-1 hover:bg-gray-100 rounded-full"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            ) : (
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input
-                  type="text"
-                  value={customerSearch}
-                  onChange={(e) => {
-                    setCustomerSearch(e.target.value);
-                    setShowCustomerDropdown(true);
-                    if (!customers.length) {
-                      fetchCustomers();
-                    }
-                  }}
-                  onFocus={() => {
-                    setShowCustomerDropdown(true);
-                    if (!customers.length) {
-                      fetchCustomers();
-                    }
-                  }}
-                  placeholder="Search customers..."
-                  className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-                />
-              </div>
-            )}
-
-            <AnimatePresence>
-              {showCustomerDropdown && customerSearch && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="absolute z-10 w-full mt-1 bg-white rounded-lg shadow-lg border border-gray-200"
-                >
-                  {filteredCustomers.length > 0 ? (
-                    <ul className="py-1 max-h-60 overflow-auto">
-                      {filteredCustomers.map(customer => (
-                        <li
-                          key={customer.customer_id}
-                          onClick={() => handleCustomerSelect(customer)}
-                          className="px-4 py-2 hover:bg-gray-50 cursor-pointer"
-                        >
-                          <div className="font-medium">
-                            {customer.first_name} {customer.last_name}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {customer.email}
-                          </div>
-                          {customer.company && (
-                            <div className="text-sm text-gray-500">
-                              {customer.company}
-                            </div>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <div className="p-4 text-gray-500">
-                      No customers found
-                    </div>
-                  )}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
-          <div ref={vendorSearchRef} className="relative">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Account
-            </label>
-            {selectedVendor ? (
-              <div className="flex items-center justify-between p-2 border rounded-lg">
-                <div>
-                  <p className="font-medium">{selectedVendor.name}</p>
-                  {selectedVendor.contact_person && (
-                    <p className="text-sm text-gray-500">
-                      Contact: {selectedVendor.contact_person}
-                    </p>
-                  )}
-                  {selectedVendor.email && (
-                    <p className="text-sm text-gray-500">{selectedVendor.email}</p>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedVendor(null);
-                    setFormData(prev => ({ ...prev, vendor_id: null }));
-                  }}
-                  className="p-1 hover:bg-gray-100 rounded-full"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            ) : (
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input
-                  type="text"
-                  value={vendorSearch}
-                  onChange={(e) => {
-                    setVendorSearch(e.target.value);
-                    setShowVendorDropdown(true);
-                    if (!vendors.length) {
-                      fetchVendors();
-                    }
-                  }}
-                  onFocus={() => {
-                    setShowVendorDropdown(true);
-                    if (!vendors.length) {
-                      fetchVendors();
-                    }
-                  }}
-                  placeholder="Search accounts..."
-                  className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-                />
-              </div>
-            )}
-
-            <AnimatePresence>
-              {showVendorDropdown && vendorSearch && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="absolute z-10 w-full mt-1 bg-white rounded-lg shadow-lg border border-gray-200"
-                >
-                  {filteredVendors.length > 0 ? (
-                    <ul className="py-1 max-h-60 overflow-auto">
-                      {filteredVendors.map(vendor => (
-                        <li
-                          key={vendor.id}
-                          onClick={() => handleVendorSelect(vendor)}
-                          className="px-4 py-2 hover:bg-gray-50 cursor-pointer"
-                        >
-                          <div className="font-medium">{vendor.name}</div>
-                          {vendor.contact_person && (
-                            <div className="text-sm text-gray-500">
-                              Contact: {vendor.contact_person}
-                            </div>
-                          )}
-                          {vendor.email && (
-                            <div className="text-sm text-gray-500">
-                              {vendor.email}
-                            </div>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <div className="p-4 text-gray-500">
-                      No accounts found
-                    </div>
-                  )}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
-          {/* New field: Owner ID */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Owner
-            </label>
-            <UserSearch
-              organizationId={selectedOrganization?.id}
-              selectedUserId={formData.owner_id}
-              onSelect={(userId) => setFormData(prev => ({ ...prev, owner_id: userId }))}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Status
-            </label>
-            <select
-              value={formData.status}
-              onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
-              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-            >
-              <option value="Draft">Draft</option>
-              <option value="Sent">Sent</option>
-              <option value="Approved">Approved</option>
-              <option value="Rejected">Rejected</option>
-              <option value="Expired">Expired</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Approval Status
-            </label>
-            <select
-              value={formData.approval_status || 'Pending'}
-              onChange={(e) => setFormData(prev => ({ ...prev, approval_status: e.target.value }))}
-              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-            >
-              {approvalStatusOptions.length > 0 ? (
-                approvalStatusOptions.map(option => (
-                  <option key={option.id} value={option.value}>
-                    {option.value}
-                  </option>
-                ))
-              ) : (
-                <>
-                  <option value="Pending">Pending</option>
-                  <option value="Approved">Approved</option>
-                  <option value="Rejected">Rejected</option>
-                </>
-              )}
-            </select>
-          </div>
-
-          {formData.approval_status === 'Approved' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Approved By
-              </label>
-              <UserSearch
-                organizationId={selectedOrganization?.id}
-                selectedUserId={formData.approved_by}
-                onSelect={(userId) => setFormData(prev => ({ ...prev, approved_by: userId }))}
-              />
-            </div>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Expiration Date
-            </label>
-            <input
-              type="datetime-local"
-              value={formData.expire_at || ''}
-              onChange={(e) => setFormData(prev => ({ ...prev, expire_at: e.target.value }))}
-              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-            />
-          </div>
-        </div>
-
-        {/* Shipping Information Section */}
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <h2 className="text-lg font-semibold mb-4 flex items-center">
-            <MapPin className="w-5 h-5 mr-2 text-gray-600" />
-            Shipping Information
-          </h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div ref={shipToCustomerSearchRef} className="relative md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Ship To Customer
-              </label>
-              {selectedShipToCustomer ? (
-                <div className="flex items-center justify-between p-2 border rounded-lg">
-                  <div>
-                    <p className="font-medium">
-                      {selectedShipToCustomer.first_name} {selectedShipToCustomer.last_name}
-                    </p>
-                    <p className="text-sm text-gray-500">{selectedShipToCustomer.email}</p>
-                    {selectedShipToCustomer.company && (
-                      <p className="text-sm text-gray-500">{selectedShipToCustomer.company}</p>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedShipToCustomer(null);
-                      setFormData(prev => ({ ...prev, ship_to_customer_id: null }));
-                    }}
-                    className="p-1 hover:bg-gray-100 rounded-full"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              ) : (
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                  <input
-                    type="text"
-                    value={shipToCustomerSearch}
-                    onChange={(e) => {
-                      setShipToCustomerSearch(e.target.value);
-                      setShowShipToCustomerDropdown(true);
-                      if (!customers.length) {
-                        fetchCustomers();
-                      }
-                    }}
-                    onFocus={() => {
-                      setShowShipToCustomerDropdown(true);
-                      if (!customers.length) {
-                        fetchCustomers();
-                      }
-                    }}
-                    placeholder="Search customers for shipping..."
-                    className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-                  />
-                </div>
-              )}
-
-              <AnimatePresence>
-                {showShipToCustomerDropdown && shipToCustomerSearch && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    className="absolute z-10 w-full mt-1 bg-white rounded-lg shadow-lg border border-gray-200"
-                  >
-                    {filteredShipToCustomers.length > 0 ? (
-                      <ul className="py-1 max-h-60 overflow-auto">
-                        {filteredShipToCustomers.map(customer => (
-                          <li
-                            key={customer.customer_id}
-                            onClick={() => handleShipToCustomerSelect(customer)}
-                            className="px-4 py-2 hover:bg-gray-50 cursor-pointer"
-                          >
-                            <div className="font-medium">
-                              {customer.first_name} {customer.last_name}
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              {customer.email}
-                            </div>
-                            {customer.company && (
-                              <div className="text-sm text-gray-500">
-                                {customer.company}
-                              </div>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <div className="p-4 text-gray-500">
-                        No customers found
-                      </div>
-                    )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Address Line 1
-              </label>
-              <input
-                id="shipping-address-line1"
-                type="text"
-                value={formData.shipping_address_line1 || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, shipping_address_line1: e.target.value }))}
-                placeholder="Type to search for an address"
-                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-              />
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Address Line 2
-              </label>
-              <input
-                type="text"
-                value={formData.shipping_address_line2 || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, shipping_address_line2: e.target.value }))}
-                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                City
-              </label>
-              <input
-                type="text"
-                value={formData.shipping_city || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, shipping_city: e.target.value }))}
-                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                State
-              </label>
-              <input
-                type="text"
-                value={formData.shipping_state || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, shipping_state: e.target.value }))}
-                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Country
-              </label>
-              <input
-                type="text"
-                value={formData.shipping_country || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, shipping_country: e.target.value }))}
-                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Billing Information Section */}
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
+    <div className="px-4 py-6 max-w-7xl mx-auto">
+      <form onSubmit={handleSubmit}>
+        {/* Header Section */}
+        <div className="mb-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold flex items-center">
-              <Building2 className="w-5 h-5 mr-2 text-gray-600" />
-              Billing Information
-            </h2>
-            <label className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                checked={useShippingForBilling}
-                onChange={(e) => setUseShippingForBilling(e.target.checked)}
-                className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-              />
-              <span className="text-sm text-gray-600">Same as shipping</span>
-            </label>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div ref={billToCustomerSearchRef} className="relative md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Bill To Customer
-              </label>
-              {selectedBillToCustomer ? (
-                <div className="flex items-center justify-between p-2 border rounded-lg">
-                  <div>
-                    <p className="font-medium">
-                      {selectedBillToCustomer.first_name} {selectedBillToCustomer.last_name}
-                    </p>
-                    <p className="text-sm text-gray-500">{selectedBillToCustomer.email}</p>
-                    {selectedBillToCustomer.company && (
-                      <p className="text-sm text-gray-500">{selectedBillToCustomer.company}</p>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedBillToCustomer(null);
-                      setFormData(prev => ({ ...prev, bill_to_customer_id: null }));
-                    }}
-                    className="p-1 hover:bg-gray-100 rounded-full"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              ) : (
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                  <input
-                    type="text"
-                    value={billToCustomerSearch}
-                    onChange={(e) => {
-                      setBillToCustomerSearch(e.target.value);
-                      setShowBillToCustomerDropdown(true);
-                      if (!customers.length) {
-                        fetchCustomers();
-                      }
-                    }}
-                    onFocus={() => {
-                      setShowBillToCustomerDropdown(true);
-                      if (!customers.length) {
-                        fetchCustomers();
-                      }
-                    }}
-                    placeholder="Search customers for billing..."
-                    className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-                  />
-                </div>
-              )}
-
-              <AnimatePresence>
-                {showBillToCustomerDropdown && billToCustomerSearch && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    className="absolute z-10 w-full mt-1 bg-white rounded-lg shadow-lg border border-gray-200"
-                  >
-                    {filteredBillToCustomers.length > 0 ? (
-                      <ul className="py-1 max-h-60 overflow-auto">
-                        {filteredBillToCustomers.map(customer => (
-                          <li
-                            key={customer.customer_id}
-                            onClick={() => handleBillToCustomerSelect(customer)}
-                            className="px-4 py-2 hover:bg-gray-50 cursor-pointer"
-                          >
-                            <div className="font-medium">
-                              {customer.first_name} {customer.last_name}
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              {customer.email}
-                            </div>
-                            {customer.company && (
-                              <div className="text-sm text-gray-500">
-                                {customer.company}
-                              </div>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <div className="p-4 text-gray-500">
-                        No customers found
-                      </div>
-                    )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Address Line 1
-              </label>
-              <input
-                id="billing-address-line1"
-                type="text"
-                value={formData.billing_address_line1 || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, billing_address_line1: e.target.value }))}
-                disabled={useShippingForBilling}
-                placeholder={!useShippingForBilling ? "Type to search for an address" : undefined}
-                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none disabled:bg-gray-100 disabled:text-gray-500"
-              />
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Address Line 2
-              </label>
-              <input
-                type="text"
-                value={formData.billing_address_line2 || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, billing_address_line2: e.target.value }))}
-                disabled={useShippingForBilling}
-                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none disabled:bg-gray-100 disabled:text-gray-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                City
-              </label>
-              <input
-                type="text"
-                value={formData.billing_city || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, billing_city: e.target.value }))}
-                disabled={useShippingForBilling}
-                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none disabled:bg-gray-100 disabled:text-gray-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                State
-              </label>
-              <input
-                type="text"
-                value={formData.billing_state || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, billing_state: e.target.value }))}
-                disabled={useShippingForBilling}
-                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none disabled:bg-gray-100 disabled:text-gray-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Country
-              </label>
-              <input
-                type="text"
-                value={formData.billing_country || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, billing_country: e.target.value }))}
-                disabled={useShippingForBilling}
-                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none disabled:bg-gray-100 disabled:text-gray-500"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Quote Items Section */}
-        <div className="border-t border-gray-200 pt-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold">Quote Items</h2>
-            <div ref={productSearchRef} className="relative">
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={selectedProductIndex === null ? '' : productSearch}
-                  onChange={(e) => {
-                    setProductSearch(e.target.value);
-                    setShowProductDropdown(true);
-                    if (!products.length) {
-                      fetchProducts();
-                    }
-                  }}
-                  onFocus={() => {
-                    setShowProductDropdown(true);
-                    if (!products.length) {
-                      fetchProducts();
-                    }
-                  }}
-                  placeholder="Search products..."
-                  className="w-64 px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedProductIndex(null);
-                    setProductSearch('');
-                    setShowProductDropdown(true);
-                  }}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Product
-                </button>
-              </div>
-
-              <AnimatePresence>
-                {showProductDropdown && productSearch && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    className="absolute z-10 w-full mt-1 bg-white rounded-lg shadow-lg border border-gray-200"
-                  >
-                    {filteredProducts.length > 0 ? (
-                      <ul className="py-1 max-h-60 overflow-auto">
-                        {filteredProducts.map(product => (
-                          <li
-                            key={product.id}
-                            onClick={() => handleProductSelect(product)}
-                            className="px-4 py-2 hover:bg-gray-50 cursor-pointer"
-                          >
-                            <div className="flex items-center">
-                              <Package className="w-4 h-4 text-gray-400 mr-2" />
-                              <div>
-                                <div className="font-medium">{product.name}</div>
-                                <div className="text-sm text-gray-500">
-                                  Price: ${product.price.toFixed(2)}
-                                </div>
-                              </div>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <div className="p-4 text-gray-500">
-                        No products found
-                      </div>
-                    )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            {formData.items.map((item, index) => (
-              <div key={index} className="bg-gray-50 p-4 rounded-lg">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Item Name *
-                    </label>
-                    <input
-                      type="text"
-                      value={item.item_name || ''}
-                      onChange={(e) => updateItem(index, 'item_name', e.target.value)}
-                      className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Quantity *
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={item.quantity}
-                      onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value))}
-                      className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Unit Price *
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={item.unit_price}
-                      onChange={(e) => updateItem(index, 'unit_price', parseFloat(e.target.value))}
-                      className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Description
-                    </label>
-                    <input
-                      type="text"
-                      value={item.item_desc || ''}
-                      onChange={(e) => updateItem(index, 'item_desc', e.target.value)}
-                      className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div className="mt-4 flex justify-between items-center">
-                  <button
-                    type="button"
-                    onClick={() => removeItem(index)}
-                    className="text-red-600 hover:text-red-700"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                  </button>
-                  <div className="text-right">
-                    <span className="text-sm text-gray-500">Line Total:</span>
-                    <span className="ml-2 font-medium">
-                      ${item.line_total.toFixed(2)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
-
             <button
               type="button"
-              onClick={() => {
-                setFormData(prev => ({
-                  ...prev,
-                  items: [
-                    ...prev.items,
-                    {
-                      item_name: '',
-                      item_desc: '',
-                      quantity: 1,
-                      unit_price: 0,
-                      line_total: 0
-                    }
-                  ]
-                }));
-              }}
-              className="w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-primary-500 hover:text-primary-500 transition-colors flex items-center justify-center"
+              onClick={() => navigate('/admin/quotes')}
+              className="inline-flex items-center text-gray-600 hover:text-gray-900 transition-colors"
             >
-              <Plus className="w-5 h-5 mr-2" />
-              Add Item
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              <span>Back to Quotes</span>
             </button>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Discount Amount
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.discount_amount}
-                  onChange={(e) => setFormData(prev => ({ ...prev, discount_amount: parseFloat(e.target.value) || 0 }))}
-                  className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Tax Percentage
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  max="100"
-                  value={formData.tax_percent}
-                  onChange={(e) => setFormData(prev => ({ ...prev, tax_percent: parseFloat(e.target.value) || 0 }))}
-                  className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-                />
-              </div>
+            {/* Right buttons group */}
+            <div className="flex space-x-3">
+              <button
+                type="submit"
+                disabled={loading}
+                className="inline-flex items-center px-5 py-2.5 text-sm font-medium rounded-full text-white bg-teal-600 hover:bg-teal-700 transition-colors shadow-sm disabled:opacity-50"
+              >
+                <Save className="w-4 h-4 mr-2" />
+                {loading ? 'Saving...' : 'Save Quote'}
+              </button>
             </div>
+          </div>
 
-            <div className="flex flex-col items-end mt-4">
-              <div className="w-full md:w-1/3 space-y-2">
-                <div className="flex justify-between">
-                  <span>Subtotal:</span>
-                  <span>${formData.subtotal.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Discount:</span>
-                  <span>-${formData.discount_amount.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Tax ({formData.tax_percent}%):</span>
-                  <span>${formData.tax_amount.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between font-bold pt-2 border-t">
-                  <span>Total:</span>
-                  <span>${formData.total_amount.toFixed(2)}</span>
+          {/* Card Header with Title and Status */}
+          <div className="bg-white rounded-2xl shadow-sm overflow-hidden mb-6">
+            <div className="p-6">
+              <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
+                <div className="flex items-center space-x-3">
+                  <div className="bg-teal-100 rounded-full p-2.5">
+                    <FileText className="w-6 h-6 text-teal-600" />
+                  </div>
+                  <div>
+                    <h1 className="text-2xl font-bold text-gray-900">
+                      {id ? quoteNumber : (convertedFromOpportunity ? 'Convert to Quote' : 'New Quote')}
+                    </h1>
+                    <div className="flex items-center mt-1.5 space-x-3">
+                      {convertedFromOpportunity && (
+                        <span className="text-teal-600 text-sm">
+                          Converted from Opportunity
+                        </span>
+                      )}
+
+                      {/* Approval Status Badge - Editable */}
+                      <div className="relative">
+                        <select
+                          value={formData.approval_status || 'Pending'}
+                          onChange={(e) => setFormData(prev => ({ ...prev, approval_status: e.target.value }))}
+                          className="px-3 py-1 text-xs font-medium rounded-full appearance-none cursor-pointer"
+                          style={getApprovalStatusStyle(formData.approval_status || 'Pending')}
+                        >
+                          {approvalStatusOptions.length > 0 ? (
+                            approvalStatusOptions.map(option => (
+                              <option key={option.id} value={option.value}>
+                                {option.value}
+                              </option>
+                            ))
+                          ) : (
+                            <>
+                              <option value="Pending">Pending</option>
+                              <option value="Approved">Approved</option>
+                              <option value="Rejected">Rejected</option>
+                            </>
+                          )}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
+
+              {/* Expiration Information */}
+              <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <Clock className="w-5 h-5 mr-2 text-yellow-500" />
+                    <span className="font-medium text-yellow-700">Expiration Date</span>
+                  </div>
+                  <input
+                    type="datetime-local"
+                    value={formData.expire_at || ''}
+                    onChange={(e) => setFormData(prev => ({ ...prev, expire_at: e.target.value }))}
+                    className="px-3 py-1 text-sm rounded-lg border border-yellow-300 bg-white focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Status Bar */}
+              <div className="mb-8 bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+                {quoteStatuses.length > 0 && (
+                  <div className="relative pt-2">
+                    {/* Progress bar track */}
+                    <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                      {/* Progress bar fill - width based on current status */}
+                      <div
+                        className="absolute top-2 left-0 h-2 bg-teal-500 rounded-full"
+                        style={{
+                          width: `${(getCurrentStatusIndex() + 1) * 100 / quoteStatuses.length}%`,
+                          transition: 'width 0.3s ease-in-out'
+                        }}
+                      ></div>
+                    </div>
+
+                    {/* Status indicators with dots */}
+                    <div className="flex justify-between mt-1">
+                      {quoteStatuses.map((status, index) => {
+                        // Determine if this status is active (current or passed)
+                        const isActive = index <= getCurrentStatusIndex();
+                        // Position dots evenly
+                        const position = index / (quoteStatuses.length - 1) * 100;
+
+                        return (
+                          <div
+                            key={status.id}
+                            className="flex flex-col items-center"
+                            style={{ position: 'absolute', left: `${position}%`, transform: 'translateX(-50%)' }}
+                          >
+                            {/* Status dot */}
+                            <div
+                              className={`w-4 h-4 rounded-full border-2 border-white ${isActive ? 'bg-teal-500' : 'bg-gray-300'}`}
+                              style={{
+                                marginTop: '-10px',
+                                boxShadow: '0 0 0 2px white'
+                              }}
+                            ></div>
+
+                            {/* Status label */}
+                            <div
+                              onClick={() => setFormData(prev => ({ ...prev, status: status.value }))}
+                              className={`text-sm font-medium mt-2 px-3 py-1 rounded-full transition-colors cursor-pointer ${isActive ? 'text-teal-700' : 'text-gray-500 hover:text-gray-700'
+                                }`}
+                            >
+                              {status.label || status.value}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Tabs Navigation */}
+              <div className="border-b border-gray-200 mb-6">
+                <nav className="-mb-px flex space-x-8">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('details')}
+                    className={`py-4 px-1 inline-flex items-center text-sm font-medium border-b-2 ${activeTab === 'details'
+                      ? 'border-teal-500 text-teal-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      }`}
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    Details
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('approval')}
+                    className={`py-4 px-1 inline-flex items-center text-sm font-medium border-b-2 ${activeTab === 'approval'
+                      ? 'border-teal-500 text-teal-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      }`}
+                  >
+                    <CheckCircle className="w-4 h-4 mr-2" />
+                    Approval
+                  </button>
+                </nav>
+              </div>
+
+              {/* Details Tab Content */}
+              {activeTab === 'details' && (
+                <div className="space-y-8">
+                  {/* Quote Items */}
+                  <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                    <div className="flex justify-between items-center mb-4">
+                      <h2 className="text-lg font-semibold flex items-center">
+                        <Package className="w-5 h-5 text-teal-500 mr-2" />
+                        Quote Items
+                      </h2>
+                      <div ref={productSearchRef} className="relative">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={selectedProductIndex === null ? productSearch : ''}
+                            onChange={(e) => {
+                              setProductSearch(e.target.value);
+                              setShowProductDropdown(true);
+                              if (!products.length) {
+                                fetchProducts();
+                              }
+                            }}
+                            onFocus={() => {
+                              setShowProductDropdown(true);
+                              if (!products.length) {
+                                fetchProducts();
+                              }
+                            }}
+                            placeholder="Search products..."
+                            className="px-4 py-2 rounded-lg border border-gray-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedProductIndex(null);
+                              setProductSearch('');
+                              setShowProductDropdown(true);
+                            }}
+                            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-teal-600 hover:bg-teal-700"
+                          >
+                            <Plus className="w-4 h-4 mr-2" />
+                            Add Product
+                          </button>
+                        </div>
+
+                        <AnimatePresence>
+                          {showProductDropdown && productSearch && (
+                            <motion.div
+                              initial={{ opacity: 0, y: -10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -10 }}
+                              className="absolute z-10 w-full mt-1 bg-white rounded-lg shadow-lg border border-gray-200"
+                            >
+                              {filteredProducts.length > 0 ? (
+                                <ul className="py-1 max-h-60 overflow-auto">
+                                  {filteredProducts.map(product => (
+                                    <li
+                                      key={product.id}
+                                      onClick={() => handleProductSelect(product)}
+                                      className="px-4 py-2 hover:bg-gray-50 cursor-pointer"
+                                    >
+                                      <div className="flex items-center">
+                                        <Package className="w-4 h-4 text-gray-400 mr-2" />
+                                        <div>
+                                          <div className="font-medium">{product.name}</div>
+                                          <div className="text-sm text-gray-500">
+                                            Price: ${product.price.toFixed(2)}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : (
+                                <div className="p-4 text-gray-500">
+                                  No products found
+                                </div>
+                              )}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200 rounded-lg overflow-hidden">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Item
+                            </th>
+                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Quantity
+                            </th>
+                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Unit Price
+                            </th>
+                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Total
+                            </th>
+                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Actions
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {formData.items.map((item, index) => (
+                            <tr key={index}>
+                              <td className="px-6 py-4">
+                                <div>
+                                  <input
+                                    type="text"
+                                    value={item.item_name || ''}
+                                    onChange={(e) => updateItem(index, 'item_name', e.target.value)}
+                                    className="font-medium text-gray-900 w-full px-2 py-1 rounded border border-gray-300 focus:border-teal-500 focus:ring-1 focus:ring-teal-200 outline-none"
+                                    required
+                                  />
+                                  <input
+                                    type="text"
+                                    value={item.item_desc || ''}
+                                    onChange={(e) => updateItem(index, 'item_desc', e.target.value)}
+                                    placeholder="Description"
+                                    className="text-sm text-gray-500 w-full mt-1 px-2 py-1 rounded border border-gray-300 focus:border-teal-500 focus:ring-1 focus:ring-teal-200 outline-none"
+                                  />
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 text-right whitespace-nowrap">
+                                <input
+                                  type="number"
+                                  min="1"
+                                  value={item.quantity}
+                                  onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value) || 0)}
+                                  className="text-sm text-gray-900 w-20 px-2 py-1 rounded border border-gray-300 focus:border-teal-500 focus:ring-1 focus:ring-teal-200 outline-none text-right"
+                                  required
+                                />
+                              </td>
+                              <td className="px-6 py-4 text-right whitespace-nowrap">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={item.unit_price}
+                                  onChange={(e) => updateItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
+                                  className="text-sm text-gray-900 w-24 px-2 py-1 rounded border border-gray-300 focus:border-teal-500 focus:ring-1 focus:ring-teal-200 outline-none text-right"
+                                  required
+                                />
+                              </td>
+                              <td className="px-6 py-4 text-right whitespace-nowrap">
+                                <div className="text-sm font-medium text-gray-900">
+                                  {formatCurrency(item.line_total)}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 text-right whitespace-nowrap">
+                                <button
+                                  type="button"
+                                  onClick={() => removeItem(index)}
+                                  className="text-red-600 hover:text-red-700"
+                                >
+                                  <Trash2 className="w-5 h-5" />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                          {formData.items.length === 0 && (
+                            <tr>
+                              <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
+                                No items added yet. Search for products or add a new item.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormData(prev => ({
+                          ...prev,
+                          items: [
+                            ...prev.items,
+                            {
+                              item_name: '',
+                              item_desc: '',
+                              quantity: 1,
+                              unit_price: 0,
+                              line_total: 0
+                            }
+                          ]
+                        }));
+                      }}
+                      className="mt-4 w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-teal-500 hover:text-teal-500 transition-colors flex items-center justify-center"
+                    >
+                      <Plus className="w-5 h-5 mr-2" />
+                      Add Item
+                    </button>
+                  </div>
+
+                  {/* Pricing Summary */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Tax and Discount */}
+                    <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                      <h2 className="text-lg font-semibold mb-4 flex items-center">
+                        <Tag className="w-5 h-5 text-teal-500 mr-2" />
+                        Tax & Discount
+                      </h2>
+                      <div className="space-y-4">
+                        {/* Tax Section */}
+                        <div>
+                          <h3 className="text-md font-medium mb-2">Tax Details</h3>
+                          <div className="space-y-2">
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-gray-600">Tax Percentage:</span>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                max="100"
+                                value={formData.tax_percent}
+                                onChange={(e) => setFormData(prev => ({ ...prev, tax_percent: parseFloat(e.target.value) || 0 }))}
+                                className="w-24 px-3 py-1 text-right rounded border border-gray-300 focus:border-teal-500 focus:ring-1 focus:ring-teal-200 outline-none"
+                              />
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-sm text-gray-600">Tax Amount:</span>
+                              <span className="text-sm text-gray-900">
+                                {formatCurrency(formData.tax_amount)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Divider */}
+                        <div className="border-t border-gray-200 my-3"></div>
+
+                        {/* Discount Section */}
+                        <div>
+                          <h3 className="text-md font-medium mb-2">Discount Details</h3>
+                          <div className="space-y-2">
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-gray-600">Discount Amount:</span>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={formData.discount_amount}
+                                onChange={(e) => setFormData(prev => ({ ...prev, discount_amount: parseFloat(e.target.value) || 0 }))}
+                                className="w-24 px-3 py-1 text-right rounded border border-gray-300 focus:border-teal-500 focus:ring-1 focus:ring-teal-200 outline-none"
+                              />
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-sm text-gray-600">Discount Percentage:</span>
+                              <span className="text-sm text-gray-900">
+                                {formData.subtotal > 0 ? ((formData.discount_amount / formData.subtotal) * 100).toFixed(2) : '0.00'}%
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Total Summary */}
+                    <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                      <h2 className="text-lg font-semibold mb-4 flex items-center">
+                        <DollarSign className="w-5 h-5 text-teal-500 mr-2" />
+                        Price Summary
+                      </h2>
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-600">Subtotal:</span>
+                          <span className="text-gray-900 font-medium">
+                            {formatCurrency(formData.subtotal)}
+                          </span>
+                        </div>
+
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-600">Tax:</span>
+                          <span className="text-gray-900">
+                            {formatCurrency(formData.tax_amount)}
+                          </span>
+                        </div>
+
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-600">Discount:</span>
+                          <span className="text-gray-900">
+                            -{formatCurrency(formData.discount_amount)}
+                          </span>
+                        </div>
+
+                        <div className="border-t border-gray-200 pt-3 mt-3">
+                          <div className="flex justify-between items-center">
+                            <span className="text-lg font-semibold">Total:</span>
+                            <span className="text-lg font-bold text-teal-700">
+                              {formatCurrency(formData.total_amount)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Information Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Customer Information */}
+                    <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                      <h2 className="text-lg font-semibold mb-4 flex items-center">
+                        <User className="w-5 h-5 text-teal-500 mr-2" />
+                        Customer Information
+                      </h2>
+                      <div ref={customerSearchRef} className="relative mb-4">
+                        {selectedCustomer ? (
+                          <div className="flex items-center justify-between p-3 border rounded-lg bg-gray-50">
+                            <div className="flex items-center">
+                              <User className="w-5 h-5 text-gray-400 mr-3" />
+                              <div>
+                                <div className="font-medium">
+                                  {selectedCustomer.first_name} {selectedCustomer.last_name}
+                                </div>
+                                {selectedCustomer.company && (
+                                  <div className="text-sm text-gray-500">
+                                    {selectedCustomer.company}
+                                  </div>
+                                )}
+                                {selectedCustomer.email && (
+                                  <div className="text-sm text-teal-600">
+                                    {selectedCustomer.email}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedCustomer(null);
+                                setFormData(prev => ({ ...prev, customer_id: '' }));
+                              }}
+                              className="p-1 hover:bg-gray-200 rounded-full"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                            <input
+                              type="text"
+                              value={customerSearch}
+                              onChange={(e) => {
+                                setCustomerSearch(e.target.value);
+                                setShowCustomerDropdown(true);
+                                if (!customers.length) {
+                                  fetchCustomers();
+                                }
+                              }}
+                              onFocus={() => {
+                                setShowCustomerDropdown(true);
+                                if (!customers.length) {
+                                  fetchCustomers();
+                                }
+                              }}
+                              placeholder="Search customers..."
+                                className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none"
+                            />
+                          </div>
+                        )}
+
+                        <AnimatePresence>
+                          {showCustomerDropdown && customerSearch && (
+                            <motion.div
+                              initial={{ opacity: 0, y: -10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -10 }}
+                              className="absolute z-10 w-full mt-1 bg-white rounded-lg shadow-lg border border-gray-200"
+                            >
+                              {filteredCustomers.length > 0 ? (
+                                <ul className="py-1 max-h-60 overflow-auto">
+                                  {filteredCustomers.map(customer => (
+                                    <li
+                                      key={customer.customer_id}
+                                      onClick={() => handleCustomerSelect(customer)}
+                                      className="px-4 py-2 hover:bg-gray-50 cursor-pointer"
+                                    >
+                                      <div className="font-medium">
+                                        {customer.first_name} {customer.last_name}
+                                      </div>
+                                      <div className="text-sm text-gray-500">
+                                        {customer.email}
+                                      </div>
+                                      {customer.company && (
+                                        <div className="text-sm text-gray-500">
+                                          {customer.company}
+                                        </div>
+                                      )}
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : (
+                                <div className="p-4 text-gray-500">
+                                  No customers found
+                                </div>
+                              )}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    </div>
+
+                    {/* Account Information */}
+                    <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                      <h2 className="text-lg font-semibold mb-4 flex items-center">
+                        <Building2 className="w-5 h-5 text-teal-500 mr-2" />
+                        Account Information
+                      </h2>
+                      <div ref={vendorSearchRef} className="relative mb-4">
+                        {selectedVendor ? (
+                          <div className="flex items-center justify-between p-3 border rounded-lg bg-gray-50">
+                            <div className="flex items-center">
+                              <Building2 className="w-5 h-5 text-gray-400 mr-3" />
+                              <div>
+                                <div className="font-medium">{selectedVendor.name}</div>
+                                <div className="text-sm text-gray-500">
+                                  Type: {selectedVendor.type}
+                                </div>
+                                {selectedVendor.email && (
+                                  <div className="text-sm text-teal-600">
+                                    {selectedVendor.email}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedVendor(null);
+                                setFormData(prev => ({ ...prev, vendor_id: null }));
+                              }}
+                              className="p-1 hover:bg-gray-200 rounded-full"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                            <input
+                              type="text"
+                              value={vendorSearch}
+                              onChange={(e) => {
+                                setVendorSearch(e.target.value);
+                                setShowVendorDropdown(true);
+                                if (!vendors.length) {
+                                  fetchVendors();
+                                }
+                              }}
+                              onFocus={() => {
+                                setShowVendorDropdown(true);
+                                if (!vendors.length) {
+                                  fetchVendors();
+                                }
+                              }}
+                              placeholder="Search accounts..."
+                              className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none"
+                            />
+                          </div>
+                        )}
+
+                        <AnimatePresence>
+                          {showVendorDropdown && vendorSearch && (
+                            <motion.div
+                              initial={{ opacity: 0, y: -10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -10 }}
+                              className="absolute z-10 w-full mt-1 bg-white rounded-lg shadow-lg border border-gray-200"
+                            >
+                              {filteredVendors.length > 0 ? (
+                                <ul className="py-1 max-h-60 overflow-auto">
+                                  {filteredVendors.map(vendor => (
+                                    <li
+                                      key={vendor.id}
+                                      onClick={() => handleVendorSelect(vendor)}
+                                      className="px-4 py-2 hover:bg-gray-50 cursor-pointer"
+                                    >
+                                      <div className="font-medium">{vendor.name}</div>
+                                      {vendor.contact_person && (
+                                        <div className="text-sm text-gray-500">
+                                          Contact: {vendor.contact_person}
+                                        </div>
+                                      )}
+                                      {vendor.email && (
+                                        <div className="text-sm text-gray-500">
+                                          {vendor.email}
+                                        </div>
+                                      )}
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : (
+                                <div className="p-4 text-gray-500">
+                                  No accounts found
+                                </div>
+                              )}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    </div>
+
+                    {/* Owner Information */}
+                    <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                      <h2 className="text-lg font-semibold mb-4 flex items-center">
+                        <UserCheck className="w-5 h-5 text-teal-500 mr-2" />
+                        Owner Information
+                      </h2>
+                      <UserSearch
+                        organizationId={selectedOrganization?.id}
+                        selectedUserId={formData.owner_id}
+                        onSelect={(userId) => setFormData(prev => ({ ...prev, owner_id: userId }))}
+                      />
+                    </div>
+
+                    {/* Notes */}
+                    <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                      <h2 className="text-lg font-semibold mb-4 flex items-center">
+                        <FileText className="w-5 h-5 text-teal-500 mr-2" />
+                        Notes
+                      </h2>
+                      <textarea
+                        value={formData.notes}
+                        onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                        rows={4}
+                        className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none"
+                        placeholder="Add notes here..."
+                      />
+                    </div>
+                  </div>
+
+                  {/* Shipping & Billing Information */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Shipping Information */}
+                    <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                      <h2 className="text-lg font-semibold mb-4 flex items-center">
+                        <MapPin className="w-5 h-5 text-teal-500 mr-2" />
+                        Shipping Information
+                      </h2>
+
+                      <div ref={shipToCustomerSearchRef} className="relative mb-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Ship To Customer
+                        </label>
+                        {selectedShipToCustomer ? (
+                          <div className="flex items-center justify-between p-3 border rounded-lg bg-gray-50">
+                            <div className="flex items-center">
+                              <User className="w-5 h-5 text-gray-400 mr-3" />
+                              <div>
+                                <div className="font-medium">
+                                  {selectedShipToCustomer.first_name} {selectedShipToCustomer.last_name}
+                                </div>
+                                {selectedShipToCustomer.company && (
+                                  <div className="text-sm text-gray-500">
+                                    {selectedShipToCustomer.company}
+                                  </div>
+                                )}
+                                {selectedShipToCustomer.email && (
+                                  <div className="text-sm text-teal-600">
+                                    {selectedShipToCustomer.email}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedShipToCustomer(null);
+                                setFormData(prev => ({ ...prev, ship_to_customer_id: null }));
+                              }}
+                              className="p-1 hover:bg-gray-200 rounded-full"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                            <input
+                              type="text"
+                              value={shipToCustomerSearch}
+                              onChange={(e) => {
+                                setShipToCustomerSearch(e.target.value);
+                                setShowShipToCustomerDropdown(true);
+                                if (!customers.length) {
+                                  fetchCustomers();
+                                }
+                              }}
+                              onFocus={() => {
+                                setShowShipToCustomerDropdown(true);
+                                if (!customers.length) {
+                                  fetchCustomers();
+                                }
+                              }}
+                              placeholder="Search customers for shipping..."
+                              className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none"
+                            />
+                          </div>
+                        )}
+
+                        <AnimatePresence>
+                          {showShipToCustomerDropdown && shipToCustomerSearch && (
+                            <motion.div
+                              initial={{ opacity: 0, y: -10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -10 }}
+                              className="absolute z-10 w-full mt-1 bg-white rounded-lg shadow-lg border border-gray-200"
+                            >
+                              {filteredShipToCustomers.length > 0 ? (
+                                <ul className="py-1 max-h-60 overflow-auto">
+                                  {filteredShipToCustomers.map(customer => (
+                                    <li
+                                      key={customer.customer_id}
+                                      onClick={() => handleShipToCustomerSelect(customer)}
+                                      className="px-4 py-2 hover:bg-gray-50 cursor-pointer"
+                                    >
+                                      <div className="font-medium">
+                                        {customer.first_name} {customer.last_name}
+                                      </div>
+                                      <div className="text-sm text-gray-500">
+                                        {customer.email}
+                                      </div>
+                                      {customer.company && (
+                                        <div className="text-sm text-gray-500">
+                                          {customer.company}
+                                        </div>
+                                      )}
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : (
+                                <div className="p-4 text-gray-500">
+                                  No customers found
+                                </div>
+                              )}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+
+                      <div className="space-y-3 mt-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Address Line 1
+                          </label>
+                          <input
+                            id="shipping-address-line1"
+                            type="text"
+                            value={formData.shipping_address_line1 || ''}
+                            onChange={(e) => setFormData(prev => ({ ...prev, shipping_address_line1: e.target.value }))}
+                            placeholder="Type to search for an address"
+                            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Address Line 2
+                          </label>
+                          <input
+                            type="text"
+                            value={formData.shipping_address_line2 || ''}
+                            onChange={(e) => setFormData(prev => ({ ...prev, shipping_address_line2: e.target.value }))}
+                            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              City
+                            </label>
+                            <input
+                              type="text"
+                              value={formData.shipping_city || ''}
+                              onChange={(e) => setFormData(prev => ({ ...prev, shipping_city: e.target.value }))}
+                              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              State
+                            </label>
+                            <input
+                              type="text"
+                              value={formData.shipping_state || ''}
+                              onChange={(e) => setFormData(prev => ({ ...prev, shipping_state: e.target.value }))}
+                              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Country
+                          </label>
+                          <input
+                            type="text"
+                            value={formData.shipping_country || ''}
+                            onChange={(e) => setFormData(prev => ({ ...prev, shipping_country: e.target.value }))}
+                            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Billing Information */}
+                    <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                      <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-lg font-semibold flex items-center">
+                          <CreditCard className="w-5 h-5 text-teal-500 mr-2" />
+                          Billing Information
+                        </h2>
+                        <label className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            checked={useShippingForBilling}
+                            onChange={(e) => setUseShippingForBilling(e.target.checked)}
+                            className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                          />
+                          <span className="text-sm text-gray-600">Same as shipping</span>
+                        </label>
+                      </div>
+
+                      <div ref={billToCustomerSearchRef} className="relative mb-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Bill To Customer
+                        </label>
+                        {selectedBillToCustomer ? (
+                          <div className="flex items-center justify-between p-3 border rounded-lg bg-gray-50">
+                            <div className="flex items-center">
+                              <User className="w-5 h-5 text-gray-400 mr-3" />
+                              <div>
+                                <div className="font-medium">
+                                  {selectedBillToCustomer.first_name} {selectedBillToCustomer.last_name}
+                                </div>
+                                {selectedBillToCustomer.company && (
+                                  <div className="text-sm text-gray-500">
+                                    {selectedBillToCustomer.company}
+                                  </div>
+                                )}
+                                {selectedBillToCustomer.email && (
+                                  <div className="text-sm text-teal-600">
+                                    {selectedBillToCustomer.email}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedBillToCustomer(null);
+                                setFormData(prev => ({ ...prev, bill_to_customer_id: null }));
+                              }}
+                              className="p-1 hover:bg-gray-200 rounded-full"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                            <input
+                              type="text"
+                              value={billToCustomerSearch}
+                              onChange={(e) => {
+                                setBillToCustomerSearch(e.target.value);
+                                setShowBillToCustomerDropdown(true);
+                                if (!customers.length) {
+                                  fetchCustomers();
+                                }
+                              }}
+                              onFocus={() => {
+                                setShowBillToCustomerDropdown(true);
+                                if (!customers.length) {
+                                  fetchCustomers();
+                                }
+                              }}
+                              placeholder="Search customers for billing..."
+                              disabled={useShippingForBilling}
+                              className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none disabled:bg-gray-100 disabled:text-gray-500"
+                            />
+                          </div>
+                        )}
+
+                        <AnimatePresence>
+                          {!useShippingForBilling && showBillToCustomerDropdown && billToCustomerSearch && (
+                            <motion.div
+                              initial={{ opacity: 0, y: -10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -10 }}
+                              className="absolute z-10 w-full mt-1 bg-white rounded-lg shadow-lg border border-gray-200"
+                            >
+                              {filteredBillToCustomers.length > 0 ? (
+                                <ul className="py-1 max-h-60 overflow-auto">
+                                  {filteredBillToCustomers.map(customer => (
+                                    <li
+                                      key={customer.customer_id}
+                                      onClick={() => handleBillToCustomerSelect(customer)}
+                                      className="px-4 py-2 hover:bg-gray-50 cursor-pointer"
+                                    >
+                                      <div className="font-medium">
+                                        {customer.first_name} {customer.last_name}
+                                      </div>
+                                      <div className="text-sm text-gray-500">
+                                        {customer.email}
+                                      </div>
+                                      {customer.company && (
+                                        <div className="text-sm text-gray-500">
+                                          {customer.company}
+                                        </div>
+                                      )}
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : (
+                                <div className="p-4 text-gray-500">
+                                  No customers found
+                                </div>
+                              )}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+
+                      <div className="space-y-3 mt-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Address Line 1
+                          </label>
+                          <input
+                            id="billing-address-line1"
+                            type="text"
+                            value={formData.billing_address_line1 || ''}
+                            onChange={(e) => setFormData(prev => ({ ...prev, billing_address_line1: e.target.value }))}
+                            placeholder={!useShippingForBilling ? "Type to search for an address" : undefined}
+                            disabled={useShippingForBilling}
+                            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none disabled:bg-gray-100 disabled:text-gray-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Address Line 2
+                          </label>
+                          <input
+                            type="text"
+                            value={formData.billing_address_line2 || ''}
+                            onChange={(e) => setFormData(prev => ({ ...prev, billing_address_line2: e.target.value }))}
+                            disabled={useShippingForBilling}
+                            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none disabled:bg-gray-100 disabled:text-gray-500"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              City
+                            </label>
+                            <input
+                              type="text"
+                              value={formData.billing_city || ''}
+                              onChange={(e) => setFormData(prev => ({ ...prev, billing_city: e.target.value }))}
+                              disabled={useShippingForBilling}
+                              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none disabled:bg-gray-100 disabled:text-gray-500"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              State
+                            </label>
+                            <input
+                              type="text"
+                              value={formData.billing_state || ''}
+                              onChange={(e) => setFormData(prev => ({ ...prev, billing_state: e.target.value }))}
+                              disabled={useShippingForBilling}
+                              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none disabled:bg-gray-100 disabled:text-gray-500"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Country
+                          </label>
+                          <input
+                            type="text"
+                            value={formData.billing_country || ''}
+                            onChange={(e) => setFormData(prev => ({ ...prev, billing_country: e.target.value }))}
+                            disabled={useShippingForBilling}
+                            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none disabled:bg-gray-100 disabled:text-gray-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Custom Fields */}
+                  <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                    <h2 className="text-lg font-semibold mb-4 flex items-center">
+                      <Bookmark className="w-5 h-5 text-teal-500 mr-2" />
+                      Custom Fields
+                    </h2>
+                    <CustomFieldsForm
+                      entityType="quotes"
+                      entityId={id}
+                      organizationId={selectedOrganization?.id}
+                      onChange={(values) => setCustomFields(values)}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Notes
-          </label>
-          <textarea
-            value={formData.notes}
-            onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-            rows={4}
-            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-          />
-        </div>
-
-        <CustomFieldsForm
-          entityType="quotes"
-          entityId={id}
-          organizationId={selectedOrganization?.id}
-          onChange={(values) => setCustomFields(values)}
-          className="border-t border-gray-200 pt-6"
-        />
-
-        <div className="flex justify-end space-x-4">
-          <button
-            type="button"
-            onClick={() => navigate('/admin/quotes')}
-            className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={loading}
-            className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center"
-          >
-            <Save className="w-4 h-4 mr-2" />
-            {loading ? 'Saving...' : 'Save Quote'}
-          </button>
-        </div>
       </form>
-    </motion.div>
+    </div>
   );
 }

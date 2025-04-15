@@ -39,7 +39,7 @@ export function RelatedCustomers({
     organizationId,
     title = 'Customers',
     refreshKey,
-    defaultExpanded = true
+    defaultExpanded = false
 }: Props) {
     const [customers, setCustomers] = useState<Customer[]>([]);
     const [loading, setLoading] = useState(true);

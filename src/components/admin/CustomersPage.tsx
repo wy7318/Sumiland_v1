@@ -180,7 +180,7 @@ export function CustomersPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-cyan-600"></div>
       </div>
     );
   }
@@ -190,7 +190,7 @@ export function CustomersPage() {
       {/* Header Section */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
         <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-700 to-purple-500 bg-clip-text text-transparent">
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-cyan-700 to-purple-500 bg-clip-text text-transparent">
             Customer Management
           </h1>
           <p className="text-gray-500 mt-1">Manage your customer relationships and contacts</p>
@@ -198,14 +198,14 @@ export function CustomersPage() {
         <div className="flex flex-wrap gap-3">
           <button
             onClick={exportToCSV}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white border border-gray-200 text-gray-700 font-medium shadow-sm hover:shadow-md transition-all duration-200 hover:border-indigo-300"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white border border-gray-200 text-gray-700 font-medium shadow-sm hover:shadow-md transition-all duration-200 hover:border-cyan-300"
           >
             <FileSpreadsheet className="w-4 h-4" />
             <span>Export CSV</span>
           </button>
           <Link
             to="/admin/customers/new"
-            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-indigo-600 to-indigo-700 text-white font-medium shadow-md hover:shadow-lg transition-all duration-200 hover:from-indigo-700 hover:to-indigo-800"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-cyan-600 to-cyan-700 text-white font-medium shadow-md hover:shadow-lg transition-all duration-200 hover:from-cyan-700 hover:to-cyan-800"
           >
             <Plus className="w-4 h-4" />
             <span>Add Customer</span>
@@ -225,7 +225,7 @@ export function CustomersPage() {
         <div className="p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-              <Filter className="w-5 h-5 text-indigo-500" />
+              <Filter className="w-5 h-5 text-cyan-500" />
               Search Customers
             </h2>
             <button
@@ -246,7 +246,7 @@ export function CustomersPage() {
                 placeholder="Search customers by name, email, company, owner..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-12 pr-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all duration-200"
+                className="w-full pl-12 pr-4 py-3 rounded-xl border border-gray-200 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200 outline-none transition-all duration-200"
               />
             </div>
           )}
@@ -301,7 +301,7 @@ export function CustomersPage() {
                   <tr key={customer.customer_id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center">
-                        <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center mr-3 flex-shrink-0">
+                        <div className="w-10 h-10 rounded-full bg-cyan-100 text-cyan-700 flex items-center justify-center mr-3 flex-shrink-0">
                           <span className="font-semibold">
                             {customer.first_name.charAt(0)}{customer.last_name.charAt(0)}
                           </span>
@@ -317,7 +317,7 @@ export function CustomersPage() {
                           <Mail className="w-4 h-4 text-gray-400 mr-1.5" />
                           <a
                             href={`mailto:${customer.email}`}
-                            className="text-indigo-600 hover:text-indigo-800 transition-colors"
+                            className="text-cyan-600 hover:text-cyan-800 transition-colors"
                           >
                             {customer.email}
                           </a>
@@ -327,7 +327,7 @@ export function CustomersPage() {
                             <Phone className="w-4 h-4 text-gray-400 mr-1.5" />
                             <a
                               href={`tel:${customer.phone}`}
-                              className="text-indigo-600 hover:text-indigo-800 transition-colors"
+                              className="text-cyan-600 hover:text-cyan-800 transition-colors"
                             >
                               {customer.phone}
                             </a>
@@ -391,7 +391,7 @@ export function CustomersPage() {
                       <div className="flex justify-end items-center gap-2">
                         <Link
                           to={`/admin/customers/${customer.customer_id}`}
-                          className="p-1.5 bg-indigo-50 text-indigo-600 rounded-full hover:bg-indigo-100 transition-colors"
+                          className="p-1.5 bg-cyan-50 text-cyan-600 rounded-full hover:bg-cyan-100 transition-colors"
                           title="View details"
                         >
                           <Eye className="w-4 h-4" />
@@ -484,7 +484,7 @@ export function CustomersPage() {
                             className={cn(
                               "flex items-center justify-center w-8 h-8 mx-1 rounded-full text-sm font-medium transition-colors",
                               currentPage === page
-                                ? "bg-indigo-100 text-indigo-700 border border-indigo-300"
+                                ? "bg-cyan-100 text-cyan-700 border border-cyan-300"
                                 : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
                             )}
                           >
@@ -501,7 +501,7 @@ export function CustomersPage() {
                         className={cn(
                           "flex items-center justify-center w-8 h-8 mx-1 rounded-full text-sm font-medium transition-colors",
                           currentPage === page
-                            ? "bg-indigo-100 text-indigo-700 border border-indigo-300"
+                            ? "bg-cyan-100 text-cyan-700 border border-cyan-300"
                             : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
                         )}
                       >
@@ -537,7 +537,7 @@ export function CustomersPage() {
               Showing <span className="font-medium text-gray-900">{filteredCustomers.length}</span> customers
             </div>
             <div className="flex items-center gap-2">
-              <Users className="w-5 h-5 text-indigo-500" />
+              <Users className="w-5 h-5 text-cyan-500" />
               <span className="text-gray-700 font-medium">{customers.length} total customers</span>
             </div>
           </div>

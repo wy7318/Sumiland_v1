@@ -558,8 +558,8 @@ export function CaseDetailPage() {
       >
         <div className="flex justify-between items-start">
           <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center">
-              <span className="text-primary-700 font-medium">
+            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+              <span className="text-blue-700 font-medium">
                 {feed.profile.name.charAt(0).toUpperCase()}
               </span>
             </div>
@@ -603,7 +603,7 @@ export function CaseDetailPage() {
             <textarea
               value={editingFeed.content}
               onChange={(e) => setEditingFeed({ ...editingFeed, content: e.target.value })}
-              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
               rows={3}
             />
             <div className="flex justify-end space-x-2 mt-2">
@@ -615,7 +615,7 @@ export function CaseDetailPage() {
               </button>
               <button
                 onClick={() => handleUpdateComment(feed.id, editingFeed.content)}
-                className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
               >
                 Save
               </button>
@@ -648,7 +648,7 @@ export function CaseDetailPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
       </div>
     );
   }
@@ -686,7 +686,7 @@ export function CaseDetailPage() {
             </Link>
             <Link
               to={`/admin/cases/${id}/edit`}
-              className="inline-flex items-center px-5 py-2.5 text-sm font-medium rounded-full text-white bg-primary-600 hover:bg-primary-700 transition-colors shadow-sm"
+              className="inline-flex items-center px-5 py-2.5 text-sm font-medium rounded-full text-white bg-blue-600 hover:bg-blue-700 transition-colors shadow-sm"
             >
               <Edit className="w-4 h-4 mr-2" />
               Edit Case
@@ -699,8 +699,8 @@ export function CaseDetailPage() {
           <div className="p-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
               <div className="flex items-center space-x-3">
-                <div className="bg-primary-100 rounded-full p-2.5">
-                  <FileText className="w-6 h-6 text-primary-600" />
+                <div className="bg-blue-100 rounded-full p-2.5">
+                  <FileText className="w-6 h-6 text-blue-600" />
                 </div>
                 <div>
                   <h1 className="text-2xl font-bold text-gray-900">{caseData.title}</h1>
@@ -807,7 +807,7 @@ export function CaseDetailPage() {
                 <button
                   onClick={() => setActiveTab('details')}
                   className={`py-4 px-1 inline-flex items-center text-sm font-medium border-b-2 ${activeTab === 'details'
-                      ? 'border-primary-500 text-primary-600'
+                      ? 'border-blue-500 text-blue-600'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                     }`}
                 >
@@ -817,7 +817,7 @@ export function CaseDetailPage() {
                 <button
                   onClick={() => setActiveTab('related')}
                   className={`py-4 px-1 inline-flex items-center text-sm font-medium border-b-2 ${activeTab === 'related'
-                      ? 'border-primary-500 text-primary-600'
+                      ? 'border-blue-500 text-blue-600'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                     }`}
                 >
@@ -827,7 +827,7 @@ export function CaseDetailPage() {
                 <button
                   onClick={() => setActiveTab('comments')}
                   className={`py-4 px-1 inline-flex items-center text-sm font-medium border-b-2 ${activeTab === 'comments'
-                      ? 'border-primary-500 text-primary-600'
+                      ? 'border-blue-500 text-blue-600'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                     }`}
                 >
@@ -846,7 +846,7 @@ export function CaseDetailPage() {
                   {caseData.contact && (
                     <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                       <h2 className="text-lg font-semibold mb-4 flex items-center">
-                        <User className="w-5 h-5 text-primary-500 mr-2" />
+                        <User className="w-5 h-5 text-blue-500 mr-2" />
                         Contact Information
                       </h2>
                       <div className="space-y-4">
@@ -867,7 +867,7 @@ export function CaseDetailPage() {
                           <Mail className="w-5 h-5 text-gray-400 mr-3" />
                           <a
                             href={`mailto:${caseData.contact.email}`}
-                            className="text-primary-600 hover:text-primary-700"
+                            className="text-blue-600 hover:text-blue-700"
                           >
                             {caseData.contact.email}
                           </a>
@@ -875,7 +875,7 @@ export function CaseDetailPage() {
 
                         <button
                           onClick={handleEmailClick}
-                          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-full text-white bg-primary-600 hover:bg-primary-700 transition-colors shadow-sm"
+                          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-full text-white bg-blue-600 hover:bg-blue-700 transition-colors shadow-sm"
                         >
                           <Send className="w-4 h-4 mr-2" />
                           Send Email
@@ -886,7 +886,7 @@ export function CaseDetailPage() {
                             <Phone className="w-5 h-5 text-gray-400 mr-3" />
                             <a
                               href={`tel:${caseData.contact.phone}`}
-                              className="text-primary-600 hover:text-primary-700"
+                              className="text-blue-600 hover:text-blue-700"
                             >
                               {caseData.contact.phone}
                             </a>
@@ -900,7 +900,7 @@ export function CaseDetailPage() {
                   {caseData.vendor && (
                     <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                       <h2 className="text-lg font-semibold mb-4 flex items-center">
-                        <Building2 className="w-5 h-5 text-primary-500 mr-2" />
+                        <Building2 className="w-5 h-5 text-blue-500 mr-2" />
                         Vendor Information
                       </h2>
                       <div className="space-y-4">
@@ -911,7 +911,7 @@ export function CaseDetailPage() {
                           </div>
                           <button
                             onClick={() => setShowAccountModal(true)}
-                            className="text-primary-600 hover:text-primary-700 hover:underline text-sm"
+                            className="text-blue-600 hover:text-blue-700 hover:underline text-sm"
                           >
                             View Details
                           </button>
@@ -922,7 +922,7 @@ export function CaseDetailPage() {
                             <Mail className="w-5 h-5 text-gray-400 mr-3" />
                             <a
                               href={`mailto:${caseData.vendor.email}`}
-                              className="text-primary-600 hover:text-primary-700"
+                              className="text-blue-600 hover:text-blue-700"
                             >
                               {caseData.vendor.email}
                             </a>
@@ -934,7 +934,7 @@ export function CaseDetailPage() {
                             <Phone className="w-5 h-5 text-gray-400 mr-3" />
                             <a
                               href={`tel:${caseData.vendor.phone}`}
-                              className="text-primary-600 hover:text-primary-700"
+                              className="text-blue-600 hover:text-blue-700"
                             >
                               {caseData.vendor.phone}
                             </a>
@@ -956,7 +956,7 @@ export function CaseDetailPage() {
                   {/* Timestamps Section */}
                   <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                     <h2 className="text-lg font-semibold mb-4 flex items-center">
-                      <Clock className="w-5 h-5 text-primary-500 mr-2" />
+                      <Clock className="w-5 h-5 text-blue-500 mr-2" />
                       Timeline
                     </h2>
                     <div className="space-y-4">
@@ -1012,7 +1012,7 @@ export function CaseDetailPage() {
                   {/* Assignment */}
                   <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                     <h2 className="text-lg font-semibold mb-4 flex items-center">
-                      <UserCheck className="w-5 h-5 text-primary-500 mr-2" />
+                      <UserCheck className="w-5 h-5 text-blue-500 mr-2" />
                       Case Assignment
                     </h2>
                     <div className="space-y-4">
@@ -1024,8 +1024,8 @@ export function CaseDetailPage() {
 
                       {caseData.owner && (
                         <div className="flex items-center mt-4">
-                          <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center mr-3">
-                            <span className="text-primary-700 font-medium">
+                          <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center mr-3">
+                            <span className="text-blue-700 font-medium">
                               {caseData.owner.name.charAt(0).toUpperCase()}
                             </span>
                           </div>
@@ -1040,7 +1040,7 @@ export function CaseDetailPage() {
                   {/* Files Section */}
                   <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                     <h2 className="text-lg font-semibold mb-4 flex items-center">
-                      <FileText className="w-5 h-5 text-primary-500 mr-2" />
+                      <FileText className="w-5 h-5 text-blue-500 mr-2" />
                       Attachments
                     </h2>
                     <div className="space-y-4">
@@ -1054,7 +1054,7 @@ export function CaseDetailPage() {
                             href={caseData.resume_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center px-4 py-2 text-sm font-medium rounded-full text-primary-600 border border-primary-200 hover:bg-primary-50 transition-colors"
+                            className="inline-flex items-center px-4 py-2 text-sm font-medium rounded-full text-blue-600 border border-blue-200 hover:bg-blue-50 transition-colors"
                           >
                             <Download className="w-4 h-4 mr-2" />
                             Download
@@ -1071,7 +1071,7 @@ export function CaseDetailPage() {
                             href={caseData.attachment_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center px-4 py-2 text-sm font-medium rounded-full text-primary-600 border border-primary-200 hover:bg-primary-50 transition-colors"
+                            className="inline-flex items-center px-4 py-2 text-sm font-medium rounded-full text-blue-600 border border-blue-200 hover:bg-blue-50 transition-colors"
                           >
                             <Download className="w-4 h-4 mr-2" />
                             Download
@@ -1088,7 +1088,7 @@ export function CaseDetailPage() {
                 {/* Case Description - Full Width */}
                 <div className="md:col-span-2 bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                   <h2 className="text-lg font-semibold mb-4 flex items-center">
-                    <FileText className="w-5 h-5 text-primary-500 mr-2" />
+                    <FileText className="w-5 h-5 text-blue-500 mr-2" />
                     Case Description
                   </h2>
                   <div className="text-gray-700 whitespace-pre-wrap">
@@ -1099,7 +1099,7 @@ export function CaseDetailPage() {
                 {/* Custom Fields - Full Width */}
                 <div className="md:col-span-2 bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                   <h2 className="text-lg font-semibold mb-4 flex items-center">
-                    <Bookmark className="w-5 h-5 text-primary-500 mr-2" />
+                    <Bookmark className="w-5 h-5 text-blue-500 mr-2" />
                     Custom Fields
                   </h2>
                   <CustomFieldsSection
@@ -1137,7 +1137,7 @@ export function CaseDetailPage() {
                 {/* Additional related records */}
                 <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                   <h2 className="text-lg font-semibold mb-4 flex items-center">
-                    <Briefcase className="w-5 h-5 text-primary-500 mr-2" />
+                    <Briefcase className="w-5 h-5 text-blue-500 mr-2" />
                     Other Related Records
                   </h2>
                   <div className="text-sm text-gray-500 italic py-2">
@@ -1153,7 +1153,7 @@ export function CaseDetailPage() {
                 {/* Comment Form */}
                 <form onSubmit={handleSubmitComment} className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                   <h2 className="text-lg font-semibold mb-4 flex items-center">
-                    <MessageSquare className="w-5 h-5 text-primary-500 mr-2" />
+                    <MessageSquare className="w-5 h-5 text-blue-500 mr-2" />
                     Add Comment
                   </h2>
 
@@ -1179,13 +1179,13 @@ export function CaseDetailPage() {
                         onChange={(e) => setNewComment(e.target.value)}
                         placeholder="Add a comment..."
                         rows={3}
-                        className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                        className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
                       />
                     </div>
                     <button
                       type="submit"
                       disabled={!newComment.trim()}
-                      className="px-5 py-3 bg-primary-600 text-white rounded-xl hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center shadow-sm"
+                      className="px-5 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center shadow-sm"
                     >
                       <Send className="w-4 h-4 mr-2" />
                       Send

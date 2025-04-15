@@ -504,7 +504,7 @@ export function QuoteDetailPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-teal-500"></div>
       </div>
     );
   }
@@ -545,7 +545,7 @@ export function QuoteDetailPage() {
             ) : (
               <Link
                 to={`/admin/orders/${quote.converted_to_id}`}
-                className="inline-flex items-center px-5 py-2.5 text-sm font-medium rounded-full text-white bg-blue-600 hover:bg-blue-700 transition-colors shadow-sm"
+                  className="inline-flex items-center px-5 py-2.5 text-sm font-medium rounded-full text-white bg-orange-600 hover:bg-orange-700 transition-colors shadow-sm"
               >
                 <ShoppingBag className="w-4 h-4 mr-2" />
                 View Order
@@ -560,7 +560,7 @@ export function QuoteDetailPage() {
             </Link>
             <Link
               to={`/admin/quotes/${id}/edit`}
-              className="inline-flex items-center px-5 py-2.5 text-sm font-medium rounded-full text-white bg-primary-600 hover:bg-primary-700 transition-colors shadow-sm"
+              className="inline-flex items-center px-5 py-2.5 text-sm font-medium rounded-full text-white bg-teal-600 hover:bg-teal-700 transition-colors shadow-sm"
             >
               <Edit className="w-4 h-4 mr-2" />
               Edit Quote
@@ -573,8 +573,8 @@ export function QuoteDetailPage() {
           <div className="p-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
               <div className="flex items-center space-x-3">
-                <div className="bg-primary-100 rounded-full p-2.5">
-                  <FileText className="w-6 h-6 text-primary-600" />
+                <div className="bg-teal-100 rounded-full p-2.5">
+                  <FileText className="w-6 h-6 text-teal-600" />
                 </div>
                 <div>
                   <h1 className="text-2xl font-bold text-gray-900">{quote.quote_number}</h1>
@@ -601,7 +601,7 @@ export function QuoteDetailPage() {
                     )}
 
                     {/* Total Badge */}
-                    <span className="px-3 py-1 text-xs font-medium rounded-full bg-primary-100 text-primary-800">
+                    <span className="px-3 py-1 text-xs font-medium rounded-full bg-teal-100 text-teal-800">
                       {formatCurrency(quote.total_amount)}
                     </span>
                   </div>
@@ -611,16 +611,16 @@ export function QuoteDetailPage() {
 
             {/* Conversion Information Section */}
             {quote.is_converted && quote.converted_at && (
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+              <div className="bg-teal-50 border border-teal-200 rounded-xl p-4 mb-6">
                 <div className="flex items-center">
-                  <Repeat className="w-5 h-5 text-blue-500 mr-2" />
-                  <span className="font-medium text-blue-700">
+                  <Repeat className="w-5 h-5 text-teal-500 mr-2" />
+                  <span className="font-medium text-teal-700">
                     Converted to Order on {new Date(quote.converted_at).toLocaleDateString()}
                   </span>
                   {quote.converted_to_id && (
                     <Link
                       to={`/admin/orders/${quote.converted_to_id}`}
-                      className="ml-2 text-blue-600 hover:text-blue-800 underline"
+                      className="ml-2 text-teal-600 hover:text-teal-800 underline"
                     >
                       View Order
                     </Link>
@@ -661,7 +661,7 @@ export function QuoteDetailPage() {
                   <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                     {/* Progress bar fill - width based on current status */}
                     <div
-                      className="absolute top-2 left-0 h-2 bg-blue-500 rounded-full"
+                      className="absolute top-2 left-0 h-2 bg-teal-500 rounded-full"
                       style={{
                         width: `${(getCurrentStatusIndex() + 1) * 100 / quoteStatuses.length}%`,
                         transition: 'width 0.3s ease-in-out'
@@ -685,7 +685,7 @@ export function QuoteDetailPage() {
                         >
                           {/* Status dot */}
                           <div
-                            className={`w-4 h-4 rounded-full border-2 border-white ${isActive ? 'bg-blue-500' : 'bg-gray-300'}`}
+                            className={`w-4 h-4 rounded-full border-2 border-white ${isActive ? 'bg-teal-500' : 'bg-gray-300'}`}
                             style={{
                               marginTop: '-10px',
                               boxShadow: '0 0 0 2px white'
@@ -695,7 +695,7 @@ export function QuoteDetailPage() {
                           {/* Status label */}
                           <button
                             onClick={() => handleStatusChange(status.value)}
-                            className={`text-sm font-medium mt-2 px-3 py-1 rounded-full transition-colors ${isActive ? 'text-blue-700' : 'text-gray-500 hover:text-gray-700'
+                            className={`text-sm font-medium mt-2 px-3 py-1 rounded-full transition-colors ${isActive ? 'text-teal-700' : 'text-gray-500 hover:text-gray-700'
                               }`}
                           >
                             {status.label}
@@ -714,7 +714,7 @@ export function QuoteDetailPage() {
                 <button
                   onClick={() => setActiveTab('details')}
                   className={`py-4 px-1 inline-flex items-center text-sm font-medium border-b-2 ${activeTab === 'details'
-                    ? 'border-primary-500 text-primary-600'
+                    ? 'border-teal-500 text-teal-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                     }`}
                 >
@@ -724,7 +724,7 @@ export function QuoteDetailPage() {
                 <button
                   onClick={() => setActiveTab('related')}
                   className={`py-4 px-1 inline-flex items-center text-sm font-medium border-b-2 ${activeTab === 'related'
-                    ? 'border-primary-500 text-primary-600'
+                    ? 'border-teal-500 text-teal-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                     }`}
                 >
@@ -734,7 +734,7 @@ export function QuoteDetailPage() {
                 <button
                   onClick={() => setActiveTab('approval')}
                   className={`py-4 px-1 inline-flex items-center text-sm font-medium border-b-2 ${activeTab === 'approval'
-                    ? 'border-primary-500 text-primary-600'
+                    ? 'border-teal-500 text-teal-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                     }`}
                 >
@@ -750,7 +750,7 @@ export function QuoteDetailPage() {
                 {/* Quote Items */}
                 <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                   <h2 className="text-lg font-semibold mb-4 flex items-center">
-                    <Package className="w-5 h-5 text-primary-500 mr-2" />
+                    <Package className="w-5 h-5 text-teal-500 mr-2" />
                     Quote Items
                   </h2>
                   <div className="overflow-x-auto">
@@ -811,7 +811,7 @@ export function QuoteDetailPage() {
                   {/* Tax and Discount */}
                   <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                     <h2 className="text-lg font-semibold mb-4 flex items-center">
-                      <Tag className="w-5 h-5 text-primary-500 mr-2" />
+                      <Tag className="w-5 h-5 text-teal-500 mr-2" />
                       Tax & Discount
                     </h2>
                     <div className="space-y-4">
@@ -861,7 +861,7 @@ export function QuoteDetailPage() {
                   {/* Total Summary */}
                   <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                     <h2 className="text-lg font-semibold mb-4 flex items-center">
-                      <DollarSign className="w-5 h-5 text-primary-500 mr-2" />
+                      <DollarSign className="w-5 h-5 text-teal-500 mr-2" />
                       Price Summary
                     </h2>
                     <div className="space-y-3">
@@ -893,7 +893,7 @@ export function QuoteDetailPage() {
                       <div className="border-t border-gray-200 pt-3 mt-3">
                         <div className="flex justify-between items-center">
                           <span className="text-lg font-semibold">Total:</span>
-                          <span className="text-lg font-bold text-primary-700">
+                          <span className="text-lg font-bold text-teal-700">
                             {formatCurrency(quote.total_amount)}
                           </span>
                         </div>
@@ -907,7 +907,7 @@ export function QuoteDetailPage() {
                   {/* Customer Information */}
                   <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                     <h2 className="text-lg font-semibold mb-4 flex items-center">
-                      <User className="w-5 h-5 text-primary-500 mr-2" />
+                      <User className="w-5 h-5 text-teal-500 mr-2" />
                       Customer Information
                     </h2>
                     <div className="space-y-4">
@@ -930,7 +930,7 @@ export function QuoteDetailPage() {
                           <Mail className="w-5 h-5 text-gray-400 mr-3" />
                           <a
                             href={`mailto:${quote.customer.email}`}
-                            className="text-primary-600 hover:text-primary-700"
+                            className="text-teal-600 hover:text-teal-700"
                           >
                             {quote.customer.email}
                           </a>
@@ -939,7 +939,7 @@ export function QuoteDetailPage() {
 
                       <button
                         onClick={handleEmailClick}
-                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-full text-white bg-primary-600 hover:bg-primary-700 transition-colors shadow-sm"
+                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-full text-white bg-teal-600 hover:bg-teal-700 transition-colors shadow-sm"
                       >
                         <Send className="w-4 h-4 mr-2" />
                         Send Email
@@ -951,7 +951,7 @@ export function QuoteDetailPage() {
                   {quote.vendor && (
                     <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                       <h2 className="text-lg font-semibold mb-4 flex items-center">
-                        <Building2 className="w-5 h-5 text-primary-500 mr-2" />
+                        <Building2 className="w-5 h-5 text-teal-500 mr-2" />
                         Account Information
                       </h2>
                       <div className="space-y-4">
@@ -967,7 +967,7 @@ export function QuoteDetailPage() {
                           </div>
                           <button
                             onClick={() => setShowAccountModal(true)}
-                            className="text-primary-600 hover:text-primary-700 hover:underline text-sm"
+                            className="text-teal-600 hover:text-teal-700 hover:underline text-sm"
                           >
                             View Details
                           </button>
@@ -985,7 +985,7 @@ export function QuoteDetailPage() {
                               <Mail className="w-4 h-4 text-gray-400 mr-2" />
                               <a
                                 href={`mailto:${quote.vendor.customer.email}`}
-                                className="text-sm text-primary-600 hover:text-primary-700"
+                                className="text-sm text-teal-600 hover:text-teal-700"
                               >
                                 {quote.vendor.customer.email}
                               </a>
@@ -996,7 +996,7 @@ export function QuoteDetailPage() {
                                 <Phone className="w-4 h-4 text-gray-400 mr-2" />
                                 <a
                                   href={`tel:${quote.vendor.customer.phone}`}
-                                  className="text-sm text-primary-600 hover:text-primary-700"
+                                  className="text-sm text-teal-600 hover:text-teal-700"
                                 >
                                   {quote.vendor.customer.phone}
                                 </a>
@@ -1012,12 +1012,12 @@ export function QuoteDetailPage() {
                   {quote.owner && (
                     <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                       <h2 className="text-lg font-semibold mb-4 flex items-center">
-                        <UserCheck className="w-5 h-5 text-primary-500 mr-2" />
+                        <UserCheck className="w-5 h-5 text-teal-500 mr-2" />
                         Owner Information
                       </h2>
                       <div className="flex items-center">
-                        <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center mr-3">
-                          <span className="text-primary-700 font-medium">
+                        <div className="w-10 h-10 rounded-full bg-teal-100 flex items-center justify-center mr-3">
+                          <span className="text-teal-700 font-medium">
                             {quote.owner.name.charAt(0).toUpperCase()}
                           </span>
                         </div>
@@ -1032,7 +1032,7 @@ export function QuoteDetailPage() {
                   {quote.notes && (
                     <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                       <h2 className="text-lg font-semibold mb-4 flex items-center">
-                        <FileText className="w-5 h-5 text-primary-500 mr-2" />
+                        <FileText className="w-5 h-5 text-teal-500 mr-2" />
                         Notes
                       </h2>
                       <p className="text-gray-700 whitespace-pre-wrap">{quote.notes}</p>
@@ -1045,7 +1045,7 @@ export function QuoteDetailPage() {
                   {/* Shipping Information */}
                   <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                     <h2 className="text-lg font-semibold mb-4 flex items-center">
-                      <MapPin className="w-5 h-5 text-primary-500 mr-2" />
+                      <MapPin className="w-5 h-5 text-teal-500 mr-2" />
                       Shipping Information
                     </h2>
 
@@ -1069,7 +1069,7 @@ export function QuoteDetailPage() {
                       quote.shipping_city ||
                       quote.shipping_state ||
                       quote.shipping_country) ? (
-                      <div className="pl-2 border-l-2 border-primary-100 py-1 space-y-1">
+                      <div className="pl-2 border-l-2 border-teal-100 py-1 space-y-1">
                         {quote.shipping_address_line1 && (
                           <div className="text-gray-600">{quote.shipping_address_line1}</div>
                         )}
@@ -1098,7 +1098,7 @@ export function QuoteDetailPage() {
                   {/* Billing Information */}
                   <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                     <h2 className="text-lg font-semibold mb-4 flex items-center">
-                      <CreditCard className="w-5 h-5 text-primary-500 mr-2" />
+                      <CreditCard className="w-5 h-5 text-teal-500 mr-2" />
                       Billing Information
                     </h2>
 
@@ -1122,7 +1122,7 @@ export function QuoteDetailPage() {
                       quote.billing_city ||
                       quote.billing_state ||
                       quote.billing_country) ? (
-                      <div className="pl-2 border-l-2 border-primary-100 py-1 space-y-1">
+                      <div className="pl-2 border-l-2 border-teal-100 py-1 space-y-1">
                         {quote.billing_address_line1 && (
                           <div className="text-gray-600">{quote.billing_address_line1}</div>
                         )}
@@ -1152,7 +1152,7 @@ export function QuoteDetailPage() {
                 {/* Custom Fields */}
                 <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                   <h2 className="text-lg font-semibold mb-4 flex items-center">
-                    <Bookmark className="w-5 h-5 text-primary-500 mr-2" />
+                    <Bookmark className="w-5 h-5 text-teal-500 mr-2" />
                     Custom Fields
                   </h2>
                   <CustomFieldsSection
@@ -1190,7 +1190,7 @@ export function QuoteDetailPage() {
                 {/* Additional related records */}
                 <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                   <h2 className="text-lg font-semibold mb-4 flex items-center">
-                    <Briefcase className="w-5 h-5 text-primary-500 mr-2" />
+                    <Briefcase className="w-5 h-5 text-teal-500 mr-2" />
                     Other Related Records
                   </h2>
                   <div className="text-sm text-gray-500 italic py-2">
@@ -1206,7 +1206,7 @@ export function QuoteDetailPage() {
                 {/* Approval Status Card */}
                 <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                   <h2 className="text-lg font-semibold mb-4 flex items-center">
-                    <CheckCircle className="w-5 h-5 text-primary-500 mr-2" />
+                    <CheckCircle className="w-5 h-5 text-teal-500 mr-2" />
                     Approval Status
                   </h2>
 

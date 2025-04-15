@@ -413,8 +413,8 @@ export function LeadDetailPage() {
       >
         <div className="flex justify-between items-start">
           <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center">
-              <span className="text-primary-700 font-medium">
+            <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
+              <span className="text-indigo-700 font-medium">
                 {feed.profile.name.charAt(0).toUpperCase()}
               </span>
             </div>
@@ -458,7 +458,7 @@ export function LeadDetailPage() {
             <textarea
               value={editingFeed.content}
               onChange={(e) => setEditingFeed({ ...editingFeed, content: e.target.value })}
-              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none"
               rows={3}
             />
             <div className="flex justify-end space-x-2 mt-2">
@@ -470,7 +470,7 @@ export function LeadDetailPage() {
               </button>
               <button
                 onClick={() => handleUpdateComment(feed.id, editingFeed.content)}
-                className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
               >
                 Save
               </button>
@@ -503,7 +503,7 @@ export function LeadDetailPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
       </div>
     );
   }
@@ -541,7 +541,7 @@ export function LeadDetailPage() {
             </Link>
             <Link
               to={`/admin/leads/${id}/edit`}
-              className="inline-flex items-center px-5 py-2.5 text-sm font-medium rounded-full text-white bg-primary-600 hover:bg-primary-700 transition-colors shadow-sm"
+              className="inline-flex items-center px-5 py-2.5 text-sm font-medium rounded-full text-white bg-indigo-600 hover:bg-indigo-700 transition-colors shadow-sm"
             >
               <Edit className="w-4 h-4 mr-2" />
               Edit Lead
@@ -554,8 +554,8 @@ export function LeadDetailPage() {
           <div className="p-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
               <div className="flex items-center space-x-3">
-                <div className="bg-primary-100 rounded-full p-2.5">
-                  <User className="w-6 h-6 text-primary-600" />
+                <div className="bg-indigo-100 rounded-full p-2.5">
+                  <User className="w-6 h-6 text-indigo-600" />
                 </div>
                 <div>
                   <h1 className="text-2xl font-bold text-gray-900">
@@ -587,7 +587,7 @@ export function LeadDetailPage() {
                 <button
                   onClick={handleConvertToContact}
                   disabled={converting}
-                  className="inline-flex items-center px-5 py-2.5 text-sm font-medium rounded-full text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 transition-colors shadow-sm"
+                  className="inline-flex items-center px-5 py-2.5 text-sm font-medium rounded-full text-white bg-cyan-600 hover:bg-cyan-700 disabled:opacity-50 transition-colors shadow-sm"
                 >
                   <UserPlus className="w-4 h-4 mr-2" />
                   Convert to Contact
@@ -595,7 +595,7 @@ export function LeadDetailPage() {
                 <button
                   onClick={handleConvertToOpportunity}
                   disabled={converting}
-                  className="inline-flex items-center px-5 py-2.5 text-sm font-medium rounded-full text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 transition-colors shadow-sm"
+                  className="inline-flex items-center px-5 py-2.5 text-sm font-medium rounded-full text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 transition-colors shadow-sm"
                 >
                   <Target className="w-4 h-4 mr-2" />
                   Convert to Opportunity
@@ -619,7 +619,7 @@ export function LeadDetailPage() {
                   <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                     {/* Progress bar fill - width based on current status */}
                     <div
-                      className="absolute top-2 left-0 h-2 bg-blue-500 rounded-full"
+                      className="absolute top-2 left-0 h-2 bg-indigo-500 rounded-full"
                       style={{
                         width: `${(getCurrentStatusIndex() + 1) * 100 / leadStatuses.length}%`,
                         transition: 'width 0.3s ease-in-out'
@@ -643,7 +643,7 @@ export function LeadDetailPage() {
                         >
                           {/* Status dot */}
                           <div
-                            className={`w-4 h-4 rounded-full border-2 border-white ${isActive ? 'bg-blue-500' : 'bg-gray-300'}`}
+                            className={`w-4 h-4 rounded-full border-2 border-white ${isActive ? 'bg-indigo-500' : 'bg-gray-300'}`}
                             style={{
                               marginTop: '-10px',
                               boxShadow: '0 0 0 2px white'
@@ -653,7 +653,7 @@ export function LeadDetailPage() {
                           {/* Status label */}
                           <button
                             onClick={() => handleStatusChange(status.value)}
-                            className={`text-sm font-medium mt-2 px-3 py-1 rounded-full transition-colors ${isActive ? 'text-blue-700' : 'text-gray-500 hover:text-gray-700'
+                            className={`text-sm font-medium mt-2 px-3 py-1 rounded-full transition-colors ${isActive ? 'text-indigo-700' : 'text-gray-500 hover:text-gray-700'
                               }`}
                           >
                             {status.label}
@@ -672,7 +672,7 @@ export function LeadDetailPage() {
                 <button
                   onClick={() => setActiveTab('details')}
                   className={`py-4 px-1 inline-flex items-center text-sm font-medium border-b-2 ${activeTab === 'details'
-                      ? 'border-primary-500 text-primary-600'
+                      ? 'border-indigo-500 text-indigo-600'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                     }`}
                 >
@@ -682,7 +682,7 @@ export function LeadDetailPage() {
                 <button
                   onClick={() => setActiveTab('related')}
                   className={`py-4 px-1 inline-flex items-center text-sm font-medium border-b-2 ${activeTab === 'related'
-                      ? 'border-primary-500 text-primary-600'
+                      ? 'border-indigo-500 text-indigo-600'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                     }`}
                 >
@@ -692,7 +692,7 @@ export function LeadDetailPage() {
                 <button
                   onClick={() => setActiveTab('comments')}
                   className={`py-4 px-1 inline-flex items-center text-sm font-medium border-b-2 ${activeTab === 'comments'
-                      ? 'border-primary-500 text-primary-600'
+                      ? 'border-indigo-500 text-indigo-600'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                     }`}
                 >
@@ -710,7 +710,7 @@ export function LeadDetailPage() {
                   {/* Contact Information */}
                   <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                     <h2 className="text-lg font-semibold mb-4 flex items-center">
-                      <User className="w-5 h-5 text-primary-500 mr-2" />
+                      <User className="w-5 h-5 text-indigo-500 mr-2" />
                       Contact Information
                     </h2>
                     <div className="space-y-4">
@@ -718,7 +718,7 @@ export function LeadDetailPage() {
                         <Mail className="w-5 h-5 text-gray-400 mr-3" />
                         <a
                           href={`mailto:${lead.email}`}
-                          className="text-primary-600 hover:text-primary-700"
+                          className="text-indigo-600 hover:text-indigo-700"
                         >
                           {lead.email}
                         </a>
@@ -726,7 +726,7 @@ export function LeadDetailPage() {
 
                       <button
                         onClick={handleEmailClick}
-                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-full text-white bg-primary-600 hover:bg-primary-700 transition-colors shadow-sm"
+                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-full text-white bg-indigo-600 hover:bg-indigo-700 transition-colors shadow-sm"
                       >
                         <Send className="w-4 h-4 mr-2" />
                         Send Email
@@ -737,7 +737,7 @@ export function LeadDetailPage() {
                           <Phone className="w-5 h-5 text-gray-400 mr-3" />
                           <a
                             href={`tel:${lead.phone}`}
-                            className="text-primary-600 hover:text-primary-700"
+                            className="text-indigo-600 hover:text-indigo-700"
                           >
                             {lead.phone}
                           </a>
@@ -751,7 +751,7 @@ export function LeadDetailPage() {
                             href={lead.website.startsWith('http') ? lead.website : `https://${lead.website}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-primary-600 hover:text-primary-700 hover:underline"
+                            className="text-indigo-600 hover:text-indigo-700 hover:underline"
                           >
                             {lead.website}
                           </a>
@@ -763,7 +763,7 @@ export function LeadDetailPage() {
                   {/* Lead Details */}
                   <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                     <h2 className="text-lg font-semibold mb-4 flex items-center">
-                      <Bookmark className="w-5 h-5 text-primary-500 mr-2" />
+                      <Bookmark className="w-5 h-5 text-indigo-500 mr-2" />
                       Lead Details
                     </h2>
                     <div className="space-y-4">
@@ -804,7 +804,7 @@ export function LeadDetailPage() {
                   {/* Assignment */}
                   <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                     <h2 className="text-lg font-semibold mb-4 flex items-center">
-                      <UserCheck className="w-5 h-5 text-primary-500 mr-2" />
+                      <UserCheck className="w-5 h-5 text-indigo-500 mr-2" />
                       Lead Assignment
                     </h2>
                     <div className="space-y-4">
@@ -816,8 +816,8 @@ export function LeadDetailPage() {
 
                       {lead.owner && (
                         <div className="flex items-center mt-4">
-                          <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center mr-3">
-                            <span className="text-primary-700 font-medium">
+                          <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center mr-3">
+                            <span className="text-indigo-700 font-medium">
                               {lead.owner.name.charAt(0).toUpperCase()}
                             </span>
                           </div>
@@ -833,7 +833,7 @@ export function LeadDetailPage() {
                   {lead.lead_source && (
                     <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                       <h2 className="text-lg font-semibold mb-4 flex items-center">
-                        <Target className="w-5 h-5 text-primary-500 mr-2" />
+                        <Target className="w-5 h-5 text-indigo-500 mr-2" />
                         Lead Source
                       </h2>
                       <div className="space-y-4">
@@ -853,7 +853,7 @@ export function LeadDetailPage() {
                 {/* Custom Fields - Full Width */}
                 <div className="md:col-span-2 bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                   <h2 className="text-lg font-semibold mb-4 flex items-center">
-                    <Bookmark className="w-5 h-5 text-primary-500 mr-2" />
+                    <Bookmark className="w-5 h-5 text-indigo-500 mr-2" />
                     Custom Fields
                   </h2>
                   <CustomFieldsSection
@@ -891,7 +891,7 @@ export function LeadDetailPage() {
                 {/* Additional related records */}
                 <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                   <h2 className="text-lg font-semibold mb-4 flex items-center">
-                    <Briefcase className="w-5 h-5 text-primary-500 mr-2" />
+                    <Briefcase className="w-5 h-5 text-indigo-500 mr-2" />
                     Other Related Records
                   </h2>
                   <div className="text-sm text-gray-500 italic py-2">
@@ -907,7 +907,7 @@ export function LeadDetailPage() {
                 {/* Comment Form */}
                 <form onSubmit={handleSubmitComment} className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                   <h2 className="text-lg font-semibold mb-4 flex items-center">
-                    <MessageSquare className="w-5 h-5 text-primary-500 mr-2" />
+                    <MessageSquare className="w-5 h-5 text-indigo-500 mr-2" />
                     Add Comment
                   </h2>
 
@@ -933,13 +933,13 @@ export function LeadDetailPage() {
                         onChange={(e) => setNewComment(e.target.value)}
                         placeholder="Add a comment..."
                         rows={3}
-                        className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                        className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none"
                       />
                     </div>
                     <button
                       type="submit"
                       disabled={!newComment.trim()}
-                      className="px-5 py-3 bg-primary-600 text-white rounded-xl hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center shadow-sm"
+                      className="px-5 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center shadow-sm"
                     >
                       <Send className="w-4 h-4 mr-2" />
                       Send
