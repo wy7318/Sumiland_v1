@@ -61,6 +61,7 @@ import { FullTaskCalendar } from './components/admin/FullTaskCalendar';
 import FAQPage from './components/FAQPage';
 import { EmailProvider } from './components/admin/EmailProvider';
 import { ReportsPage } from './components/admin/ReportsPage';
+import { SearchResultsPage } from './components/admin/search/SearchResultsPage';
 
 
 
@@ -206,7 +207,7 @@ function App() {
                                 <Route path="tasks/new" element={<TaskFormPage />} />
                                 <Route path="tasks/:id/edit" element={<TaskFormPage />} />
                                 <Route path="tasks/calendar" element={<FullTaskCalendar />} />
-                                    
+                                <Route path="search" element={<SearchResultsPage />} />
                                 <Route path="settings" element={<SettingsPage />} />
                             </Route>
                         </Routes>

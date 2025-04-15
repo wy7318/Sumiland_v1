@@ -13,13 +13,13 @@ import { cn } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
 import { OrganizationSwitcher } from '../OrganizationSwitcher';
 import { NotificationPanel } from './NotificationPanel';
+import { SearchBar } from './search/SearchBar';
 
 export function AdminLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [userData, setUserData] = useState(null);
@@ -141,7 +141,6 @@ export function AdminLayout() {
   const currentMenuItem = menuItems.find(item => isActive(item.path));
   const currentBgColor = currentMenuItem ? getMenuBgColor(currentMenuItem.label) : "bg-white";
 
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -149,13 +148,6 @@ export function AdminLayout() {
       </div>
     );
   }
-
-  
-
-  
-
-
-  
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -192,7 +184,6 @@ export function AdminLayout() {
           )}
         </button>
 
-        {/* Navigation Menu Items */}
         {/* Navigation Menu Items */}
         <div className={cn(
           "py-2 flex flex-col h-[calc(100%-10rem)]", // Increase the subtracted height to leave more room for Settings
@@ -246,18 +237,9 @@ export function AdminLayout() {
           currentBgColor
         )}>
           <div className="px-6 flex items-center justify-between">
-            {/* Search Bar */}
+            {/* Global Search Bar - Updated to use new SearchBar component */}
             <div className="w-2/5">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-                <input
-                  type="text"
-                  placeholder="Search records..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
+              <SearchBar />
             </div>
 
             {/* Right Side Controls */}
