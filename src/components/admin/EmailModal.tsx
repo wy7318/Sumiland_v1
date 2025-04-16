@@ -1,7 +1,6 @@
 import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { X, Send, AlertCircle, Sparkles, Bot, Copy, ChevronDown, ChevronUp } from 'lucide-react';
-// import { sendEmail } from '../../lib/email';
+import { X, Send, AlertCircle, Sparkles, Bot, Copy } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import 'react-quill/dist/quill.snow.css';
 import ReactQuill from 'react-quill';
@@ -99,33 +98,37 @@ export function EmailModal({ to, onClose, onSuccess, caseTitle, orgId, caseId }:
   const aiModel = OPENAI_MODELS.GPT_3_5_TURBO;
   const quillRef = useRef<any>(null);
 
+  // Updated scope to include userinfo.email for proper authentication
   const googleLogin = useGoogleLogin({
-    scope: 'https://www.googleapis.com/auth/gmail.send',
+    scope: 'https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/userinfo.email',
     onSuccess: async (tokenResponse) => {
       if (!user) return;
-      const config = await connectGmail(tokenResponse);
-      const { error: saveError } = await saveEmailConfig(user.id, config);
 
-      console.log('[Reauth] Saving config:', config);
+      try {
+        setLoading(true);
+        const config = await connectGmail(tokenResponse);
+        const { error: saveError } = await saveEmailConfig(user.id, config, orgId);
 
-      if (saveError) {
-        console.error('[Reauth] Failed to save config:', saveError);
-        setError('Failed to re-authenticate Gmail');
-        setLoading(false);
-        return;
-      } else {
+        console.log('[Reauth] Saving config:', config);
+
+        if (saveError) {
+          console.error('[Reauth] Failed to save config:', saveError);
+          setError('Failed to re-authenticate Gmail');
+          setLoading(false);
+          return;
+        }
+
         // Try sending email again
         console.log('caseId : ' + caseId);
-        try {
-          await sendEmail(user.id, toAddress, subject, body, cc, bcc, orgId, caseId);
-          onSuccess();
-        } catch (retryErr) {
-          setError('Still failed after re-auth: ' + retryErr.message);
-        }
+        await sendEmail(user.id, toAddress, subject, body, cc, bcc, orgId, caseId);
+        onSuccess();
+      } catch (retryErr: any) {
+        setError('Still failed after re-auth: ' + retryErr.message);
+        setLoading(false);
       }
-      setLoading(false);
     },
-    onError: () => {
+    onError: (errorResponse) => {
+      console.error('Google login error:', errorResponse);
       setError('Gmail login failed');
       setLoading(false);
     },
@@ -139,9 +142,9 @@ export function EmailModal({ to, onClose, onSuccess, caseTitle, orgId, caseId }:
       setLoading(true);
       setError(null);
 
-      const config = await getEmailConfig(user.id);
+      const config = await getEmailConfig(user.id, orgId);
 
-      console.log('config : ' + config);
+      console.log('config:', config);
 
       if (!config || Date.now() >= config.expiresAt) {
         // Token expired or not available — reauthenticate
@@ -150,13 +153,30 @@ export function EmailModal({ to, onClose, onSuccess, caseTitle, orgId, caseId }:
         return;
       }
 
+      // Check if we have the sender email (required in our new implementation)
+      if (!config.email) {
+        alert('Email configuration incomplete. Re-authenticating...');
+        googleLogin();
+        return;
+      }
+
       // Token is good — send email
       await sendEmail(user.id, toAddress, subject, body, cc, bcc, orgId, caseId);
 
       onSuccess();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error sending email:', err);
       setError(err instanceof Error ? err.message : 'Failed to send email');
+
+      // If the error is about profile access, trigger a re-auth
+      if (err.message && (
+        err.message.includes('Failed to fetch Gmail profile') ||
+        err.message.includes('Sender email address not found')
+      )) {
+        alert('Email authentication issue. Please reconnect your Gmail account.');
+        googleLogin();
+      }
+
       setLoading(false);
     }
   };
@@ -201,55 +221,6 @@ export function EmailModal({ to, onClose, onSuccess, caseTitle, orgId, caseId }:
     return cleaned.trim();
   };
 
-  const generateEmailContent = async () => {
-    if (!aiPrompt.trim()) {
-      setError('Please enter a prompt or select a template');
-      setTimeout(() => setError(null), 3000);
-      return;
-    }
-
-    setAiGenerating(true);
-    setError(null);
-
-    try {
-      // Create context-aware prompt
-      let contextPrompt = aiPrompt;
-
-      // Add context about the case if available
-      if (caseTitle) {
-        contextPrompt = `${contextPrompt}\n\nThis email is regarding: ${caseTitle}`;
-      }
-
-      // Different instruction based on target (subject or body)
-      if (aiTarget === 'subject') {
-        contextPrompt = `${contextPrompt}\n\nGenerate ONLY a concise and effective email subject line. Do not include any introductory phrases or explanations. Just output the subject line directly. Do not use any HTML.`;
-      } else {
-        contextPrompt = `${contextPrompt}\n\nGenerate the email body directly without any introductory phrases like "Here's" or "Certainly!". Do not include any HTML doctype, html, head, or meta tags. Only include the actual formatted content that would go in an email body using simple formatting like <p>, <strong>, <em>, <ul>, <li> tags.`;
-      }
-
-      const response = await generateContent({
-        prompt: contextPrompt,
-        tone: aiTone,
-        contentLength: aiTarget === 'subject' ? 'short' : 'medium',
-        contentType: 'email',
-        model: aiModel
-      });
-
-      if (response.error) {
-        setError(response.error);
-      } else {
-        // Clean the response
-        const cleanedContent = cleanAiContent(response.content);
-        setGeneratedContent(cleanedContent);
-      }
-    } catch (err) {
-      setError('Failed to generate content. Please try again.');
-      console.error('AI generation error:', err);
-    } finally {
-      setAiGenerating(false);
-    }
-  };
-
   const extractSubjectFromBody = (bodyContent: string): { subject: string | null, cleanedBody: string } => {
     // Check for common subject line patterns in the body
     const subjectPattern = /(?:^|\n|\<p\>|\<div\>)(?:Subject:|re:|Subject)[\s:]*(.*?)(?:\n|\r\n?|$|\<\/p\>|\<\/div\>)/i;
@@ -265,7 +236,6 @@ export function EmailModal({ to, onClose, onSuccess, caseTitle, orgId, caseId }:
     return { subject: null, cleanedBody: bodyContent };
   };
 
-  // Replace the useGeneratedContent function in your EmailModal component with this:
   const useGeneratedContent = () => {
     if (aiTarget === 'subject') {
       // For subject, use the cleaned content
@@ -360,6 +330,55 @@ export function EmailModal({ to, onClose, onSuccess, caseTitle, orgId, caseId }:
     } catch (err) {
       setError('Failed to generate subject. Please try again.');
       console.error('AI subject generation error:', err);
+      setAiGenerating(false);
+    }
+  };
+
+  const generateEmailContent = async () => {
+    if (!aiPrompt.trim()) {
+      setError('Please enter a prompt or select a template');
+      setTimeout(() => setError(null), 3000);
+      return;
+    }
+
+    setAiGenerating(true);
+    setError(null);
+
+    try {
+      // Create context-aware prompt
+      let contextPrompt = aiPrompt;
+
+      // Add context about the case if available
+      if (caseTitle) {
+        contextPrompt = `${contextPrompt}\n\nThis email is regarding: ${caseTitle}`;
+      }
+
+      // Different instruction based on target (subject or body)
+      if (aiTarget === 'subject') {
+        contextPrompt = `${contextPrompt}\n\nGenerate ONLY a concise and effective email subject line. Do not include any introductory phrases or explanations. Just output the subject line directly. Do not use any HTML.`;
+      } else {
+        contextPrompt = `${contextPrompt}\n\nGenerate the email body directly without any introductory phrases like "Here's" or "Certainly!". Do not include any HTML doctype, html, head, or meta tags. Only include the actual formatted content that would go in an email body using simple formatting like <p>, <strong>, <em>, <ul>, <li> tags.`;
+      }
+
+      const response = await generateContent({
+        prompt: contextPrompt,
+        tone: aiTone,
+        contentLength: aiTarget === 'subject' ? 'short' : 'medium',
+        contentType: 'email',
+        model: aiModel
+      });
+
+      if (response.error) {
+        setError(response.error);
+      } else {
+        // Clean the response
+        const cleanedContent = cleanAiContent(response.content);
+        setGeneratedContent(cleanedContent);
+      }
+    } catch (err) {
+      setError('Failed to generate content. Please try again.');
+      console.error('AI generation error:', err);
+    } finally {
       setAiGenerating(false);
     }
   };
@@ -518,8 +537,8 @@ export function EmailModal({ to, onClose, onSuccess, caseTitle, orgId, caseId }:
                     type="button"
                     onClick={() => setAiTarget('subject')}
                     className={`px-2 py-1 text-xs rounded-full ${aiTarget === 'subject'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-white text-blue-600 border border-blue-300'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-white text-blue-600 border border-blue-300'
                       }`}
                   >
                     Subject Line
@@ -528,8 +547,8 @@ export function EmailModal({ to, onClose, onSuccess, caseTitle, orgId, caseId }:
                     type="button"
                     onClick={() => setAiTarget('body')}
                     className={`px-2 py-1 text-xs rounded-full ${aiTarget === 'body'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-white text-blue-600 border border-blue-300'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-white text-blue-600 border border-blue-300'
                       }`}
                   >
                     Email Body
