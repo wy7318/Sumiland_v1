@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Send, AlertCircle, Sparkles, Bot, Copy, ChevronDown, ChevronUp, Minimize2, Maximize2, Mail } from 'lucide-react';
+import { X, Send, AlertCircle, Sparkles, Bot, Copy, Minimize2, Maximize2, Mail } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import 'react-quill/dist/quill.snow.css';
 import ReactQuill from 'react-quill';
@@ -108,6 +108,7 @@ export function FoldableEmailModal({
     const [generatedContent, setGeneratedContent] = useState('');
     const [aiTarget, setAiTarget] = useState<'subject' | 'body'>('body');
     const [aiTone, setAiTone] = useState('professional');
+
     // Always use GPT-3.5 Turbo by default and don't allow changing it
     const aiModel = OPENAI_MODELS.GPT_3_5_TURBO;
     const quillRef = useRef<any>(null);
@@ -139,34 +140,38 @@ export function FoldableEmailModal({
         };
     }, [isVisible, onMinimize]);
 
+    // Updated scope to include userinfo.email for proper authentication
     const googleLogin = useGoogleLogin({
-        scope: 'https://www.googleapis.com/auth/gmail.send',
+        scope: 'https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/userinfo.email',
         onSuccess: async (tokenResponse) => {
             if (!user) return;
-            const config = await connectGmail(tokenResponse);
-            const { error: saveError } = await saveEmailConfig(user.id, config);
 
-            console.log('[Reauth] Saving config:', config);
+            try {
+                setLoading(true);
+                const config = await connectGmail(tokenResponse);
+                const { error: saveError } = await saveEmailConfig(user.id, config, orgId);
 
-            if (saveError) {
-                console.error('[Reauth] Failed to save config:', saveError);
-                setError('Failed to re-authenticate Gmail');
-                setLoading(false);
-                return;
-            } else {
+                console.log('[Reauth] Saving config:', config);
+
+                if (saveError) {
+                    console.error('[Reauth] Failed to save config:', saveError);
+                    setError('Failed to re-authenticate Gmail');
+                    setLoading(false);
+                    return;
+                }
+
                 // Try sending email again
                 console.log('caseId : ' + caseId);
-                try {
-                    await sendEmail(user.id, toAddress, subject, body, cc, bcc, orgId, caseId);
-                    onSuccess();
-                    resetForm();
-                } catch (retryErr) {
-                    setError('Still failed after re-auth: ' + retryErr.message);
-                }
+                await sendEmail(user.id, toAddress, subject, body, cc, bcc, orgId, caseId);
+                onSuccess();
+                resetForm();
+            } catch (retryErr: any) {
+                setError('Still failed after re-auth: ' + retryErr.message);
+                setLoading(false);
             }
-            setLoading(false);
         },
-        onError: () => {
+        onError: (errorResponse) => {
+            console.error('Google login error:', errorResponse);
             setError('Gmail login failed');
             setLoading(false);
         },
@@ -204,9 +209,9 @@ export function FoldableEmailModal({
             setLoading(true);
             setError(null);
 
-            const config = await getEmailConfig(user.id);
+            const config = await getEmailConfig(user.id, orgId);
 
-            console.log('config : ' + config);
+            console.log('config:', config);
 
             if (!config || Date.now() >= config.expiresAt) {
                 // Token expired or not available — reauthenticate
@@ -215,14 +220,31 @@ export function FoldableEmailModal({
                 return;
             }
 
+            // Check if we have the sender email (required in our new implementation)
+            if (!config.email) {
+                alert('Email configuration incomplete. Re-authenticating...');
+                googleLogin();
+                return;
+            }
+
             // Token is good — send email
             await sendEmail(user.id, toAddress, subject, body, cc, bcc, orgId, caseId);
 
             onSuccess();
             resetForm();
-        } catch (err) {
+        } catch (err: any) {
             console.error('Error sending email:', err);
             setError(err instanceof Error ? err.message : 'Failed to send email');
+
+            // If the error is about profile access, trigger a re-auth
+            if (err.message && (
+                err.message.includes('Failed to fetch Gmail profile') ||
+                err.message.includes('Sender email address not found')
+            )) {
+                alert('Email authentication issue. Please reconnect your Gmail account.');
+                googleLogin();
+            }
+
             setLoading(false);
         }
     };

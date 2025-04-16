@@ -1,17 +1,18 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Save, AlertCircle, CheckCircle, Building2, Globe, MapPin } from 'lucide-react';
+import { Save, AlertCircle, CheckCircle, Building2, Globe, MapPin, Mail, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Loader } from '@googlemaps/js-api-loader';
 import { useOrganization } from '../../contexts/OrganizationContext';
-
-
+import { EmailConfigModal } from './EmailConfigModal';
+import { AutomationSettings } from './AutomationSettings';
 
 type Organization = {
   id: string;
   name: string;
   website_url: string | null;
+  email_domain: string | null;
   billing_address_line1: string | null;
   billing_address_line2: string | null;
   billing_city: string | null;
@@ -27,17 +28,31 @@ type Organization = {
   status: 'active' | 'inactive';
   type: string | null;
   timezone: string | null;
+  logo_url?: string;
+  lead_auto_response?: boolean;
+  lead_response_template?: string;
+  case_auto_response?: boolean;
+  case_response_template?: string;
+};
+
+type EmailConfig = {
+  id: string;
+  provider: 'gmail' | 'outlook';
+  email: string;
+  created_at: string;
 };
 
 export function OrganizationSettings() {
-  const { user } = useAuth(); // You still need user
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [useShippingForBilling, setUseShippingForBilling] = useState(false);
   const { selectedOrganization } = useOrganization();
-  
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailConfigs, setEmailConfigs] = useState<EmailConfig[]>([]);
+
   const shippingAutocompleteRef = useRef<google.maps.places.Autocomplete>();
   const billingAutocompleteRef = useRef<google.maps.places.Autocomplete>();
 
@@ -119,7 +134,7 @@ export function OrganizationSettings() {
 
     setOrganization(prev => {
       if (!prev) return null;
-      
+
       const updates = {
         [`${type}_address_line1`]: `${streetNumber} ${route}`.trim(),
         [`${type}_city`]: city,
@@ -135,24 +150,11 @@ export function OrganizationSettings() {
   useEffect(() => {
     if (selectedOrganization?.id) {
       fetchOrganization(selectedOrganization.id);
+      fetchEmailConfigs(selectedOrganization.id);
     }
   }, [selectedOrganization]);
 
-
-  // useEffect(() => {
-  //   // Get the first organization where user is admin or owner
-  //   const adminOrg = organizations.find(org => 
-  //     org.role === 'admin' || org.role === 'owner'
-  //   );
-    
-  //   if (adminOrg) {
-  //     fetchOrganization(selectedOrganization?.id);
-  //   }
-  // }, [organizations]);
-
   const fetchOrganization = async (orgId: string) => {
-    console.log('orgId:', orgId);
-    console.log('selectedOrganization?.id:', selectedOrganization?.id);
     try {
       const { data, error } = await supabase
         .from('organizations')
@@ -165,7 +167,7 @@ export function OrganizationSettings() {
 
       // Check if billing address matches shipping address
       if (data) {
-        const shippingMatches = 
+        const shippingMatches =
           data.billing_address_line1 === data.shipping_address_line1 &&
           data.billing_address_line2 === data.shipping_address_line2 &&
           data.billing_city === data.shipping_city &&
@@ -181,6 +183,21 @@ export function OrganizationSettings() {
     }
   };
 
+  const fetchEmailConfigs = async (orgId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('email_configurations')
+        .select('id, provider, email, created_at')
+        .eq('organization_id', orgId)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+      setEmailConfigs(data || []);
+    } catch (err) {
+      console.error('Error fetching email configurations:', err);
+    }
+  };
+
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !selectedOrganization) return;
@@ -188,7 +205,6 @@ export function OrganizationSettings() {
     const fileExt = file.name.split('.').pop();
     const fileName = `${selectedOrganization.id}-${Date.now()}.${fileExt}`;
     const filePath = `logos/${fileName}`;
-
 
     setLoading(true);
     setError(null);
@@ -200,10 +216,9 @@ export function OrganizationSettings() {
       .from('organization-logos')
       .upload(filePath, file, {
         cacheControl: '3600',
-        upsert: true, // only if overwrite is intended and allowed
+        upsert: true,
         contentType: file.type
       });
-
 
     if (uploadError) {
       console.error('Logo upload error:', uploadError);
@@ -216,7 +231,6 @@ export function OrganizationSettings() {
       setError('Logo file size should be less than 5MB');
       return;
     }
-
 
     // Get public URL
     const { data: publicUrlData } = supabase
@@ -243,6 +257,45 @@ export function OrganizationSettings() {
     setLoading(false);
   };
 
+  const handleAutomationSettingsUpdate = async (automationSettings) => {
+    if (!selectedOrganization?.id) return;
+
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const { error } = await supabase
+        .from('organizations')
+        .update({
+          lead_auto_response: automationSettings.lead_auto_response,
+          lead_response_template: automationSettings.lead_response_template,
+          case_auto_response: automationSettings.case_auto_response,
+          case_response_template: automationSettings.case_response_template,
+          updated_at: new Date().toISOString(),
+          updated_by: user.id
+        })
+        .eq('id', selectedOrganization.id);
+
+      if (error) throw error;
+
+      // Update local state
+      setOrganization(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          ...automationSettings
+        };
+      });
+
+      setSuccess('Automation settings updated successfully');
+    } catch (err) {
+      console.error('Error updating automation settings:', err);
+      setError('Failed to update automation settings');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -253,33 +306,34 @@ export function OrganizationSettings() {
     setSuccess(null);
 
     const updatePayload = {
-      name: organization.name,
-      website_url: organization.website_url,
-      timezone: organization.timezone || null,
-      shipping_address_line1: organization.shipping_address_line1,
-      shipping_address_line2: organization.shipping_address_line2,
-      shipping_city: organization.shipping_city,
-      shipping_state: organization.shipping_state,
-      shipping_zip_code: organization.shipping_zip_code,
-      shipping_country: organization.shipping_country,
+      name: organization?.name,
+      website_url: organization?.website_url,
+      email_domain: organization?.email_domain,
+      timezone: organization?.timezone || null,
+      shipping_address_line1: organization?.shipping_address_line1,
+      shipping_address_line2: organization?.shipping_address_line2,
+      shipping_city: organization?.shipping_city,
+      shipping_state: organization?.shipping_state,
+      shipping_zip_code: organization?.shipping_zip_code,
+      shipping_country: organization?.shipping_country,
       billing_address_line1: useShippingForBilling
-        ? organization.shipping_address_line1
-        : organization.billing_address_line1,
+        ? organization?.shipping_address_line1
+        : organization?.billing_address_line1,
       billing_address_line2: useShippingForBilling
-        ? organization.shipping_address_line2
-        : organization.billing_address_line2,
+        ? organization?.shipping_address_line2
+        : organization?.billing_address_line2,
       billing_city: useShippingForBilling
-        ? organization.shipping_city
-        : organization.billing_city,
+        ? organization?.shipping_city
+        : organization?.billing_city,
       billing_state: useShippingForBilling
-        ? organization.shipping_state
-        : organization.billing_state,
+        ? organization?.shipping_state
+        : organization?.billing_state,
       billing_zip_code: useShippingForBilling
-        ? organization.shipping_zip_code
-        : organization.billing_zip_code,
+        ? organization?.shipping_zip_code
+        : organization?.billing_zip_code,
       billing_country: useShippingForBilling
-        ? organization.shipping_country
-        : organization.billing_country,
+        ? organization?.shipping_country
+        : organization?.billing_country,
       updated_at: new Date().toISOString(),
       updated_by: user.id,
     };
@@ -289,7 +343,6 @@ export function OrganizationSettings() {
       .update(updatePayload)
       .eq('id', selectedOrganization.id);
 
-    console.log('updatePayload:', updatePayload);
     if (error) {
       console.error('Update Error:', error);
       setError('Failed to update organization');
@@ -298,6 +351,37 @@ export function OrganizationSettings() {
     }
 
     setLoading(false);
+  };
+
+  const handleEmailConfigSuccess = async () => {
+    setShowEmailModal(false);
+    if (selectedOrganization?.id) {
+      await fetchEmailConfigs(selectedOrganization.id);
+      setSuccess('Email configuration successfully added');
+    }
+  };
+
+  const handleRemoveEmailConfig = async (configId: string) => {
+    if (!confirm('Are you sure you want to remove this email configuration?')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('email_configurations')
+        .delete()
+        .eq('id', configId)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      // Update the UI by filtering out the removed config
+      setEmailConfigs(prev => prev.filter(config => config.id !== configId));
+      setSuccess('Email configuration removed successfully');
+    } catch (err) {
+      console.error('Error removing email configuration:', err);
+      setError('Failed to remove email configuration');
+    }
   };
 
   if (!selectedOrganization || !organization) {
@@ -330,6 +414,84 @@ export function OrganizationSettings() {
         </div>
       )}
 
+      {/* Email Configuration Section */}
+      <div className="bg-white rounded-lg shadow p-6 mb-6">
+        <h3 className="text-lg font-semibold mb-4 flex items-center">
+          <Mail className="w-5 h-5 mr-2" />
+          Email Configuration
+        </h3>
+
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Organization Email Domain
+          </label>
+          <div className="relative flex">
+            <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500">@</span>
+            <input
+              type="text"
+              value={organization.email_domain || ''}
+              onChange={(e) => setOrganization(prev => prev ? { ...prev, email_domain: e.target.value } : null)}
+              className="flex-1 px-4 py-2 rounded-r-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+              placeholder="yourdomain.com"
+            />
+          </div>
+          <p className="mt-1 text-sm text-gray-500">
+            Enter your organization's email domain. This helps us verify authentic email addresses from your organization.
+          </p>
+        </div>
+
+        <div className="mb-4">
+          <div className="flex justify-between items-center mb-2">
+            <h4 className="font-medium">Connected Email Accounts</h4>
+            <button
+              onClick={() => setShowEmailModal(true)}
+              className="px-3 py-1 bg-primary-600 text-white text-sm rounded hover:bg-primary-700"
+            >
+              Connect Email
+            </button>
+          </div>
+
+          {emailConfigs.length === 0 ? (
+            <p className="text-gray-500 italic py-2">No email accounts connected yet</p>
+          ) : (
+            <ul className="divide-y divide-gray-200">
+              {emailConfigs.map(config => (
+                <li key={config.id} className="py-3 flex items-center justify-between">
+                  <div className="flex items-center">
+                    <div className="bg-primary-100 p-2 rounded-full mr-3">
+                      <Mail className="w-4 h-4 text-primary-600" />
+                    </div>
+                    <div>
+                      <div className="font-medium">{config.email}</div>
+                      <div className="text-sm text-gray-500 capitalize">{config.provider}</div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleRemoveEmailConfig(config.id)}
+                    className="text-gray-400 hover:text-red-500"
+                    aria-label="Remove email configuration"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <p className="mt-4 text-sm text-gray-500">
+            Connected email accounts allow you to send emails on behalf of your organization through our system.
+          </p>
+        </div>
+      </div>
+
+      {/* Automation Settings Section */}
+      <AutomationSettings
+        organization={organization}
+        emailConfigs={emailConfigs}
+        isLoading={loading}
+        onUpdate={handleAutomationSettingsUpdate}
+      />
+
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Basic Information */}
         <div className="bg-white rounded-lg shadow p-6">
@@ -337,7 +499,7 @@ export function OrganizationSettings() {
             <Building2 className="w-5 h-5 mr-2" />
             Basic Information
           </h3>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -351,33 +513,6 @@ export function OrganizationSettings() {
                 required
               />
             </div>
-
-            <div className="bg-white rounded-lg shadow p-6 mb-6">
-              <h3 className="text-lg font-semibold mb-4 flex items-center">
-                <Building2 className="w-5 h-5 mr-2" />
-                Organization Logo
-              </h3>
-              <div className="flex items-center space-x-4">
-                {organization.logo_url ? (
-                  <img
-                    src={organization.logo_url}
-                    alt="Organization Logo"
-                    className="w-24 h-24 object-cover rounded-lg border"
-                  />
-                ) : (
-                  <div className="w-24 h-24 bg-gray-100 flex items-center justify-center rounded-lg border text-gray-400">
-                    No Logo
-                  </div>
-                )}
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleLogoUpload}
-                  className="text-sm"
-                />
-              </div>
-            </div>
-
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -394,27 +529,49 @@ export function OrganizationSettings() {
                 />
               </div>
             </div>
+
+            <div className="md:col-span-2">
+              <h4 className="text-md font-medium mb-2">Organization Logo</h4>
+              <div className="flex items-center space-x-4">
+                {organization.logo_url ? (
+                  <img
+                    src={organization.logo_url}
+                    alt="Organization Logo"
+                    className="w-16 h-16 object-cover rounded-lg border"
+                  />
+                ) : (
+                  <div className="w-16 h-16 bg-gray-100 flex items-center justify-center rounded-lg border text-gray-400">
+                    No Logo
+                  </div>
+                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLogoUpload}
+                  className="text-sm"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Timezone
+              </label>
+              <select
+                value={organization.timezone || ''}
+                onChange={(e) => setOrganization(prev => prev ? { ...prev, timezone: e.target.value } : null)}
+                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+              >
+                <option value="">Select Timezone</option>
+                {Intl.supportedValuesOf('timeZone').map((tz) => (
+                  <option key={tz} value={tz}>
+                    {tz}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Timezone
-          </label>
-          <select
-            value={organization.timezone || ''}
-            onChange={(e) => setOrganization(prev => prev ? { ...prev, timezone: e.target.value } : null)}
-            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-          >
-            <option value="">Select Timezone</option>
-            {Intl.supportedValuesOf('timeZone').map((tz) => (
-              <option key={tz} value={tz}>
-                {tz}
-              </option>
-            ))}
-          </select>
-        </div>
-
 
         {/* Shipping Address */}
         <div className="bg-white rounded-lg shadow p-6">
@@ -422,7 +579,7 @@ export function OrganizationSettings() {
             <MapPin className="w-5 h-5 mr-2" />
             Shipping Address
           </h3>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -530,7 +687,7 @@ export function OrganizationSettings() {
               <span className="text-sm text-gray-600">Same as shipping</span>
             </label>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -625,6 +782,14 @@ export function OrganizationSettings() {
           </button>
         </div>
       </form>
+
+      {showEmailModal && (
+        <EmailConfigModal
+          onClose={() => setShowEmailModal(false)}
+          onSuccess={handleEmailConfigSuccess}
+          organizationId={selectedOrganization.id}
+        />
+      )}
     </motion.div>
   );
 }

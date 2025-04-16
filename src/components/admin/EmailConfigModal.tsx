@@ -8,23 +8,36 @@ import { connectGmail, connectOutlook, saveEmailConfig } from '../../lib/email';
 type Props = {
   onClose: () => void;
   onSuccess: () => void;
+  organizationId: string;
 };
 
-export function EmailConfigModal({ onClose, onSuccess }: Props) {
+export function EmailConfigModal({ onClose, onSuccess, organizationId }: Props) {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [email, setEmail] = useState('');
 
-  const handleGoogleSuccess = async (tokenResponse: any) => {
+
+
+  const handleGoogleSuccess = async (codeResponse: any) => {
     try {
       if (!user) return;
-      if (!tokenResponse?.access_token) {
-        throw new Error('No access token received from Google');
+      if (!codeResponse?.code) {
+        throw new Error('No authorization code received from Google');
       }
 
-      const config = await connectGmail(tokenResponse);
-      const { error: saveError } = await saveEmailConfig(user.id, config);
+      setLoading(true);
+      // Pass the code instead of tokens to connectGmail
+      const config = await connectGmail(codeResponse.code);
+
+      // Store the token with organization context
+      const { error: saveError } = await saveEmailConfig(
+        user.id,
+        config,
+        organizationId
+      );
+
       if (saveError) throw saveError;
 
       setSuccess(true);
@@ -39,14 +52,20 @@ export function EmailConfigModal({ onClose, onSuccess }: Props) {
     }
   };
 
+  
+
   const googleLogin = useGoogleLogin({
-    scope: 'https://www.googleapis.com/auth/gmail.send',
+    scope: 'https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/userinfo.email',
     onSuccess: handleGoogleSuccess,
     onError: (error) => {
       console.error('Google login error:', error);
       setError('Failed to connect to Gmail');
       setLoading(false);
-    }
+    },
+    flow: 'auth-code', // Add this line - very important for refresh tokens
+    // These are critical for refresh tokens:
+    access_type: 'offline',
+    prompt: 'consent'
   });
 
   const handleConnect = async (provider: 'gmail' | 'outlook') => {
@@ -56,12 +75,18 @@ export function EmailConfigModal({ onClose, onSuccess }: Props) {
     setError(null);
 
     if (provider === 'gmail') {
-      console.log('Triggering Google login...');
-      googleLogin(); // Note: Just call the function, don't await
+      googleLogin(); // Just call the function, don't await
     } else {
       try {
         const config = await connectOutlook();
-        const { error: saveError } = await saveEmailConfig(user.id, config);
+
+        // Store the token with organization context
+        const { error: saveError } = await saveEmailConfig(
+          user.id,
+          config,
+          organizationId
+        );
+
         if (saveError) throw saveError;
 
         setSuccess(true);
@@ -124,8 +149,34 @@ export function EmailConfigModal({ onClose, onSuccess }: Props) {
         ) : (
           <div className="space-y-4">
             <p className="text-gray-600 mb-6">
-              Choose your email provider to connect your account. This will allow you to send emails directly from the dashboard.
+              Connect your email account to send emails directly from the dashboard. This allows you to use our CRM to send emails that appear to come from your actual email address.
             </p>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="email">
+                Your Email Address
+              </label>
+              <div className="flex">
+                <div className="relative flex-grow">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
+                    placeholder="your.name@company.com"
+                  />
+                </div>
+              </div>
+              <p className="mt-1 text-xs text-gray-500">
+                Enter the email address you want to send from. We'll verify this during OAuth.
+              </p>
+            </div>
+
+            <div className="pt-2">
+              <p className="text-sm font-medium text-gray-700 mb-2">Select your email provider:</p>
+            </div>
 
             <button
               onClick={() => handleConnect('gmail')}
@@ -152,6 +203,10 @@ export function EmailConfigModal({ onClose, onSuccess }: Props) {
               />
               <span className="font-medium">Connect with Outlook</span>
             </button>
+
+            <div className="mt-4 text-xs text-gray-500">
+              <p>By connecting your email, you authorize our application to send emails on your behalf. You can revoke this access at any time.</p>
+            </div>
           </div>
         )}
       </motion.div>
