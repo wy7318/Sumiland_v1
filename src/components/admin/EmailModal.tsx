@@ -1,11 +1,19 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { X, Send, AlertCircle, Sparkles, Bot, Copy } from 'lucide-react';
+import { X, Send, AlertCircle, Sparkles, Bot, Copy, AtSign, CheckCircle, Info } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import 'react-quill/dist/quill.snow.css';
 import ReactQuill from 'react-quill';
 import { useGoogleLogin } from '@react-oauth/google';
-import { getEmailConfig, connectGmail, saveEmailConfig, sendEmail } from '../../lib/email';
+import {
+  getEmailConfig,
+  getEmailConfigs,
+  connectGmail,
+  connectOutlook,
+  saveEmailConfig,
+  sendEmail,
+  EmailConfig
+} from '../../lib/email';
 import { generateContent } from '../../services/aiService';
 
 // Define fallback models in case OPENAI_MODELS is not available
@@ -87,6 +95,11 @@ export function EmailModal({ to, onClose, onSuccess, caseTitle, orgId, caseId }:
   const [bcc, setBcc] = useState('');
   const [showCcBcc, setShowCcBcc] = useState(false);
 
+  // Email configuration state
+  const [emailConfigs, setEmailConfigs] = useState<EmailConfig[]>([]);
+  const [selectedConfigId, setSelectedConfigId] = useState<string | null>(null);
+  const [loadingConfigs, setLoadingConfigs] = useState(false);
+
   // AI assistance state
   const [showAiAssistant, setShowAiAssistant] = useState(false);
   const [aiPrompt, setAiPrompt] = useState('');
@@ -98,7 +111,82 @@ export function EmailModal({ to, onClose, onSuccess, caseTitle, orgId, caseId }:
   const aiModel = OPENAI_MODELS.GPT_3_5_TURBO;
   const quillRef = useRef<any>(null);
 
-  // Updated scope to include userinfo.email for proper authentication
+  const [isAddingEmailAccount, setIsAddingEmailAccount] = useState(false);
+  const [temporaryMessage, setTemporaryMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (temporaryMessage) {
+      const timer = setTimeout(() => {
+        setTemporaryMessage(null);
+      }, 3000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [temporaryMessage]);
+
+  // Fetch email configurations on mount
+  useEffect(() => {
+    if (user && orgId) {
+      fetchEmailConfigurations();
+    }
+  }, [user, orgId]);
+
+  useEffect(() => {
+    console.log("Selected config ID changed:", selectedConfigId);
+    console.log("Selected config:", getSelectedConfig());
+  }, [selectedConfigId, emailConfigs]);
+
+  const fetchEmailConfigurations = async () => {
+    if (!user) return;
+
+    try {
+      console.log("Starting to fetch email configurations...");
+      console.log("User ID:", user.id);
+      console.log("Organization ID:", orgId);
+
+      setLoadingConfigs(true);
+      const configs = await getEmailConfigs(user.id, orgId);
+
+      console.log("Raw configs returned:", configs);
+
+      // Filter out any configs that don't have an ID
+      const validConfigs = configs.filter(config => config.id !== undefined && config.id !== null);
+
+      console.log("Valid configs after filtering:", validConfigs);
+
+      setEmailConfigs(validConfigs);
+
+      // Select the first config by default if available
+      if (validConfigs.length > 0) {
+        console.log("Setting default config ID:", validConfigs[0].id);
+        setSelectedConfigId(validConfigs[0].id);
+      } else {
+        console.log("No valid configs found, setting selectedConfigId to null");
+        setSelectedConfigId(null);
+      }
+    } catch (err) {
+      console.error('Failed to fetch email configurations:', err);
+      setError('Failed to load email accounts');
+    } finally {
+      setLoadingConfigs(false);
+      console.log("Finished loading configs");
+    }
+  };
+
+  // Get the selected email configuration
+  const getSelectedConfig = (): EmailConfig | null => {
+    if (selectedConfigId === null) return null;
+
+    // Log the actual values to debug
+    console.log("Finding config with ID:", selectedConfigId, typeof selectedConfigId);
+    console.log("Available config IDs:", emailConfigs.map(c => ({ id: c.id, type: typeof c.id })));
+
+    // Direct string comparison of IDs
+    return emailConfigs.find(config =>
+      String(config.id) === String(selectedConfigId)
+    ) || null;
+  };
+
   const googleLogin = useGoogleLogin({
     scope: 'https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/userinfo.email',
     onSuccess: async (tokenResponse) => {
@@ -106,24 +194,35 @@ export function EmailModal({ to, onClose, onSuccess, caseTitle, orgId, caseId }:
 
       try {
         setLoading(true);
-        const config = await connectGmail(tokenResponse);
-        const { error: saveError } = await saveEmailConfig(user.id, config, orgId);
+        const config = await connectGmail(tokenResponse.code);
+        console.log("Config from connectGmail:", config);
 
-        console.log('[Reauth] Saving config:', config);
+        const { data, error: saveError } = await saveEmailConfig(user.id, config, orgId);
+
+        console.log('[Auth] Saving config result:', { data, saveError });
 
         if (saveError) {
-          console.error('[Reauth] Failed to save config:', saveError);
-          setError('Failed to re-authenticate Gmail');
+          console.error('[Auth] Failed to save config:', saveError);
+          setError('Failed to authenticate Gmail');
           setLoading(false);
           return;
         }
 
-        // Try sending email again
-        console.log('caseId : ' + caseId);
-        await sendEmail(user.id, toAddress, subject, body, cc, bcc, orgId, caseId);
-        onSuccess();
+        // Refresh the configs list
+        await fetchEmailConfigurations();
+
+        // Only try to send email if we're not just adding an account
+        if (isAddingEmailAccount) {
+          setError(null);
+          setLoading(false);
+          // Show success message
+          setTemporaryMessage('Gmail account successfully connected!');
+        } else {
+          // If this was triggered by a send attempt, continue with sending
+          await handleSendEmail();
+        }
       } catch (retryErr: any) {
-        setError('Still failed after re-auth: ' + retryErr.message);
+        setError('Failed during authentication: ' + retryErr.message);
         setLoading(false);
       }
     },
@@ -132,51 +231,124 @@ export function EmailModal({ to, onClose, onSuccess, caseTitle, orgId, caseId }:
       setError('Gmail login failed');
       setLoading(false);
     },
+    flow: 'auth-code',
+    access_type: 'offline',
+    prompt: 'consent'
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleOutlookAuth = async (isAddingAccount = false) => {
     if (!user) return;
 
     try {
       setLoading(true);
-      setError(null);
+      // Use the email address if provided in the form
+      const config = await connectOutlook(toAddress);
+      console.log("Config from connectOutlook:", config);
 
-      const config = await getEmailConfig(user.id, orgId);
+      const { data, error: saveError } = await saveEmailConfig(
+        user.id,
+        config,
+        orgId
+      );
 
-      console.log('config:', config);
+      console.log('[Auth] Outlook save result:', { data, saveError });
 
-      if (!config || Date.now() >= config.expiresAt) {
-        // Token expired or not available — reauthenticate
-        alert('Email token expired. Re-authenticating Gmail...');
-        googleLogin(); // this will handle reconnect and retry
+      if (saveError) {
+        console.error('[Auth] Failed to save Outlook config:', saveError);
+        setError('Failed to authenticate Outlook');
         return;
       }
 
-      // Check if we have the sender email (required in our new implementation)
-      if (!config.email) {
-        alert('Email configuration incomplete. Re-authenticating...');
-        googleLogin();
+      // Refresh the configs list
+      await fetchEmailConfigurations();
+
+      // Only try to send email if we're not just adding an account
+      if (isAddingAccount) {
+        setError(null);
+        setLoading(false);
+        // Show success message
+        setTemporaryMessage('Outlook account successfully connected!');
+      } else {
+        // If this was triggered by a send attempt, continue with sending
+        await handleSendEmail();
+      }
+    } catch (err: any) {
+      console.error('Error connecting Outlook:', err);
+      setError(err instanceof Error ? err.message : 'Failed to connect Outlook');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
+  const handleAuth = async (provider: 'gmail' | 'outlook', isAddingAccount = false) => {
+    // Use the setter function instead of direct assignment
+    setIsAddingEmailAccount(isAddingAccount);
+
+    if (provider === 'gmail') {
+      googleLogin();
+    } else {
+      await handleOutlookAuth(isAddingAccount);
+    }
+  };
+
+  // Send email with the selected configuration
+  const handleSendEmail = async () => {
+    if (!user) return;
+
+    try {
+      const selectedConfig = getSelectedConfig();
+
+      if (!selectedConfig) {
+        setError('Please select an email account to send from');
         return;
       }
 
-      // Token is good — send email
-      await sendEmail(user.id, toAddress, subject, body, cc, bcc, orgId, caseId);
 
+
+      // Token is valid, send the email
+      await sendEmail(
+        user.id,
+        toAddress,
+        subject,
+        body,
+        cc,
+        bcc,
+        orgId,
+        caseId,
+        selectedConfigId !== null ? selectedConfigId : undefined
+      );
       onSuccess();
     } catch (err: any) {
       console.error('Error sending email:', err);
       setError(err instanceof Error ? err.message : 'Failed to send email');
 
-      // If the error is about profile access, trigger a re-auth
+      // If the error is about authentication, trigger re-auth
       if (err.message && (
         err.message.includes('Failed to fetch Gmail profile') ||
-        err.message.includes('Sender email address not found')
+        err.message.includes('Sender email address not found') ||
+        err.message.includes('token expired') ||
+        err.message.includes('authentication')
       )) {
-        alert('Email authentication issue. Please reconnect your Gmail account.');
-        googleLogin();
+        const selectedConfig = getSelectedConfig();
+        if (selectedConfig) {
+          setError(`Authentication issue with ${selectedConfig.email}. Please reconnect.`);
+          await handleAuth(selectedConfig.provider);
+        }
       }
+    }
+  };
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    try {
+      await handleSendEmail();
+    } catch (err) {
+      // Error handling is done in handleSendEmail
+    } finally {
       setLoading(false);
     }
   };
@@ -383,6 +555,25 @@ export function EmailModal({ to, onClose, onSuccess, caseTitle, orgId, caseId }:
     }
   };
 
+
+  const handleAddEmailAccount = async (provider: 'gmail' | 'outlook') => {
+    if (!user) return;
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Pass true to indicate we're adding an account, not sending an email
+      await handleAuth(provider, true);
+
+      // Don't auto-send email after adding an account
+    } catch (err: any) {
+      console.error(`Error adding ${provider} account:`, err);
+      setError(err instanceof Error ? err.message : `Failed to add ${provider} account`);
+      setLoading(false);
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -416,7 +607,70 @@ export function EmailModal({ to, onClose, onSuccess, caseTitle, orgId, caseId }:
           </div>
         )}
 
+        {temporaryMessage && (
+          <div className="mb-6 bg-green-50 text-green-600 p-4 rounded-lg flex items-center">
+            <CheckCircle className="w-5 h-5 mr-2" />
+            {temporaryMessage}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* FROM (Email configuration selector) */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">From</label>
+            <div className="flex space-x-2">
+              <div className="flex-grow">
+                {emailConfigs.length > 0 ? (
+                  <div className="relative">
+                    <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                    <select
+                      value={selectedConfigId || ''}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (value) {
+                          setSelectedConfigId(value);
+                          console.log("Selected config ID:", value, typeof value);
+                        } else {
+                          setSelectedConfigId(null);
+                          console.log("Cleared config ID selection");
+                        }
+                      }}
+                      className="w-full pl-10 pr-4 py-2 bg-white rounded-lg border border-gray-300 appearance-none"
+                      disabled={loading || loadingConfigs}
+                    >
+                      {emailConfigs.map((config) => (
+                        <option key={config.id} value={String(config.id)}>
+                          {config.email || 'Unknown email'} ({config.provider === 'gmail' ? 'Gmail' : 'Outlook'})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div className="flex items-center text-gray-500 pl-3 py-2">
+                    {loadingConfigs ? "Loading email accounts..." : "No email accounts connected"}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center">
+                <a
+                  href="/admin/settings"
+                  className="flex items-center gap-1 px-3 py-2 text-xs text-blue-700 hover:text-blue-800 group"
+                  title="Configure email accounts"
+                >
+                  <Info className="w-4 h-4 text-blue-500" />
+                  <span className="hidden md:inline">Configure email in Organization Settings</span>
+                  <span className="inline md:hidden">Configure emails</span>
+                </a>
+              </div>
+            </div>
+            {emailConfigs.length === 0 && !loadingConfigs && (
+              <div className="text-sm text-yellow-600 mt-1">
+                No email accounts connected. Please add an account using the buttons above.
+              </div>
+            )}
+          </div>
+
           {/* TO */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">To</label>
@@ -646,7 +900,7 @@ export function EmailModal({ to, onClose, onSuccess, caseTitle, orgId, caseId }:
             </button>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || emailConfigs.length === 0}
               className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center"
             >
               <Send className="w-4 h-4 mr-2" />
