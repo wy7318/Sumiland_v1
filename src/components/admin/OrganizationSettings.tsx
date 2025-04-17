@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Save, AlertCircle, CheckCircle, Building2, Globe, MapPin, Mail, X } from 'lucide-react';
+import { Save, AlertCircle, CheckCircle, Building2, Globe, MapPin, Mail, X, Star, StarOff } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Loader } from '@googlemaps/js-api-loader';
@@ -40,6 +40,7 @@ type EmailConfig = {
   provider: 'gmail' | 'outlook';
   email: string;
   created_at: string;
+  is_default?: boolean;
 };
 
 export function OrganizationSettings() {
@@ -187,14 +188,57 @@ export function OrganizationSettings() {
     try {
       const { data, error } = await supabase
         .from('email_configurations')
-        .select('id, provider, email, created_at')
+        .select('id, provider, email, created_at, is_default')
         .eq('organization_id', orgId)
         .eq('user_id', user.id);
 
       if (error) throw error;
+
+      // If there's only one email config, make sure it's set as default
+      if (data && data.length === 1 && !data[0].is_default) {
+        await setDefaultEmail(data[0].id);
+        data[0].is_default = true;
+      }
+
       setEmailConfigs(data || []);
     } catch (err) {
       console.error('Error fetching email configurations:', err);
+    }
+  };
+
+  const setDefaultEmail = async (configId: string) => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      // First, remove default flag from all email configs for this organization
+      const { error: resetError } = await supabase
+        .from('email_configurations')
+        .update({ is_default: false })
+        .eq('organization_id', selectedOrganization.id);
+
+      if (resetError) throw resetError;
+
+      // Then set the new default
+      const { error: updateError } = await supabase
+        .from('email_configurations')
+        .update({ is_default: true })
+        .eq('id', configId);
+
+      if (updateError) throw updateError;
+
+      // Update local state
+      setEmailConfigs(prev => prev.map(config => ({
+        ...config,
+        is_default: config.id === configId
+      })));
+
+      setSuccess('Default email updated successfully');
+    } catch (err) {
+      console.error('Error setting default email:', err);
+      setError('Failed to set default email');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -367,6 +411,9 @@ export function OrganizationSettings() {
     }
 
     try {
+      // Check if this is the default email
+      const isDefault = emailConfigs.find(config => config.id === configId)?.is_default;
+
       const { error } = await supabase
         .from('email_configurations')
         .delete()
@@ -376,7 +423,14 @@ export function OrganizationSettings() {
       if (error) throw error;
 
       // Update the UI by filtering out the removed config
-      setEmailConfigs(prev => prev.filter(config => config.id !== configId));
+      const updatedConfigs = emailConfigs.filter(config => config.id !== configId);
+
+      // If we removed the default email and have other emails, set a new default
+      if (isDefault && updatedConfigs.length > 0) {
+        await setDefaultEmail(updatedConfigs[0].id);
+      }
+
+      setEmailConfigs(updatedConfigs);
       setSuccess('Email configuration removed successfully');
     } catch (err) {
       console.error('Error removing email configuration:', err);
@@ -462,17 +516,38 @@ export function OrganizationSettings() {
                       <Mail className="w-4 h-4 text-primary-600" />
                     </div>
                     <div>
-                      <div className="font-medium">{config.email}</div>
+                      <div className="font-medium flex items-center">
+                        {config.email}
+                        {config.is_default && (
+                          <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary-100 text-primary-800">
+                            <Star className="w-3 h-3 mr-1" />
+                            Default
+                          </span>
+                        )}
+                      </div>
                       <div className="text-sm text-gray-500 capitalize">{config.provider}</div>
                     </div>
                   </div>
-                  <button
-                    onClick={() => handleRemoveEmailConfig(config.id)}
-                    className="text-gray-400 hover:text-red-500"
-                    aria-label="Remove email configuration"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
+                  <div className="flex items-center space-x-2">
+                    {!config.is_default && (
+                      <button
+                        onClick={() => setDefaultEmail(config.id)}
+                        className="text-gray-500 hover:text-primary-600"
+                        title="Set as default email"
+                        disabled={loading}
+                      >
+                        <StarOff className="w-5 h-5" />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleRemoveEmailConfig(config.id)}
+                      className="text-gray-400 hover:text-red-500"
+                      aria-label="Remove email configuration"
+                      disabled={loading}
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -480,6 +555,7 @@ export function OrganizationSettings() {
 
           <p className="mt-4 text-sm text-gray-500">
             Connected email accounts allow you to send emails on behalf of your organization through our system.
+            The default email (marked with a star) will be used for automated responses.
           </p>
         </div>
       </div>
