@@ -130,7 +130,7 @@ export function AdminLayout() {
     { path: '/admin/reports', icon: BarChart2, label: 'Reports' },
     ...(hasAdminAccess ? [
       { path: '/admin/products', icon: Package, label: 'Products' },
-      { path: '/admin/customflows', icon: Package, label: 'Custom Flows' }
+      { path: '/admin/customflow', icon: Package, label: 'Custom Flows' }
     ] : []),
     ...(isSuperAdmin ? [
       { path: '/admin/user-organizations', icon: UserCog, label: 'User & Org Management' },

@@ -62,6 +62,8 @@ import FAQPage from './components/FAQPage';
 import { EmailProvider } from './components/admin/EmailProvider';
 import { ReportsPage } from './components/admin/ReportsPage';
 import { SearchResultsPage } from './components/admin/search/SearchResultsPage';
+import LogicFlowBuilder from './components/admin/LogicFlowBuilder';
+
 
 
 
@@ -209,6 +211,8 @@ function App() {
                                 <Route path="tasks/calendar" element={<FullTaskCalendar />} />
                                 <Route path="search" element={<SearchResultsPage />} />
                                 <Route path="settings" element={<SettingsPage />} />
+                                <Route path="customflow" element={<LogicFlowBuilder />} />
+                                    
                             </Route>
                         </Routes>
                       </OrganizationProvider>
