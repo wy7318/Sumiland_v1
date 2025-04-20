@@ -1,12 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Save, Mail, Phone, Lock, AlertCircle, CheckCircle, Settings as SettingsIcon, Database, List, Building2 } from 'lucide-react';
+import {
+  Save, Mail, Phone, Lock, AlertCircle, CheckCircle,
+  Settings as SettingsIcon, Database, List, Building2, Bell
+} from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { cn } from '../../lib/utils';
 import { CustomFieldsPage } from './CustomFieldsPage';
 import { PicklistManagementPage } from './PicklistManagementPage';
 import { OrganizationSettings } from './OrganizationSettings';
+import { NotificationPreferencesPage } from './NotificationPreferencesPage';
 
 type FormData = {
   email: string;
@@ -16,7 +20,7 @@ type FormData = {
   confirmPassword: string;
 };
 
-type Tab = 'profile' | 'custom-fields' | 'picklists' | 'organization';
+type Tab = 'profile' | 'custom-fields' | 'picklists' | 'organization' | 'notifications';
 
 export function SettingsPage() {
   const { user, checkAuth } = useAuth();
@@ -34,10 +38,10 @@ export function SettingsPage() {
   });
 
   // Fetch user profile data
-  useState(() => {
+  useEffect(() => {
     async function fetchProfile() {
       if (!user) return;
-      
+
       try {
         const { data, error } = await supabase
           .from('profiles')
@@ -139,7 +143,7 @@ export function SettingsPage() {
 
       setSuccess('Profile updated successfully');
       await checkAuth();
-      
+
       // Reset password fields
       if (showPasswordFields) {
         setFormData(prev => ({
@@ -160,22 +164,23 @@ export function SettingsPage() {
 
   const tabs: { id: Tab; label: string; icon: typeof SettingsIcon }[] = [
     { id: 'profile', label: 'Profile Settings', icon: SettingsIcon },
+    { id: 'notifications', label: 'Notification Preferences', icon: Bell },
     { id: 'organization', label: 'Organization', icon: Building2 },
     { id: 'custom-fields', label: 'Custom Fields', icon: Database },
     { id: 'picklists', label: 'Picklist Values', icon: List }
   ];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
       {/* Tabs */}
       <div className="border-b border-gray-200 mb-8">
-        <nav className="-mb-px flex space-x-8">
+        <nav className="-mb-px flex space-x-8 overflow-x-auto">
           {tabs.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={cn(
-                "py-4 px-1 border-b-2 font-medium text-sm flex items-center space-x-2",
+                "py-4 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 whitespace-nowrap",
                 activeTab === tab.id
                   ? "border-primary-500 text-primary-600"
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
@@ -306,6 +311,8 @@ export function SettingsPage() {
             </div>
           </form>
         </motion.div>
+      ) : activeTab === 'notifications' ? (
+        <NotificationPreferencesPage />
       ) : activeTab === 'organization' ? (
         <motion.div
           initial={{ opacity: 0, y: 20 }}

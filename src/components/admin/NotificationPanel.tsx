@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Bell, User, Settings, Check, CheckCheck, Trash2, Filter,
-  Moon, Volume2, VolumeX, ChevronDown, AlertCircle, FileText,
+  Bell, User, Settings, Check, CheckCheck, Trash2, Filter, Building2, Users,
+  Moon, Volume2, VolumeX, ChevronDown, AlertCircle, FileText, 
   MessageSquare, Target, ShoppingBag, UserCheck, Mail
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -274,16 +274,22 @@ export function NotificationPanel() {
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
+      case 'account_assigned':
+        return <Building2 className="w-5 h-5 text-blue-500" />;
+      case 'customer_assigned':
+        return <Users className="w-5 h-5 text-blue-500" />;
       case 'case_assigned':
         return <MessageSquare className="w-5 h-5 text-blue-500" />;
       case 'lead_assigned':
         return <UserCheck className="w-5 h-5 text-green-500" />;
       case 'opportunity_assigned':
         return <Target className="w-5 h-5 text-purple-500" />;
-      case 'quote_approved':
+      case 'quote_assigned':
         return <FileText className="w-5 h-5 text-orange-500" />;
-      case 'order_created':
+      case 'order_assigned':
         return <ShoppingBag className="w-5 h-5 text-indigo-500" />;
+      case 'task_assigned':
+        return <Check className="w-5 h-5 text-indigo-500" />;
       default:
         return <Bell className="w-5 h-5 text-gray-500" />;
     }
@@ -294,6 +300,12 @@ export function NotificationPanel() {
 
     const baseUrl = '/admin/';
     switch (notification.link_type) {
+      case 'vendor':
+        return `${baseUrl}vendors/${notification.link_id}`;
+      case 'task':
+        return `${baseUrl}tasks/${notification.link_id}/edit`;
+      case 'customer':
+        return `${baseUrl}customers/${notification.link_id}`;
       case 'case':
         return `${baseUrl}cases/${notification.link_id}`;
       case 'lead':
