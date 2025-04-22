@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { ChevronLeft, X, ZoomIn, Home } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { cn } from '../lib/utils';
+import { useOrganization } from '../contexts/OrganizationContext';
 
 type PortfolioItem = {
   id: string;
@@ -27,6 +28,7 @@ export function PortfolioPage() {
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
+  const { selectedOrganization } = useOrganization();
 
   useEffect(() => {
     fetchPortfolio();
