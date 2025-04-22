@@ -319,8 +319,8 @@ export function PricingSection() {
               <thead>
                 <tr>
                   <th className="px-6 py-4 bg-gray-800 text-left text-white font-semibold rounded-tl-lg">Team Size</th>
-                  <th className="px-6 py-4 bg-gray-800 text-left text-white font-semibold">Xelytic Monthly Cost</th>
-                  <th className="px-6 py-4 bg-primary-900/70 text-left text-white font-semibold">Xelytic Annual Cost (20% off)</th>
+                  <th className="px-6 py-4 bg-gray-800 text-left text-white font-semibold">SimpliDone Monthly Cost</th>
+                  <th className="px-6 py-4 bg-primary-900/70 text-left text-white font-semibold">SimpliDone Annual Cost (20% off)</th>
                   <th className="px-6 py-4 bg-gray-800 text-left text-white font-semibold">Typical CRM Annual Cost</th>
                   <th className="px-6 py-4 bg-gray-800 text-left text-white font-semibold rounded-tr-lg">Your Annual Savings</th>
                 </tr>
@@ -353,14 +353,14 @@ export function PricingSection() {
             <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
               <h4 className="text-xl font-bold mb-4">Are there any hidden costs or fees?</h4>
               <p className="text-gray-300">
-                No. Xelytic's $150/month price includes everything - all features, all users (up to 20), all storage allocations, and all support. You'll never be surprised by hidden charges or unexpected fees.
+                No. SimpliDone's $150/month price includes everything - all features, all users (up to 20), all storage allocations, and all support. You'll never be surprised by hidden charges or unexpected fees.
               </p>
             </div>
 
             <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
               <h4 className="text-xl font-bold mb-4">What happens if we need more than 20 users?</h4>
               <p className="text-gray-300 mb-4">
-                For teams larger than 20 members, Xelytic offers flexible and affordable scaling options:
+                For teams larger than 20 members, SimpliDone offers flexible and affordable scaling options:
               </p>
               <ul className="text-gray-300 list-disc list-inside space-y-2">
                 <li>$7/user for additional users beyond the initial 20</li>

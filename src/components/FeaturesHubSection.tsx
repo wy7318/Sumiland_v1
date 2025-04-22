@@ -16,14 +16,14 @@ export function FeaturesHubSection() {
                 title: 'Future-Ready AI Capabilities',
                 shortDesc: 'AI-powered tools and intelligent automation',
                 description: 'Ongoing development of AI-powered tools and intelligent automation',
-                benefits: 'As Xelytics continues to expand our capabilities, customers will benefit from cutting-edge AI features that transform how you understand and engage with your customers. Our development pipeline includes predictive analytics that forecast customer behavior, automated insight generation that surfaces hidden opportunities, intelligent lead scoring that prioritizes your most promising prospects, and AI-assisted communication tools.'
+                benefits: 'As SimpliDones continues to expand our capabilities, customers will benefit from cutting-edge AI features that transform how you understand and engage with your customers. Our development pipeline includes predictive analytics that forecast customer behavior, automated insight generation that surfaces hidden opportunities, intelligent lead scoring that prioritizes your most promising prospects, and AI-assisted communication tools.'
             },
             {
                 id: 'analytics-engine',
                 title: 'Powerful Analytics Engine',
                 shortDesc: 'Advanced data analysis with predictive capabilities',
                 description: 'Advanced data analysis tools with predictive capabilities and actionable insights',
-                benefits: 'Xelytics\' core strength lies in our powerful analytics that transform raw customer data into strategic business intelligence. Make confident decisions based on comprehensive data analysis, trend identification, and predictive modeling. Our customers report 42% better forecasting accuracy and 37% faster identification of market opportunities compared to standard CRM reporting tools.'
+                benefits: 'SimpliDones\' core strength lies in our powerful analytics that transform raw customer data into strategic business intelligence. Make confident decisions based on comprehensive data analysis, trend identification, and predictive modeling. Our customers report 42% better forecasting accuracy and 37% faster identification of market opportunities compared to standard CRM reporting tools.'
             },
             {
                 id: 'user-experience',
@@ -37,7 +37,7 @@ export function FeaturesHubSection() {
                 title: 'All-Inclusive Pricing',
                 shortDesc: 'Flat monthly rate with all features included',
                 description: 'Flat $150/month for up to 20 users with all features included, with 20% discount on annual subscriptions',
-                benefits: 'Predictable budgeting without the tiered pricing complexity of competitors. No need to pay per user or for premium features, allowing you to maximize your CRM investment. While competitors charge $65-125 per user monthly for comparable functionality, Xelytics saves the average company over $15,000 annually while providing access to every feature regardless of team size.'
+                benefits: 'Predictable budgeting without the tiered pricing complexity of competitors. No need to pay per user or for premium features, allowing you to maximize your CRM investment. While competitors charge $65-125 per user monthly for comparable functionality, SimpliDones saves the average company over $15,000 annually while providing access to every feature regardless of team size.'
             },
             {
                 id: 'infrastructure',
@@ -68,7 +68,7 @@ export function FeaturesHubSection() {
                 title: 'Integration Ecosystem',
                 shortDesc: 'Connect with essential business tools',
                 description: 'Growing network of integrations with focus on payment services and essential business tools',
-                benefits: 'Xelytics is actively developing connections with payment processors like Square and other critical business tools, allowing you to create a seamless workflow between your CRM and the other platforms you rely on. Eliminate data silos and manual data entry while maintaining a single source of truth for all customer information.'
+                benefits: 'SimpliDones is actively developing connections with payment processors like Square and other critical business tools, allowing you to create a seamless workflow between your CRM and the other platforms you rely on. Eliminate data silos and manual data entry while maintaining a single source of truth for all customer information.'
             },
             {
                 id: 'workflows',
@@ -127,7 +127,7 @@ export function FeaturesHubSection() {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
                 <div className="text-center mb-16">
                     <h2 className="text-4xl font-bold text-primary-600 mb-2">
-                        Features of <span className="text-gray-900">Xelytic CRM</span>
+                        Features of <span className="text-gray-900">SimpliDone CRM</span>
                     </h2>
                     <p className="text-lg text-gray-600 max-w-3xl mx-auto mb-8">
                         Explore our powerful features designed to transform your customer relationships and business operations
@@ -142,7 +142,7 @@ export function FeaturesHubSection() {
                     >
                         <div className="w-full h-full rounded-full bg-blue-50 border-4 border-primary-600 flex items-center justify-center shadow-lg">
                             <div className="text-center p-4">
-                                <h3 className="text-4xl font-bold text-primary-800">Features of<br />Xelytic CRM</h3>
+                                <h3 className="text-4xl font-bold text-primary-800">Features of<br />SimpliDone CRM</h3>
                             </div>
                         </div>
                     </div>

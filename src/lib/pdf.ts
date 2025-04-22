@@ -35,7 +35,7 @@ export const generateQuotePDF = (quote: any) => {
   // Company Info - Right aligned
   doc.setFontSize(10);
   doc.setTextColor(255, 255, 255); // White text for contrast
-  doc.text('Sumiland & Sub Studio', pageWidth - margin, 20, { align: 'right' });
+  doc.text('SimpliDone', pageWidth - margin, 20, { align: 'right' });
   doc.text('600 E Curry Rd, Tempe, AZ 85288', pageWidth - margin, 25, { align: 'right' });
   doc.text('www.sumisubi.com', pageWidth - margin, 30, { align: 'right' });
   doc.text('(480) 274-5767', pageWidth - margin, 35, { align: 'right' });

@@ -217,7 +217,7 @@ function App() {
                         </Routes>
                       </OrganizationProvider>
 
-                        <Footer />
+                        {/* <Footer /> */}
                     </div>
                 </AuthProvider>
             </Router>

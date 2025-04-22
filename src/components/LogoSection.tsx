@@ -10,7 +10,7 @@ export function LogoSection() {
     >
       <img
         src="https://jaytpfztifhtzcruxguj.supabase.co/storage/v1/object/public/Sumiland%20Design//SUMIL&SUB%20STUDIO%20LOGO.png"
-        alt="Sumiland & Sub Studio Logo"
+        alt="SimpliDone Logo"
         className="w-38 md:w-54"
       />
     </motion.div>

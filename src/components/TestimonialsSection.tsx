@@ -12,21 +12,21 @@ export function TestimonialsSection() {
             name: "Sarah Johnson",
             position: "Marketing Director, TechFlow Inc.",
             image: "/api/placeholder/80/80",
-            content: "Xelytic CRM has transformed how we interact with customers. The analytics capabilities have given us insights we never had before, allowing us to create more targeted campaigns that have increased our conversion rates by 45%.",
+            content: "SimpliDone CRM has transformed how we interact with customers. The analytics capabilities have given us insights we never had before, allowing us to create more targeted campaigns that have increased our conversion rates by 45%.",
             rating: 5
         },
         {
             name: "Michael Rodriguez",
             position: "Sales Manager, Innovate Solutions",
             image: "/api/placeholder/80/80",
-            content: "Since implementing Xelytic, our sales team has exceeded targets consistently. The pipeline visualization and forecasting tools have made planning so much easier, and the mobile app keeps our team connected no matter where they are.",
+            content: "Since implementing SimpliDone, our sales team has exceeded targets consistently. The pipeline visualization and forecasting tools have made planning so much easier, and the mobile app keeps our team connected no matter where they are.",
             rating: 5
         },
         {
             name: "Emily Chen",
             position: "CEO, GrowthFirst Startups",
             image: "/api/placeholder/80/80",
-            content: "As a startup founder, finding a CRM that scales with our growth was crucial. Xelytic offers enterprise-level features at a price point that worked for us, and their support team has been there every step of the way.",
+            content: "As a startup founder, finding a CRM that scales with our growth was crucial. SimpliDone offers enterprise-level features at a price point that worked for us, and their support team has been there every step of the way.",
             rating: 5
         }
     ];
@@ -74,7 +74,7 @@ export function TestimonialsSection() {
                         transition={{ duration: 0.6, delay: 0.3 }}
                         className="text-xl text-gray-300 max-w-3xl mx-auto"
                     >
-                        Don't just take our word for it — hear from the businesses that have transformed their operations with Xelytic CRM.
+                        Don't just take our word for it — hear from the businesses that have transformed their operations with SimpliDone CRM.
                     </motion.p>
                 </div>
 

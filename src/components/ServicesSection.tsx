@@ -201,7 +201,7 @@ export function ServicesSection() {
             <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50 hover:border-primary-500/50 transition-all duration-300 group">
               <Users className="w-12 h-12 text-primary-400 mb-4 group-hover:scale-110 transition-transform" />
               <h4 className="text-xl font-bold mb-3">Training & Onboarding</h4>
-              <p className="text-gray-300">Personalized onboarding sessions and ongoing training to ensure your team gets the most out of Xelytic CRM.</p>
+              <p className="text-gray-300">Personalized onboarding sessions and ongoing training to ensure your team gets the most out of SimpliDone CRM.</p>
             </div>
 
             <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50 hover:border-primary-500/50 transition-all duration-300 group">

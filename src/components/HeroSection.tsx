@@ -26,7 +26,7 @@ export function HeroSection() {
           >
             <img
               src="https://jaytpfztifhtzcruxguj.supabase.co/storage/v1/object/public/organization-logos/logos/white_logoOnly.png"
-              alt="Xelytic CRM Logo"
+              alt="SimpliDone CRM Logo"
               className="h-20 md:h-24 mb-4"
             />
           </motion.div>
