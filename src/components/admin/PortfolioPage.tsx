@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import type { Database } from '../../lib/database.types';
+import { useOrganization } from '../../contexts/OrganizationContext';
 
 type PortfolioItem = Database['public']['Tables']['portfolio_items']['Row'];
 
@@ -13,6 +14,7 @@ export function PortfolioPage() {
   const [items, setItems] = useState<PortfolioItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { selectedOrganization } = useOrganization();
 
   useEffect(() => {
     if (organizations.length > 0) {
@@ -28,7 +30,7 @@ export function PortfolioPage() {
       const { data, error } = await supabase
         .from('portfolio_items')
         .select('*')
-        .in('organization_id', organizations.map(org => org.id))
+        .eq('organization_id', selectedOrganization.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
