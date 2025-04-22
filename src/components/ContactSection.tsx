@@ -121,7 +121,7 @@ export function ContactSection() {
             transition={{ duration: 0.6, delay: 0.3 }}
             className="text-xl text-gray-300 max-w-3xl mx-auto"
           >
-            Speak with our team about how Xelytic CRM can help you achieve your business goals.
+            Speak with our team about how SimpliDone CRM can help you achieve your business goals.
           </motion.p>
         </div>
 
@@ -142,8 +142,8 @@ export function ContactSection() {
                   </div>
                   <div>
                     <h4 className="text-lg font-medium mb-1">Email Us</h4>
-                    <a href="mailto:info@xelytic.com" className="text-gray-300 hover:text-primary-400 transition-colors">
-                      info@xelytic.com
+                    <a href="mailto:info@SimpliDone.com" className="text-gray-300 hover:text-primary-400 transition-colors">
+                      info@SimpliDone.com
                     </a>
                   </div>
                 </div>

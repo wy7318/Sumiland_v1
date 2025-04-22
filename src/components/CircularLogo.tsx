@@ -17,7 +17,7 @@ export function CircularLogo() {
         <div className="absolute inset-0 flex items-center justify-center p-[15%]">
           <img
             src="https://jaytpfztifhtzcruxguj.supabase.co/storage/v1/object/public/Sumiland%20Design//SUMIL&SUB%20STUDIO%20LOGO.png"
-            alt="Sumiland & Sub Studio Logo"
+            alt="SimpliDone Logo"
             className="w-full h-full object-contain"
           />
         </div>

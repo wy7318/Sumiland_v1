@@ -72,7 +72,7 @@ export function IntegrationsSection() {
                         transition={{ duration: 0.6, delay: 0.3 }}
                         className="text-xl text-gray-300 max-w-3xl mx-auto"
                     >
-                        Connect Xelytic CRM with your favorite tools and platforms for a seamless workflow.
+                        Connect SimpliDone CRM with your favorite tools and platforms for a seamless workflow.
                     </motion.p>
                 </div>
 

@@ -161,7 +161,7 @@
 //       <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 //         <div className="flex justify-between items-center h-16">
 //           <Link to="/" className="text-2xl font-bold text-primary-600">
-//             XELYTIC
+//             SimpliDone
 //           </Link>
 
 //           {/* Desktop Navigation */}
@@ -583,8 +583,8 @@ export function Navigation() {
         <div className="flex justify-between items-center h-16">
           <Link to="/" className="flex items-center">
             <img
-              src="https://jaytpfztifhtzcruxguj.supabase.co/storage/v1/object/public/organization-logos/logos/blue_logo.png"
-              alt="Xelytic CRM Logo"
+              src="https://jaytpfztifhtzcruxguj.supabase.co/storage/v1/object/public/organization-logos/logos/SimpliDone%20(1).png"
+              alt="SimpliDone CRM Logo"
               className="h-8"
             />
           </Link>

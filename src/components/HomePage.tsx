@@ -38,8 +38,8 @@ export function HomePage() {
   return (
     <>
       <SEO
-        title="Xelytic CRM | Transform Your Business with Smart Analytics"
-        description="Harness the power of data-driven insights with Xelytic CRM. Make smarter decisions, grow your business, and delight your customers with our comprehensive solution."
+        title="SimpliDone CRM | Transform Your Business with Smart Analytics"
+        description="Harness the power of data-driven insights with SimpliDone CRM. Make smarter decisions, grow your business, and delight your customers with our comprehensive solution."
         keywords="CRM, customer relationship management, analytics, business intelligence, sales automation, customer support, business growth"
       />
 

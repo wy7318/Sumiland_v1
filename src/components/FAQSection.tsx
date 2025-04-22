@@ -110,7 +110,7 @@ export function FAQSection() {
                         transition={{ duration: 0.6, delay: 0.3 }}
                         className="text-xl text-gray-600 max-w-3xl mx-auto mb-12"
                     >
-                        Find answers to common questions about Xelytic CRM and how it can transform your business
+                        Find answers to common questions about SimpliDone CRM and how it can transform your business
                     </motion.p>
                 </div>
 

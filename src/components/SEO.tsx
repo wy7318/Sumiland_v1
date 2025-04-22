@@ -19,9 +19,9 @@ export function SEO({
     ogTitle = title,
     ogDescription = description,
     ogType = 'website',
-    ogUrl = 'https://xelytic.com',
-    ogImage = 'https://jaytpfztifhtzcruxguj.supabase.co/storage/v1/object/public/organization-logos/logos/blue_logo.png',
-    favicon = 'https://jaytpfztifhtzcruxguj.supabase.co/storage/v1/object/public/organization-logos/logos/blue_logo.png'
+    ogUrl = 'https://SimpliDone.com',
+    ogImage = 'https://jaytpfztifhtzcruxguj.supabase.co/storage/v1/object/public/organization-logos/logos/SimpliDone%20(1).png',
+    favicon = 'https://jaytpfztifhtzcruxguj.supabase.co/storage/v1/object/public/organization-logos/logos/SimpliDone%20(1).png'
 }: SEOProps) {
     useEffect(() => {
         // Helper function to create meta element - defined BEFORE it's used

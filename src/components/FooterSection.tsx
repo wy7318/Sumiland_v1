@@ -15,8 +15,8 @@ export function FooterSection() {
                     <div>
                         <div className="flex items-center mb-6">
                             <img
-                                src="https://jaytpfztifhtzcruxguj.supabase.co/storage/v1/object/public/organization-logos/logos/blue_logo.png"
-                                alt="Xelytic CRM Logo"
+                                src="https://jaytpfztifhtzcruxguj.supabase.co/storage/v1/object/public/organization-logos/logos/SimpliDone%20(1).png"
+                                alt="SimpliDone CRM Logo"
                                 className="h-12 mb-2"
                             />
                         </div>
@@ -84,7 +84,7 @@ export function FooterSection() {
 
                 <div className="mt-12 pt-8 border-t border-gray-800 flex flex-col md:flex-row justify-between items-center">
                     <p className="text-gray-500 text-sm mb-4 md:mb-0">
-                        © {new Date().getFullYear()} Xelytic CRM. All rights reserved.
+                        © {new Date().getFullYear()} SimpliDone CRM. All rights reserved.
                     </p>
 
                     <div className="flex gap-6">
