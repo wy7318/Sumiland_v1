@@ -153,17 +153,48 @@ export async function getCurrentUser() {
   }
 }
 
+// export async function resetPassword(email: string) {
+//   try {
+//     const { error } = await supabase.auth.resetPasswordForEmail(email, {
+//       redirectTo: `${window.location.origin}/reset-password`,
+//     });
+//     if (error) throw error;
+//     return { error: null };
+//   } catch (err) {
+//     console.error('Reset password error:', err);
+//     return {
+//       error: err instanceof Error ? err : new Error('Failed to send reset password email')
+//     };
+//   }
+// }
+
 export async function resetPassword(email: string) {
   try {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: `${window.location.origin}/reset-password?type=recovery`,
     });
+    
     if (error) throw error;
     return { error: null };
   } catch (err) {
     console.error('Reset password error:', err);
     return {
       error: err instanceof Error ? err : new Error('Failed to send reset password email')
+    };
+  }
+}
+
+export async function updatePassword(newPassword: string) {
+  try {
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword
+    });
+    if (error) throw error;
+    return { error: null };
+  } catch (err) {
+    console.error('Update password error:', err);
+    return {
+      error: err instanceof Error ? err : new Error('Failed to update password')
     };
   }
 }
