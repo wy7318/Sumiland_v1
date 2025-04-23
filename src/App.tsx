@@ -65,6 +65,8 @@ import { SearchResultsPage } from './components/admin/search/SearchResultsPage';
 import LogicFlowBuilder from './components/admin/LogicFlowBuilder';
 import { PrivacyPolicyPage } from './components/PrivacyPolicyPage';
 import { TermsOfServicePage } from './components/TermsOfServicePage';
+import {ResetPasswordPage} from './components/ResetPasswordPage';
+import SetPasswordPage from './components/SetPasswordPage';
 
 
 
@@ -124,6 +126,10 @@ function App() {
                             <Route path="/faq" element={<FAQPage />} />
                             <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
                             <Route path="/terms-of-service" element={<TermsOfServicePage />} />
+                            <Route path="/reset-password" element={<ResetPasswordPage />} />
+                            <Route path="/set-password" element={<SetPasswordPage />} />
+                                
+                                
                             
                             
 
