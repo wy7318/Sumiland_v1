@@ -63,6 +63,8 @@ import { EmailProvider } from './components/admin/EmailProvider';
 import { ReportsPage } from './components/admin/ReportsPage';
 import { SearchResultsPage } from './components/admin/search/SearchResultsPage';
 import LogicFlowBuilder from './components/admin/LogicFlowBuilder';
+import { PrivacyPolicyPage } from './components/PrivacyPolicyPage';
+import { TermsOfServicePage } from './components/TermsOfServicePage';
 
 
 
@@ -120,6 +122,10 @@ function App() {
                             <Route path="/blog/:slug" element={<BlogPost />} />
                             <Route path="/portfolio" element={<PortfolioPage />} />
                             <Route path="/faq" element={<FAQPage />} />
+                            <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+                            <Route path="/terms-of-service" element={<TermsOfServicePage />} />
+                            
+                            
 
                             {/* Public Routes */}
                             <Route path="/login" element={

@@ -1,3 +1,5 @@
+import React from 'react';
+import { Link } from 'react-router-dom';
 import { ArrowUp } from 'lucide-react';
 
 export function FooterSection() {
@@ -73,9 +75,16 @@ export function FooterSection() {
                         <ul className="space-y-4">
                             {['About Us', 'Careers', 'Press', 'Partners', 'Contact Us', 'Terms of Service'].map((item, index) => (
                                 <li key={index}>
-                                    <a href={`#${item.toLowerCase().replace(/\s+/g, '-')}`} className="text-gray-400 hover:text-primary-400 transition-colors">
-                                        {item}
-                                    </a>
+                                    {/* Use Link for Terms of Service, regular anchor for others */}
+                                    {item === 'Terms of Service' ? (
+                                        <Link to="/terms-of-service" className="text-gray-400 hover:text-primary-400 transition-colors">
+                                            {item}
+                                        </Link>
+                                    ) : (
+                                        <a href={`#${item.toLowerCase().replace(/\s+/g, '-')}`} className="text-gray-400 hover:text-primary-400 transition-colors">
+                                            {item}
+                                        </a>
+                                    )}
                                 </li>
                             ))}
                         </ul>
@@ -88,12 +97,12 @@ export function FooterSection() {
                     </p>
 
                     <div className="flex gap-6">
-                        <a href="#privacy-policy" className="text-gray-500 hover:text-primary-400 text-sm transition-colors">
+                        <Link to="/privacy-policy" className="text-gray-500 hover:text-primary-400 text-sm transition-colors">
                             Privacy Policy
-                        </a>
-                        <a href="#terms-of-service" className="text-gray-500 hover:text-primary-400 text-sm transition-colors">
+                        </Link>
+                        <Link to="/terms-of-service" className="text-gray-500 hover:text-primary-400 text-sm transition-colors">
                             Terms of Service
-                        </a>
+                        </Link>
                         <a href="#cookies-policy" className="text-gray-500 hover:text-primary-400 text-sm transition-colors">
                             Cookies Policy
                         </a>
