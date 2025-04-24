@@ -28,7 +28,9 @@ export function useBlogPosts(adminView = false) {
             author:authors(*),
             categories:post_categories(categories(*)),
             tags:post_tags(tags(*))
-          `);
+          `)
+          .eq('published', true)
+          .eq('organization_id', '53c12775-1877-4116-a8bc-9b52eb4a3a34');
 
         // If in admin view, only show posts for user's organizations
         if (adminView && organizations.length > 0) {
