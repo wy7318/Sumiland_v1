@@ -67,6 +67,8 @@ import { PrivacyPolicyPage } from './components/PrivacyPolicyPage';
 import { TermsOfServicePage } from './components/TermsOfServicePage';
 import {ResetPasswordPage} from './components/ResetPasswordPage';
 import SetPasswordPage from './components/SetPasswordPage';
+import { SalesAssistantPage } from './components/admin/SalesAssistantPage';
+
 
 
 
@@ -224,6 +226,7 @@ function App() {
                                 <Route path="search" element={<SearchResultsPage />} />
                                 <Route path="settings" element={<SettingsPage />} />
                                 <Route path="customflow" element={<LogicFlowBuilder />} />
+                                <Route path="sales-assistant" element={<SalesAssistantPage />} />
                                     
                             </Route>
                         </Routes>

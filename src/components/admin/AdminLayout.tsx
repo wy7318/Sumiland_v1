@@ -5,7 +5,7 @@ import {
   FileText, Image, LogOut, Users, Package, Quote, MessageSquare,
   LayoutDashboard, Settings, ShoppingBag, Building2, Truck, ClipboardList,
   BoxSelect as BoxSeam, UserCog, Home, UserPlus, UserCheck, Target,
-  Search, MoreHorizontal, BarChart2, CheckSquare, ChevronLeft, ChevronRight,
+  Search, MoreHorizontal, Zap, BarChart2, CheckSquare, ChevronLeft, ChevronRight,
   Bell, User
 } from 'lucide-react';
 import { getCurrentUser, signOut } from '../../lib/auth';
@@ -128,6 +128,7 @@ export function AdminLayout() {
     { path: '/admin/posts', icon: FileText, label: 'Blog Posts' },
     { path: '/admin/portfolio', icon: Image, label: 'Portfolio' },
     { path: '/admin/reports', icon: BarChart2, label: 'Reports' },
+    { path: '/admin/sales-assistant', icon: Zap, label: 'Sales Assistant' },
     ...(hasAdminAccess ? [
       { path: '/admin/products', icon: Package, label: 'Products' },
       { path: '/admin/customflow', icon: Package, label: 'Custom Flows' },
