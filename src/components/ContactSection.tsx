@@ -33,11 +33,11 @@ export function ContactSection() {
       const firstName = nameParts[0] || '';
       const lastName = nameParts.slice(1).join(' ') || '';
 
-      // Get default organization (System Organization)
+      // Get default organization (SimpliDone)
       const { data: orgData, error: orgError } = await supabase
         .from('organizations')
         .select('id')
-        .eq('name', 'System Organization')
+        .eq('name', 'SimpliDone')
         .single();
 
       console.log('orgData : ' + orgData);
