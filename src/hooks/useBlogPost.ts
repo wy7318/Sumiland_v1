@@ -27,6 +27,7 @@ export function useBlogPost(slug: string) {
           `)
           .eq('slug', slug)
           .eq('published', true)
+          .eq('organization_id', '53c12775-1877-4116-a8bc-9b52eb4a3a34')
           .single();
 
         if (error) throw error;
