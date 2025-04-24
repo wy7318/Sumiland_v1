@@ -7,8 +7,8 @@ import {
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { cn } from '../../lib/utils';
-import { InventoryAdjustmentModal } from './InventoryAdjustmentModal';
-import { InventoryTransactionModal } from './InventoryTransactionModal';
+import { InventoryAdjustmentModal } from './inventory/InventoryAdjustmentModal';
+import { InventoryTransactionModal } from './inventory/InventoryTransactionModal';
 
 type Product = {
   id: string;

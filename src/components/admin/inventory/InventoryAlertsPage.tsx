@@ -5,8 +5,8 @@ import {
   CheckCircle, ArrowLeft, Package, Scale
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { supabase } from '../../lib/supabase';
-import { cn } from '../../lib/utils';
+import { supabase } from '../../../lib/supabase';
+import { cn } from '../../../lib/utils';
 
 type InventoryAlert = {
   id: string;
