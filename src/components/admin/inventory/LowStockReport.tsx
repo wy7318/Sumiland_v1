@@ -10,6 +10,7 @@ import {
     ArrowLeft,
     TrendingUp,
     ShoppingCart,
+    CheckCircle,
     Filter,
     BarChart3
 } from 'lucide-react';

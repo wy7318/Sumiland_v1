@@ -40,95 +40,106 @@ export const TransactionDetails = () => {
             setError(null);
 
             try {
-                const { data, error } = await supabase
+                // 1. Fetch the transaction without nested joins
+                const { data: txData, error } = await supabase
                     .from('inventory_transactions')
                     .select(`
-            id,
-            product_id,
-            location_id,
-            transaction_type,
-            quantity,
-            unit_cost,
-            total_cost,
-            reference_id,
-            reference_type,
-            notes,
-            source_location_id,
-            destination_location_id,
-            created_by,
-            created_at,
-            products(name, sku, stock_unit, image_url, category),
-            locations(name, type, address)
-          `)
+                    id,
+                    product_id,
+                    location_id,
+                    transaction_type,
+                    quantity,
+                    unit_cost,
+                    total_cost,
+                    reference_id,
+                    reference_type,
+                    notes,
+                    source_location_id,
+                    destination_location_id,
+                    created_by,
+                    created_at
+                `)
                     .eq('id', transactionId)
                     .eq('organization_id', selectedOrganization.id)
                     .single();
 
                 if (error) throw error;
 
-                if (data) {
-                    const formattedTransaction: TransactionWithDetails = {
-                        ...data,
+                if (txData) {
+                    // 2. Fetch related data in parallel instead of nested
+                    const [productResult, locationResult, sourceLocationResult, destLocationResult, userResult] = await Promise.all([
+                        // Fetch product data
+                        txData.product_id ? supabase
+                            .from('products')
+                            .select('name, sku, stock_unit, image_url, category')
+                            .eq('id', txData.product_id)
+                            .single() : { data: null },
+
+                        // Fetch primary location data
+                        txData.location_id ? supabase
+                            .from('locations')
+                            .select('name, type, address')
+                            .eq('id', txData.location_id)
+                            .single() : { data: null },
+
+                        // Fetch source location data
+                        txData.source_location_id ? supabase
+                            .from('locations')
+                            .select('name, type, address')
+                            .eq('id', txData.source_location_id)
+                            .single() : { data: null },
+
+                        // Fetch destination location data
+                        txData.destination_location_id ? supabase
+                            .from('locations')
+                            .select('name, type, address')
+                            .eq('id', txData.destination_location_id)
+                            .single() : { data: null },
+
+                        // Fetch user data
+                        txData.created_by ? supabase
+                            .from('user_profiles')
+                            .select('full_name, email')
+                            .eq('user_id', txData.created_by)
+                            .single() : { data: null }
+                    ]);
+
+                    const productData = productResult.data;
+                    const locationData = locationResult.data;
+                    const sourceLocationData = sourceLocationResult.data;
+                    const destLocationData = destLocationResult.data;
+                    const userData = userResult.data;
+
+                    // 3. Combine everything into a single object
+                    const formattedTransaction = {
+                        ...txData,
                         product: {
-                            name: data.products?.name || 'Unknown Product',
-                            sku: data.products?.sku || '',
-                            stock_unit: data.products?.stock_unit,
-                            image_url: data.products?.image_url,
-                            category: data.products?.category
+                            name: productData?.name || 'Unknown Product',
+                            sku: productData?.sku || '',
+                            stock_unit: productData?.stock_unit,
+                            image_url: productData?.image_url,
+                            category: productData?.category
                         },
                         location: {
-                            name: data.locations?.name || 'Unknown Location',
-                            type: data.locations?.type,
-                            address: data.locations?.address
+                            name: locationData?.name || 'Unknown Location',
+                            type: locationData?.type,
+                            address: locationData?.address
                         },
-                        user: {}
+                        source_location: sourceLocationData ? {
+                            name: sourceLocationData.name,
+                            type: sourceLocationData.type,
+                            address: sourceLocationData.address
+                        } : undefined,
+                        destination_location: destLocationData ? {
+                            name: destLocationData.name,
+                            type: destLocationData.type,
+                            address: destLocationData.address
+                        } : undefined,
+                        user: userData ? {
+                            name: userData.full_name,
+                            email: userData.email
+                        } : {}
                     };
-
-                    // Get source location data if it's a transfer
-                    if (data.source_location_id) {
-                        const { data: sourceData } = await supabase
-                            .from('locations')
-                            .select('name, type, address')
-                            .eq('id', data.source_location_id)
-                            .single();
-
-                        if (sourceData) {
-                            formattedTransaction.source_location = sourceData;
-                        }
-                    }
-
-                    // Get destination location data if it's a transfer
-                    if (data.destination_location_id) {
-                        const { data: destData } = await supabase
-                            .from('locations')
-                            .select('name, type, address')
-                            .eq('id', data.destination_location_id)
-                            .single();
-
-                        if (destData) {
-                            formattedTransaction.destination_location = destData;
-                        }
-                    }
-
-                    // Get user info
-                    if (data.created_by) {
-                        try {
-                            const { data: userData } = await supabase
-                                .from('user_profiles') // Adjust based on your user table name
-                                .select('full_name, email')
-                                .eq('user_id', data.created_by)
-                                .single();
-
-                            if (userData) {
-                                formattedTransaction.user = {
-                                    name: userData.full_name,
-                                    email: userData.email
-                                };
-                            }
-                        } catch (e) {
-                            console.error('Error fetching user data:', e);
-                        }
-                    }
 
                     setTransaction(formattedTransaction);
                 } else {

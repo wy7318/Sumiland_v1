@@ -49,97 +49,114 @@ export const InventoryTransactions = () => {
         const fetchTransactions = async () => {
             setIsLoading(true);
             try {
-                const { data, error } = await supabase
+                // 1. Fetch transactions without nested joins
+                const { data: transactionsData, error } = await supabase
                     .from('inventory_transactions')
                     .select(`
-            id,
-            product_id,
-            location_id,
-            transaction_type,
-            quantity,
-            unit_cost,
-            total_cost,
-            reference_id,
-            reference_type,
-            notes,
-            source_location_id,
-            destination_location_id,
-            created_by,
-            created_at,
-            products(name, sku, stock_unit),
-            locations(name)
-          `)
+                    id,
+                    product_id,
+                    location_id,
+                    transaction_type,
+                    quantity,
+                    unit_cost,
+                    total_cost,
+                    reference_id,
+                    reference_type,
+                    notes,
+                    source_location_id,
+                    destination_location_id,
+                    created_by,
+                    created_at
+                `)
                     .eq('organization_id', selectedOrganization.id)
                     .order('created_at', { ascending: false });
 
                 if (error) throw error;
 
-                if (data) {
-                    // Get source and destination location names for transfers
-                    const enhancedData = await Promise.all(
-                        data.map(async (transaction) => {
-                            const formattedTransaction: TransactionWithDetails = {
-                                ...transaction,
-                                product: {
-                                    name: transaction.products?.name || 'Unknown Product',
-                                    sku: transaction.products?.sku || '',
-                                    stock_unit: transaction.products?.stock_unit
-                                },
-                                location: {
-                                    name: transaction.locations?.name || 'Unknown Location'
-                                },
-                                user: {}
-                            };
+                if (transactionsData && transactionsData.length > 0) {
+                    // 2. Collect all product IDs and unique location IDs
+                    const productIds = [...new Set(transactionsData.map(tx => tx.product_id).filter(Boolean))];
 
-                            // Get source location name
-                            if (transaction.source_location_id) {
-                                const { data: sourceData } = await supabase
-                                    .from('locations')
-                                    .select('name')
-                                    .eq('id', transaction.source_location_id)
-                                    .single();
+                    // Get all location IDs (regular, source, and destination)
+                    const locationIds = [...new Set([
+                        ...transactionsData.map(tx => tx.location_id),
+                        ...transactionsData.map(tx => tx.source_location_id),
+                        ...transactionsData.map(tx => tx.destination_location_id)
+                    ].filter(Boolean))];
 
-                                if (sourceData) {
-                                    formattedTransaction.source_location = { name: sourceData.name };
-                                }
-                            }
+                    const userIds = [...new Set(transactionsData.map(tx => tx.created_by).filter(Boolean))];
 
-                            // Get destination location name
-                            if (transaction.destination_location_id) {
-                                const { data: destData } = await supabase
-                                    .from('locations')
-                                    .select('name')
-                                    .eq('id', transaction.destination_location_id)
-                                    .single();
+                    // 3. Fetch all products in a single query
+                    const productsMap = {};
+                    if (productIds.length > 0) {
+                        const { data: productsData } = await supabase
+                            .from('products')
+                            .select('id, name, sku, stock_unit')
+                            .in('id', productIds);
 
-                                if (destData) {
-                                    formattedTransaction.destination_location = { name: destData.name };
-                                }
-                            }
+                        if (productsData) {
+                            productsData.forEach(product => {
+                                productsMap[product.id] = product;
+                            });
+                        }
+                    }
 
-                            // Get user info
-                            if (transaction.created_by) {
-                                try {
-                                    const { data: userData } = await supabase
-                                        .from('user_profiles') // Adjust based on your user table name
-                                        .select('full_name, email')
-                                        .eq('user_id', transaction.created_by)
-                                        .single();
+                    // 4. Fetch all locations in a single query
+                    const locationsMap = {};
+                    if (locationIds.length > 0) {
+                        const { data: locationsData } = await supabase
+                            .from('locations')
+                            .select('id, name')
+                            .in('id', locationIds);
 
-                                    if (userData) {
-                                        formattedTransaction.user = {
-                                            name: userData.full_name,
-                                            email: userData.email
-                                        };
-                                    }
-                                } catch (e) {
-                                    // Silently fail if user data not found
-                                }
-                            }
+                        if (locationsData) {
+                            locationsData.forEach(location => {
+                                locationsMap[location.id] = location;
+                            });
+                        }
+                    }
 
-                            return formattedTransaction;
-                        })
-                    );
+                    // 5. Fetch all users in a single query
+                    const usersMap = {};
+                    if (userIds.length > 0) {
+                        const { data: usersData } = await supabase
+                            .from('user_profiles')
+                            .select('user_id, full_name, email')
+                            .in('user_id', userIds);
+
+                        if (usersData) {
+                            usersData.forEach(user => {
+                                usersMap[user.user_id] = user;
+                            });
+                        }
+                    }
+
+                    // 6. Combine all the data
+                    const enhancedData = transactionsData.map(transaction => {
+                        const product = productsMap[transaction.product_id] || { name: 'Unknown Product', sku: '', stock_unit: '' };
+                        const location = locationsMap[transaction.location_id] || { name: 'Unknown Location' };
+                        const sourceLocation = locationsMap[transaction.source_location_id] || null;
+                        const destLocation = locationsMap[transaction.destination_location_id] || null;
+                        const user = usersMap[transaction.created_by] || null;
+
+                        return {
+                            ...transaction,
+                            product: {
+                                name: product.name,
+                                sku: product.sku,
+                                stock_unit: product.stock_unit
+                            },
+                            location: {
+                                name: location.name
+                            },
+                            source_location: sourceLocation ? { name: sourceLocation.name } : undefined,
+                            destination_location: destLocation ? { name: destLocation.name } : undefined,
+                            user: user ? {
+                                name: user.full_name,
+                                email: user.email
+                            } : {}
+                        };
+                    });
 
                     setTransactions(enhancedData);
                     setFilteredTransactions(enhancedData);

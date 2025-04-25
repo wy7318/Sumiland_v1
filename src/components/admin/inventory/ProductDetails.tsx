@@ -184,16 +184,16 @@ export const ProductDetails = () => {
                     const { data: transactionsData, error: transactionsError } = await supabase
                         .from('inventory_transactions')
                         .select(`
-              id,
-              transaction_type,
-              quantity,
-              unit_cost,
-              total_cost,
-              reference_id,
-              reference_type,
-              created_at,
-              locations(name)
-            `)
+        id,
+        transaction_type,
+        quantity,
+        unit_cost,
+        total_cost,
+        reference_id,
+        reference_type,
+        created_at,
+        location_id
+    `)
                         .eq('product_id', productId)
                         .eq('organization_id', selectedOrganization.id)
                         .order('created_at', { ascending: false })
@@ -202,6 +202,30 @@ export const ProductDetails = () => {
                     if (transactionsError) throw transactionsError;
 
                     if (transactionsData) {
+                        // Get all unique location IDs from the transactions
+                        const locationIds = [...new Set(transactionsData
+                            .map(tx => tx.location_id)
+                            .filter(id => id !== null))];
+
+                        // Then fetch location names in a separate query
+                        let locationMap = {};
+                        if (locationIds.length > 0) {
+                            const { data: locationsData } = await supabase
+                                .from('locations')
+                                .select('id, name')
+                                .in('id', locationIds)
+                                .eq('organization_id', selectedOrganization.id);
+
+                            if (locationsData) {
+                                // Create a map for quick lookups
+                                locationMap = locationsData.reduce((map, loc) => {
+                                    map[loc.id] = loc.name;
+                                    return map;
+                                }, {});
+                            }
+                        }
+
+                        // Format transactions with location names
                         const formattedTransactions = transactionsData.map(tx => ({
                             id: tx.id,
                             transaction_type: tx.transaction_type,
@@ -210,7 +234,7 @@ export const ProductDetails = () => {
                             total_cost: tx.total_cost,
                             reference_id: tx.reference_id,
                             reference_type: tx.reference_type,
-                            location_name: tx.locations?.name || 'Unknown',
+                            location_name: locationMap[tx.location_id] || 'Unknown',
                             created_at: tx.created_at
                         }));
 

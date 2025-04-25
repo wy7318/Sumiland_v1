@@ -69,12 +69,12 @@ export const InventoryDashboard = () => {
                 const { data: inventoryData } = await supabase
                     .from('available_inventory')
                     .select(`
-                            current_stock, 
-                            available_stock, 
-                            inventory_value, 
-                            product_id,
-                            products!inner(min_stock_level)
-                        `)
+                        current_stock, 
+                        available_stock, 
+                        inventory_value, 
+                        product_id,
+                        products!inner(min_stock_level)
+                    `)
                     .eq('organization_id', selectedOrganization.id);
 
                 // Calculate totals
@@ -87,8 +87,8 @@ export const InventoryDashboard = () => {
                     inventoryValue = inventoryData.reduce((sum, item) => sum + (item.inventory_value || 0), 0);
                     lowStockItems = inventoryData.filter(item =>
                         item.current_stock !== null &&
-                        item.min_stock_level !== null &&
-                        item.current_stock < item.min_stock_level
+                        item.products?.min_stock_level !== null &&
+                        item.current_stock < item.products.min_stock_level
                     ).length;
                 }
 
@@ -100,30 +100,65 @@ export const InventoryDashboard = () => {
                     locations: locationsCount || 0
                 });
 
-                // Fetch recent transactions
-                const { data: transactions } = await supabase
+                // Fetch recent transactions - FLATTENED VERSION
+                const { data: transactionsData } = await supabase
                     .from('inventory_transactions')
                     .select(`
-            id,
-            quantity,
-            transaction_type,
-            created_at,
-            reference_id,
-            products(name),
-            locations(name)
-          `)
+                    id,
+                    quantity,
+                    transaction_type,
+                    created_at,
+                    reference_id,
+                    product_id,
+                    location_id
+                `)
                     .eq('organization_id', selectedOrganization.id)
                     .order('created_at', { ascending: false })
                     .limit(5);
 
-                if (transactions) {
-                    const formattedTransactions = transactions.map(tx => ({
+                if (transactionsData && transactionsData.length > 0) {
+                    // Get unique product and location IDs
+                    const productIds = [...new Set(transactionsData.map(tx => tx.product_id).filter(Boolean))];
+                    const locationIds = [...new Set(transactionsData.map(tx => tx.location_id).filter(Boolean))];
+
+                    // Fetch products in a single query
+                    const productsMap = {};
+                    if (productIds.length > 0) {
+                        const { data: productsData } = await supabase
+                            .from('products')
+                            .select('id, name')
+                            .in('id', productIds);
+
+                        if (productsData) {
+                            productsData.forEach(product => {
+                                productsMap[product.id] = product;
+                            });
+                        }
+                    }
+
+                    // Fetch locations in a single query
+                    const locationsMap = {};
+                    if (locationIds.length > 0) {
+                        const { data: locationsData } = await supabase
+                            .from('locations')
+                            .select('id, name')
+                            .in('id', locationIds);
+
+                        if (locationsData) {
+                            locationsData.forEach(location => {
+                                locationsMap[location.id] = location;
+                            });
+                        }
+                    }
+
+                    // Format transactions with the fetched data
+                    const formattedTransactions = transactionsData.map(tx => ({
                         id: tx.id,
-                        product_name: tx.products.name,
+                        product_name: productsMap[tx.product_id]?.name || 'Unknown Product',
                         transaction_type: tx.transaction_type,
                         quantity: tx.quantity,
                         created_at: tx.created_at,
-                        location_name: tx.locations.name,
+                        location_name: locationsMap[tx.location_id]?.name || 'Unknown Location',
                         reference_id: tx.reference_id
                     }));
 
