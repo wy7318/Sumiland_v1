@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { X, Search, Filter, AlertCircle, Download } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
-import { cn } from '../../lib/utils';
+import { supabase } from '../../../lib/supabase';
+import { cn } from '../../../lib/utils';
 
 type Transaction = {
   id: string;
