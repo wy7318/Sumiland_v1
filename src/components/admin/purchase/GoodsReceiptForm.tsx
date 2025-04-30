@@ -201,6 +201,7 @@ export const GoodsReceiptForm = () => {
     };
 
 
+    // Fix for saveGoodsReceipt function - only the relevant section is shown
     const saveGoodsReceipt = async () => {
         if (!validateForm()) return;
 
@@ -238,23 +239,7 @@ export const GoodsReceiptForm = () => {
 
             // Process each item
             for (const item of itemsToReceive) {
-                // 1. Insert goods receipt item
-                const { error: itemError } = await supabase
-                    .from('goods_receipt_items')
-                    .insert({
-                        goods_receipt_id: receiptData.id,
-                        purchase_order_item_id: item.purchase_order_item_id,
-                        quantity: item.quantity,
-                        location_id: item.location_id, // Use location_id instead of inventory_id
-                        notes: item.notes,
-                        organization_id: selectedOrganization.id,
-                        created_by: user.id,
-                        updated_by: user.id
-                    });
-
-                if (itemError) throw itemError;
-
-                // 2. Check if an inventory record exists for this product at this location
+                // 1. Check if an inventory record exists for this product at this location
                 const { data: existingInventory, error: inventoryCheckError } = await supabase
                     .from('inventories')
                     .select('id, current_stock')
@@ -265,10 +250,15 @@ export const GoodsReceiptForm = () => {
 
                 if (inventoryCheckError) throw inventoryCheckError;
 
-                // 3. Update or create the inventory record
+                let inventoryId;
+
+                // 2. Update or create the inventory record
                 const quantityReceived = parseFloat(item.quantity);
 
                 if (existingInventory) {
+                    // Use existing inventory
+                    inventoryId = existingInventory.id;
+
                     // Update existing inventory record
                     const { error: updateInventoryError } = await supabase
                         .from('inventories')
@@ -283,7 +273,7 @@ export const GoodsReceiptForm = () => {
                     if (updateInventoryError) throw updateInventoryError;
                 } else {
                     // Create new inventory record
-                    const { error: createInventoryError } = await supabase
+                    const { data: newInventory, error: createInventoryError } = await supabase
                         .from('inventories')
                         .insert({
                             product_id: item.product_id,
@@ -296,10 +286,29 @@ export const GoodsReceiptForm = () => {
                             organization_id: selectedOrganization.id,
                             created_by: user.id,
                             updated_by: user.id
-                        });
+                        })
+                        .select('id')
+                        .single();
 
                     if (createInventoryError) throw createInventoryError;
+                    inventoryId = newInventory.id;
                 }
+
+                // 3. Now insert the goods receipt item with the inventory_id
+                const { error: itemError } = await supabase
+                    .from('goods_receipt_items')
+                    .insert({
+                        goods_receipt_id: receiptData.id,
+                        purchase_order_item_id: item.purchase_order_item_id,
+                        quantity: item.quantity,
+                        inventory_id: inventoryId, // Use inventory_id instead of location_id
+                        notes: item.notes,
+                        organization_id: selectedOrganization.id,
+                        created_by: user.id,
+                        updated_by: user.id
+                    });
+
+                if (itemError) throw itemError;
 
                 // 4. Create an inventory transaction record
                 const { error: transactionError } = await supabase

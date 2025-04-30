@@ -88,6 +88,8 @@ import { PurchaseOrderForm } from './components/admin/purchase/PurchaseOrderForm
 import { PurchaseOrderDetails } from './components/admin/purchase/PurchaseOrderDetails';
 import { GoodsReceiptForm } from './components/admin/purchase/GoodsReceiptForm';
 import { PurchaseOrderStats } from './components/admin/purchase/PurchaseOrderStats';
+import { GoodsReceiptDetails } from './components/admin/purchase/GoodsReceiptDetails';
+
 
 
 function App() {
@@ -233,6 +235,7 @@ function App() {
                                     <Route path="purchase-orders/:id" element={<PurchaseOrderDetails />} />
                                     <Route path="purchase-orders/:id/edit" element={<PurchaseOrderForm />} />
                                     <Route path="purchase-orders/:id/receive" element={<GoodsReceiptForm />} />
+                                    <Route path="goods-receipts/:id" element={<GoodsReceiptDetails />} />
                                     <Route path="vendors" element={<VendorsPage />} />
                                     <Route path="vendors/new" element={<VendorForm />} />
                                     <Route path="vendors/:id" element={<VendorDetailPage />} />

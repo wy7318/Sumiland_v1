@@ -587,7 +587,7 @@ export const PurchaseOrderDetails = () => {
                                                 </p>
                                             </div>
                                             <Link
-                                                to={`/goods-receipts/${receipt.id}`}
+                                                to={`/admin/goods-receipts/${receipt.id}`}
                                                 className="text-blue-600 hover:text-blue-800 text-sm"
                                             >
                                                 View Details
@@ -599,13 +599,9 @@ export const PurchaseOrderDetails = () => {
                                                 <thead className="bg-gray-50">
                                                     <tr>
                                                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product</th>
-                                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty</th>
-                                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit Price</th>
-                                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tax Rate %</th>
-                                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Discount</th>
-                                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
-                                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Received</th>
-                                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Remaining</th>
+                                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
+                                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
+                                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Notes</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="bg-white divide-y divide-gray-200">
@@ -621,6 +617,17 @@ export const PurchaseOrderDetails = () => {
                                                             </td>
                                                             <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">
                                                                 {item.quantity} {item.purchase_order_items.products.stock_unit}
+                                                            </td>
+                                                            <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">
+                                                                {/* Fetch and display location information */}
+                                                                {item.inventory_id ? (
+                                                                    <span className="text-gray-600">In Inventory</span>
+                                                                ) : (
+                                                                    <span className="text-gray-500">Not specified</span>
+                                                                )}
+                                                            </td>
+                                                            <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-600">
+                                                                {item.notes || "—"}
                                                             </td>
                                                         </tr>
                                                     ))}

@@ -24,11 +24,16 @@ import { useOrganization } from '../../../contexts/OrganizationContext';
 import { useTimeZone } from '../../../contexts/TimeZoneContext';
 import { TransactionWithDetails, TransactionType, getTransactionTypeLabel } from './inventoryTypes';
 
+// Update the interface to include receipt_number
+interface TransactionWithReceiptInfo extends TransactionWithDetails {
+    receipt_number?: string;
+}
+
 export const InventoryTransactions = () => {
     const { selectedOrganization } = useOrganization();
     const { formatDate, formatTime } = useTimeZone();
-    const [transactions, setTransactions] = useState<TransactionWithDetails[]>([]);
-    const [filteredTransactions, setFilteredTransactions] = useState<TransactionWithDetails[]>([]);
+    const [transactions, setTransactions] = useState<TransactionWithReceiptInfo[]>([]);
+    const [filteredTransactions, setFilteredTransactions] = useState<TransactionWithReceiptInfo[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [typeFilter, setTypeFilter] = useState<string>('');
@@ -86,6 +91,9 @@ export const InventoryTransactions = () => {
 
                     const userIds = [...new Set(transactionsData.map(tx => tx.created_by).filter(Boolean))];
 
+                    // Get unique reference IDs for goods receipts
+                    const referenceIds = [...new Set(transactionsData.map(tx => tx.reference_id).filter(Boolean))];
+
                     // 3. Fetch all products in a single query
                     const productsMap = {};
                     if (productIds.length > 0) {
@@ -131,13 +139,62 @@ export const InventoryTransactions = () => {
                         }
                     }
 
-                    // 6. Combine all the data
+                    // 6. Fetch receipt numbers from goods_receipts
+                    const receiptsMap = {};
+                    if (referenceIds.length > 0) {
+                        try {
+                            console.log('Fetching receipt numbers for IDs:', referenceIds);
+
+                            // Try different table name possibilities
+                            let receiptsData = null;
+                            let error = null;
+
+                            // Try with 'goods_receipts' table
+                            const response = await supabase
+                                .from('goods_receipts')
+                                .select('id, receipt_number')
+                                .in('id', referenceIds);
+
+                            error = response.error;
+                            receiptsData = response.data;
+
+                            // If error, try with 'goods_receipt' (singular) 
+                            if (error) {
+                                console.error('Error fetching from goods_receipts:', error);
+                                console.log('Trying alternative table name: goods_receipt');
+
+                                const altResponse = await supabase
+                                    .from('goods_receipt')
+                                    .select('id, receipt_number')
+                                    .in('id', referenceIds);
+
+                                if (!altResponse.error) {
+                                    receiptsData = altResponse.data;
+                                    error = null;
+                                }
+                            }
+
+                            if (!error && receiptsData) {
+                                console.log('Successfully retrieved receipt data:', receiptsData);
+                                receiptsData.forEach(receipt => {
+                                    receiptsMap[receipt.id] = receipt.receipt_number;
+                                });
+                            } else {
+                                console.error('Could not fetch receipt numbers from any table variation');
+                            }
+                        } catch (err) {
+                            console.error('Exception when fetching receipt numbers:', err);
+                        }
+                    }
+
+                    // 7. Combine all the data
                     const enhancedData = transactionsData.map(transaction => {
                         const product = productsMap[transaction.product_id] || { name: 'Unknown Product', sku: '', stock_unit: '' };
                         const location = locationsMap[transaction.location_id] || { name: 'Unknown Location' };
                         const sourceLocation = locationsMap[transaction.source_location_id] || null;
                         const destLocation = locationsMap[transaction.destination_location_id] || null;
                         const user = usersMap[transaction.created_by] || null;
+                        const receiptNumber = receiptsMap[transaction.reference_id] || null;
 
                         return {
                             ...transaction,
@@ -154,7 +211,8 @@ export const InventoryTransactions = () => {
                             user: user ? {
                                 name: user.full_name,
                                 email: user.email
-                            } : {}
+                            } : {},
+                            receipt_number: receiptNumber
                         };
                     });
 
@@ -186,6 +244,7 @@ export const InventoryTransactions = () => {
                     item.product.sku.toLowerCase().includes(lowerSearch) ||
                     item.location.name.toLowerCase().includes(lowerSearch) ||
                     item.reference_id?.toLowerCase().includes(lowerSearch) ||
+                    item.receipt_number?.toLowerCase().includes(lowerSearch) || // Add search for receipt_number
                     item.notes?.toLowerCase().includes(lowerSearch)
             );
         }
@@ -198,7 +257,9 @@ export const InventoryTransactions = () => {
         // Apply reference filter
         if (referenceFilter) {
             result = result.filter(
-                item => item.reference_id?.toLowerCase().includes(referenceFilter.toLowerCase())
+                item =>
+                    item.reference_id?.toLowerCase().includes(referenceFilter.toLowerCase()) ||
+                    item.receipt_number?.toLowerCase().includes(referenceFilter.toLowerCase()) // Filter by receipt_number too
             );
         }
 
@@ -259,8 +320,8 @@ export const InventoryTransactions = () => {
 
         // Apply sorting
         result.sort((a, b) => {
-            const aValue = a[sortConfig.key as keyof TransactionWithDetails];
-            const bValue = b[sortConfig.key as keyof TransactionWithDetails];
+            const aValue = a[sortConfig.key as keyof TransactionWithReceiptInfo];
+            const bValue = b[sortConfig.key as keyof TransactionWithReceiptInfo];
 
             if (!aValue && !bValue) return 0;
             if (!aValue) return 1;
@@ -315,7 +376,7 @@ export const InventoryTransactions = () => {
             'Quantity',
             'Unit Cost',
             'Total Cost',
-            'Reference ID',
+            'Reference',
             'Notes'
         ].join(',');
 
@@ -329,7 +390,7 @@ export const InventoryTransactions = () => {
             tx.quantity,
             tx.unit_cost || '',
             tx.total_cost || '',
-            `"${tx.reference_id || ''}"`,
+            `"${tx.receipt_number || tx.reference_id || ''}"`, // Update to use receipt_number if available
             `"${tx.notes?.replace(/"/g, '""') || ''}"`,
         ].join(','));
 
@@ -437,7 +498,7 @@ export const InventoryTransactions = () => {
                         </div>
                         <input
                             type="text"
-                            placeholder="Reference ID"
+                            placeholder="Reference ID or Receipt Number"
                             className="pl-10 pr-4 py-2 w-full border rounded-md focus:ring-blue-500 focus:border-blue-500"
                             value={referenceFilter}
                             onChange={(e) => setReferenceFilter(e.target.value)}
@@ -640,7 +701,11 @@ export const InventoryTransactions = () => {
                                                 </td>
                                                 <td className="px-4 py-4 whitespace-nowrap">
                                                     <div className="text-sm text-gray-900">
-                                                        {transaction.reference_id || '-'}
+                                                        {transaction.receipt_number ?
+                                                            transaction.receipt_number :
+                                                            (transaction.reference_id ?
+                                                                `ID: ${transaction.reference_id}` :
+                                                                '-')}
                                                     </div>
                                                     {transaction.reference_type && (
                                                         <div className="text-xs text-gray-500">
