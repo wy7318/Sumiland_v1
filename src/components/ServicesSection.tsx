@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { motion, useInView } from 'framer-motion';
-import { ChevronRight, BarChart3, Users, PieChart, Mail, Shield, Database, Smartphone, Code, Workflow } from 'lucide-react';
+import { ChevronRight, BarChart3, Box, Layers, Users, PieChart, ArrowRight, Play, Zap } from 'lucide-react';
 
 export function ServicesSection() {
   const ref = useRef(null);
@@ -8,207 +8,204 @@ export function ServicesSection() {
 
   const services = [
     {
-      title: "Customer Relationship Management",
-      description: "Our core CRM platform unifies all your customer data into one powerful, easy-to-use solution.",
-      image: "/api/placeholder/600/400",
+      title: "Unified Customer & Inventory Management",
+      description: "Seamlessly connect your customer relationships with inventory operations for unmatched business visibility and control.",
+      imageSrc: "https://jaytpfztifhtzcruxguj.supabase.co/storage/v1/object/public/Sumiland%20Design/Simplidone/customer%20management.jpg",
+      icon: <Layers className="w-full h-full p-2 text-white" />,
+      iconBg: "from-blue-500 to-indigo-600",
       features: [
-        "360° customer view across departments",
-        "Intuitive interface with minimal learning curve",
-        "Customizable without coding",
-        "Automation of repetitive tasks",
-        "Real-time collaboration tools"
+        "360° customer view integrated with inventory data",
+        "Real-time stock levels visible within customer records",
+        "Purchase history with inventory analytics",
+        "Automated reorder notifications based on customer demand",
+        "Inventory forecasting tied to customer buying patterns"
       ],
-      benefits: "Get your entire team up and running in hours, not weeks. Our simplified workflow reduces onboarding costs by 60% compared to enterprise CRM systems, while increasing adoption rates across all team members."
+      benefits: "By connecting your inventory directly to your customer data, businesses reduce stockouts by 73% while improving order accuracy by 94%. This integration creates a seamless experience for both customers and staff while optimizing your supply chain."
     },
     {
-      title: "Advanced Analytics & Insights",
-      description: "Transform your customer data into actionable business intelligence with our comprehensive analytics tools.",
-      image: "/api/placeholder/600/400",
+      title: "Intelligent Analytics Dashboard",
+      description: "Uncover actionable insights across both customer relations and inventory with our comprehensive analytics platform.",
+      imageSrc: "https://jaytpfztifhtzcruxguj.supabase.co/storage/v1/object/public/Sumiland%20Design/Simplidone/reporting.jpg",
+      icon: <BarChart3 className="w-full h-full p-2 text-white" />,
+      iconBg: "from-violet-500 to-purple-600",
       features: [
-        "Predictive analytics with 42% better accuracy",
-        "Custom reporting and dashboard builder",
-        "Sales forecasting and trend identification",
-        "Marketing campaign performance metrics",
-        "Customer behavior analysis"
+        "Combined CRM and inventory performance metrics",
+        "Product popularity analysis by customer segment",
+        "Sales velocity monitoring and prediction",
+        "Multi-dimensional reporting across all business areas",
+        "Custom KPI tracking and visualization"
       ],
-      benefits: "Make confident decisions based on data-driven insights. Our customers report 37% faster identification of market opportunities and 31% improvement in customer retention by surfacing trends that would otherwise remain hidden."
+      benefits: "Our unified analytics provide 42% better forecasting accuracy and 37% faster identification of market opportunities. Clients report making strategic inventory decisions 2.5x faster with our complete business visibility dashboard."
     },
     {
-      title: "AI-Powered Automation",
-      description: "Leverage cutting-edge artificial intelligence to streamline operations and enhance customer interactions.",
-      image: "/api/placeholder/600/400",
+      title: "AI-Powered Business Automation",
+      description: "Harness cutting-edge AI to streamline operations across customer management and inventory control systems.",
+      imageSrc: "https://jaytpfztifhtzcruxguj.supabase.co/storage/v1/object/public/Sumiland%20Design/Simplidone/aipowered.jpg",
+      icon: <Zap className="w-full h-full p-2 text-white" />,
+      iconBg: "from-amber-500 to-orange-600",
       features: [
-        "Visual workflow builder for process automation",
-        "Intelligent lead scoring and prioritization",
-        "Automated insight generation",
-        "AI-assisted communication tools",
-        "Time-saving task automation"
+        "Automated inventory adjustments based on customer behavior",
+        "Smart reordering tied to sales forecasts",
+        "AI-driven customer segmentation by purchase patterns",
+        "Intelligent product recommendations based on inventory",
+        "Automated workflow optimization across departments"
       ],
-      benefits: "Free your team from mundane administrative work to focus on high-value customer interactions. Teams using our automation tools report handling 40% more customer inquiries without adding staff and reducing response times by 72%."
+      benefits: "Teams using our automation tools handle 40% more customer inquiries while reducing stockouts by 65%. The AI-powered integration between CRM and inventory means your staff focuses on growth rather than maintenance."
     },
     {
-      title: "Mobile & Remote Workspace",
-      description: "Keep your team productive anywhere with our fully-featured mobile solutions.",
-      image: "/api/placeholder/600/400",
+      title: "Inventory Lifecycle Management",
+      description: "Track products from procurement to sale with complete visibility and control throughout the entire inventory lifecycle.",
+      imageSrc: "https://jaytpfztifhtzcruxguj.supabase.co/storage/v1/object/public/Sumiland%20Design/Simplidone/inventory.jpg",
+      icon: <Box className="w-full h-full p-2 text-white" />,
+      iconBg: "from-emerald-500 to-teal-600",
       features: [
-        "Complete functionality on iOS and Android",
-        "Real-time data synchronization",
-        "Offline access to critical information",
-        "Location-based tools for field sales",
-        "Mobile document management"
+        "End-to-end product tracking and management",
+        "Supplier relationship management integration",
+        "Multi-location inventory synchronization",
+        "Serial and batch number tracking",
+        "Expiration date monitoring and alerts"
       ],
-      benefits: "Access your CRM from anywhere, ensuring your team stays productive whether in the office, working remotely, or meeting clients in the field. Field sales teams report 35% higher data entry compliance and 28% faster deal progression with our mobile tools."
+      benefits: "Our clients report 82% improvement in inventory accuracy and 47% reduction in carrying costs. By integrating inventory lifecycle with customer management, you'll eliminate data silos while creating a more responsive business operation."
     }
   ];
 
   return (
-    <section id="services" ref={ref} className="py-24 relative overflow-hidden">
-      {/* Background Gradient */}
-      <div className="absolute inset-0 bg-gradient-to-r from-gray-900 via-primary-900/30 to-gray-900"></div>
+    <section id="services" ref={ref} className="py-24 relative overflow-hidden bg-gray-50">
+      {/* Background elements */}
+      <div className="absolute inset-0 bg-gradient-to-b from-white to-gray-100 z-0"></div>
 
-      {/* Animated Dots Pattern */}
-      <div className="absolute inset-0 opacity-20">
-        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary-500 to-transparent"></div>
-        <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary-500 to-transparent"></div>
-      </div>
+      {/* Decorative elements */}
+      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary-500 to-transparent"></div>
+      <div className="absolute -right-64 top-1/4 w-96 h-96 rounded-full bg-blue-100 blur-3xl opacity-30 z-0"></div>
+      <div className="absolute -left-64 bottom-1/4 w-96 h-96 rounded-full bg-primary-100 blur-3xl opacity-30 z-0"></div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="text-center mb-16">
-          <motion.span
-            initial={{ opacity: 0 }}
-            animate={isInView ? { opacity: 1 } : {}}
-            transition={{ duration: 0.6 }}
-            className="inline-block px-3 py-1 text-sm font-medium bg-primary-900/50 rounded-full text-primary-400 mb-4"
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={isInView ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 0.5 }}
+            className="inline-block"
           >
-            Our Solutions
-          </motion.span>
+            <span className="bg-primary-50 text-primary-800 text-sm font-medium px-3 py-1 rounded-full">
+              Integrated Solutions
+            </span>
+          </motion.div>
 
           <motion.h2
-            initial={{ opacity: 0, y: -20 }}
+            initial={{ opacity: 0, y: 20 }}
             animate={isInView ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="text-4xl md:text-5xl font-bold mb-6"
+            transition={{ duration: 0.5, delay: 0.1 }}
+            className="text-4xl font-bold mt-4 mb-4"
           >
-            Comprehensive <span className="text-primary-400">Services</span>
+            <span className="text-gray-900">Powerful Services for </span>
+            <span className="bg-gradient-to-r from-primary-600 to-blue-600 bg-clip-text text-transparent">
+              Modern Businesses
+            </span>
           </motion.h2>
 
           <motion.p
-            initial={{ opacity: 0 }}
-            animate={isInView ? { opacity: 1 } : {}}
-            transition={{ duration: 0.6, delay: 0.3 }}
-            className="text-xl text-gray-300 max-w-3xl mx-auto"
+            initial={{ opacity: 0, y: 20 }}
+            animate={isInView ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="text-xl text-gray-600 max-w-3xl mx-auto"
           >
-            Tailored solutions designed to streamline your operations, enhance customer relationships, and drive growth.
+            Our comprehensive solutions unify customer relationship and inventory management,
+            providing unparalleled visibility and control across your entire business.
           </motion.p>
         </div>
 
-        <div className="space-y-24">
+        <div className="space-y-16">
           {services.map((service, index) => (
             <motion.div
               key={index}
               initial={{ opacity: 0, y: 40 }}
               animate={isInView ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 0.8, delay: 0.2 + index * 0.2 }}
-              className={`flex flex-col ${index % 2 === 0 ? 'lg:flex-row' : 'lg:flex-row-reverse'} gap-12 items-center`}
+              transition={{ duration: 0.6, delay: 0.2 + index * 0.1 }}
+              className="bg-white rounded-2xl shadow-xl overflow-hidden group"
             >
-              <div className="w-full lg:w-1/2">
-                <div className="relative rounded-2xl overflow-hidden border border-gray-700/50 shadow-xl shadow-primary-900/20">
-                  <div className="aspect-[4/3] relative">
-                    <img
-                      src={service.image}
-                      alt={service.title}
-                      className="absolute inset-0 w-full h-full object-cover z-10"
-                    />
-                    {/* Gradient overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-tr from-primary-900 to-transparent opacity-60 z-20"></div>
+              <div className={`flex flex-col ${index % 2 === 0 ? 'lg:flex-row' : 'lg:flex-row-reverse'} items-stretch`}>
+                {/* Video Section */}
+                <div className="w-full lg:w-1/2 relative overflow-hidden">
+                  {/* Service Icon - Absolute positioned over video */}
+                  <div className={`absolute top-6 left-6 z-30 w-16 h-16 rounded-2xl bg-gradient-to-br ${service.iconBg} p-1 shadow-lg transform transition-transform group-hover:scale-110`}>
+                    {service.icon}
+                  </div>
 
-                    {/* Service Icon */}
-                    <div className="absolute top-6 left-6 z-30 bg-primary-900/70 backdrop-blur-sm rounded-full p-3 border border-primary-500/50">
-                      {index === 0 ? <Users className="w-8 h-8 text-primary-400" /> :
-                        index === 1 ? <BarChart3 className="w-8 h-8 text-primary-400" /> :
-                          index === 2 ? <Workflow className="w-8 h-8 text-primary-400" /> :
-                            <Smartphone className="w-8 h-8 text-primary-400" />}
-                    </div>
+                  <div className="relative h-full min-h-[300px]">
+                    {/* Image */}
+                    <img
+                      src={service.imageSrc}
+                      alt={service.title}
+                      className="absolute inset-0 w-full h-full object-cover"
+                    />
+
+                    {/* Gradient overlay */}
+                    <div className={`absolute inset-0 bg-gradient-to-br ${service.iconBg} opacity-50 mix-blend-overlay`}></div>
+
+                    {/* Hover overlay */}
+                    {/* <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                      <div className="transform scale-0 group-hover:scale-100 transition-transform rounded-lg bg-white/10 backdrop-blur-sm p-3 border border-white/20">
+                        <span className="text-white font-medium">View Details</span>
+                      </div>
+                    </div> */}
                   </div>
                 </div>
-              </div>
 
-              <div className="w-full lg:w-1/2">
-                <h3 className="text-3xl font-bold mb-4 text-white">{service.title}</h3>
-                <p className="text-xl text-gray-300 mb-6">{service.description}</p>
+                {/* Content Section */}
+                <div className="w-full lg:w-1/2 p-8 lg:p-12 flex flex-col justify-center">
+                  <h3 className="text-2xl lg:text-3xl font-bold mb-4 text-gray-900">{service.title}</h3>
+                  <p className="text-lg text-gray-600 mb-6">{service.description}</p>
 
-                <div className="space-y-4 mb-6">
-                  {service.features.map((feature, i) => (
-                    <div key={i} className="flex items-center gap-3">
-                      <div className="flex-shrink-0 rounded-full bg-primary-900/40 p-1">
-                        <ChevronRight className="w-5 h-5 text-primary-400" />
+                  <div className="space-y-3 mb-6">
+                    {service.features.map((feature, i) => (
+                      <div key={i} className="flex items-start gap-3">
+                        <div className={`flex-shrink-0 mt-1 rounded-full bg-gradient-to-br ${service.iconBg} p-1`}>
+                          <ChevronRight className="w-4 h-4 text-white" />
+                        </div>
+                        <span className="text-gray-700">{feature}</span>
                       </div>
-                      <span className="text-lg text-gray-200">{feature}</span>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
+
+                  <div className="bg-gray-50 rounded-xl p-4 mb-6 border-l-4 border-primary-500">
+                    <p className="text-gray-700 italic">
+                      {service.benefits}
+                    </p>
+                  </div>
+
+                  <motion.a
+                    href="#contact"
+                    whileHover={{ x: 5 }}
+                    className="inline-flex items-center text-primary-600 font-semibold group mt-auto"
+                  >
+                    Learn more about this service
+                    <ArrowRight className="ml-2 w-4 h-4 transition-transform group-hover:translate-x-1" />
+                  </motion.a>
                 </div>
-
-                <p className="text-gray-400 italic border-l-4 border-primary-500/50 pl-4 py-2 mb-8">
-                  {service.benefits}
-                </p>
-
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="px-6 py-3 bg-primary-500 hover:bg-primary-600 text-white rounded-lg font-medium transition-colors"
-                >
-                  Learn More
-                </motion.button>
               </div>
             </motion.div>
           ))}
         </div>
 
-        {/* Additional Services Overview Grid */}
+        {/* Bottom CTA */}
         <motion.div
-          initial={{ opacity: 0, y: 30 }}
+          initial={{ opacity: 0, y: 20 }}
           animate={isInView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.8, delay: 0.8 }}
-          className="mt-24"
+          transition={{ duration: 0.5, delay: 0.8 }}
+          className="mt-16 text-center"
         >
-          <h3 className="text-3xl font-bold text-center mb-12">Additional Services</h3>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50 hover:border-primary-500/50 transition-all duration-300 group">
-              <Mail className="w-12 h-12 text-primary-400 mb-4 group-hover:scale-110 transition-transform" />
-              <h4 className="text-xl font-bold mb-3">Email Integration</h4>
-              <p className="text-gray-300">Seamless email synchronization with engagement analytics. Never lose track of important communications.</p>
-            </div>
-
-            <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50 hover:border-primary-500/50 transition-all duration-300 group">
-              <Shield className="w-12 h-12 text-primary-400 mb-4 group-hover:scale-110 transition-transform" />
-              <h4 className="text-xl font-bold mb-3">Data Security</h4>
-              <p className="text-gray-300">Enterprise-grade security protocols with daily backups and compliance with GDPR, CCPA, and HIPAA.</p>
-            </div>
-
-            <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50 hover:border-primary-500/50 transition-all duration-300 group">
-              <Code className="w-12 h-12 text-primary-400 mb-4 group-hover:scale-110 transition-transform" />
-              <h4 className="text-xl font-bold mb-3">Custom Development</h4>
-              <p className="text-gray-300">Need something unique? Our team can build custom solutions that perfectly align with your business requirements.</p>
-            </div>
-
-            <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50 hover:border-primary-500/50 transition-all duration-300 group">
-              <Database className="w-12 h-12 text-primary-400 mb-4 group-hover:scale-110 transition-transform" />
-              <h4 className="text-xl font-bold mb-3">Data Migration</h4>
-              <p className="text-gray-300">Seamless transition from your existing CRM with our guided data migration assistance and data cleaning services.</p>
-            </div>
-
-            <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50 hover:border-primary-500/50 transition-all duration-300 group">
-              <Users className="w-12 h-12 text-primary-400 mb-4 group-hover:scale-110 transition-transform" />
-              <h4 className="text-xl font-bold mb-3">Training & Onboarding</h4>
-              <p className="text-gray-300">Personalized onboarding sessions and ongoing training to ensure your team gets the most out of SimpliDone CRM.</p>
-            </div>
-
-            <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50 hover:border-primary-500/50 transition-all duration-300 group">
-              <PieChart className="w-12 h-12 text-primary-400 mb-4 group-hover:scale-110 transition-transform" />
-              <h4 className="text-xl font-bold mb-3">Business Intelligence</h4>
-              <p className="text-gray-300">Advanced reporting and analytics that go beyond basic CRM data to provide strategic business insights.</p>
-            </div>
+          <div className="bg-gradient-to-r from-primary-600 to-blue-600 rounded-2xl p-10 shadow-xl">
+            <h3 className="text-2xl font-bold text-white mb-4">Ready to transform your business operations?</h3>
+            <p className="text-white/90 text-lg mb-8 max-w-2xl mx-auto">
+              Experience the power of unified customer and inventory management with SimpliDone's comprehensive platform.
+            </p>
+            <a
+              href="#contact"
+              className="inline-flex items-center justify-center px-8 py-4 bg-white text-primary-700 rounded-lg text-lg font-medium hover:bg-white/90 transition-colors shadow-lg"
+            >
+              Schedule a Demo
+            </a>
           </div>
         </motion.div>
       </div>
