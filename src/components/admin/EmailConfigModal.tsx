@@ -238,7 +238,7 @@ export function EmailConfigModal({ onClose, onSuccess, organizationId }: Props) 
               className="w-full flex items-center justify-center px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <img
-                src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg"
+                src="https://upload.wikimedia.org/wikipedia/commons/7/7e/Gmail_icon_%282020%29.svg"
                 alt="Google"
                 className="w-6 h-6 mr-3"
               />

@@ -33,6 +33,7 @@ interface RecentTransaction {
     created_at: string;
     location_name: string;
     reference_id: string;
+    receipt_number?: string; // Added field for receipt number
 }
 
 export const InventoryDashboard = () => {
@@ -100,7 +101,7 @@ export const InventoryDashboard = () => {
                     locations: locationsCount || 0
                 });
 
-                // Fetch recent transactions - FLATTENED VERSION
+                // Fetch recent transactions
                 const { data: transactionsData } = await supabase
                     .from('inventory_transactions')
                     .select(`
@@ -120,6 +121,9 @@ export const InventoryDashboard = () => {
                     // Get unique product and location IDs
                     const productIds = [...new Set(transactionsData.map(tx => tx.product_id).filter(Boolean))];
                     const locationIds = [...new Set(transactionsData.map(tx => tx.location_id).filter(Boolean))];
+
+                    // Get unique reference IDs for goods receipts
+                    const referenceIds = [...new Set(transactionsData.map(tx => tx.reference_id).filter(Boolean))];
 
                     // Fetch products in a single query
                     const productsMap = {};
@@ -151,6 +155,54 @@ export const InventoryDashboard = () => {
                         }
                     }
 
+                    // Fetch receipt numbers from goods_receipts
+                    const receiptsMap = {};
+                    if (referenceIds.length > 0) {
+                        try {
+                            console.log('Fetching receipt numbers for IDs:', referenceIds);
+
+                            // Try different table name possibilities
+                            let receiptsData = null;
+                            let error = null;
+
+                            // Try with 'goods_receipts' table
+                            const response = await supabase
+                                .from('goods_receipts')
+                                .select('id, receipt_number')
+                                .in('id', referenceIds);
+
+                            error = response.error;
+                            receiptsData = response.data;
+
+                            // If error, try with 'goods_receipt' (singular) 
+                            if (error) {
+                                console.error('Error fetching from goods_receipts:', error);
+                                console.log('Trying alternative table name: goods_receipt');
+
+                                const altResponse = await supabase
+                                    .from('goods_receipt')
+                                    .select('id, receipt_number')
+                                    .in('id', referenceIds);
+
+                                if (!altResponse.error) {
+                                    receiptsData = altResponse.data;
+                                    error = null;
+                                }
+                            }
+
+                            if (!error && receiptsData) {
+                                console.log('Successfully retrieved receipt data:', receiptsData);
+                                receiptsData.forEach(receipt => {
+                                    receiptsMap[receipt.id] = receipt.receipt_number;
+                                });
+                            } else {
+                                console.error('Could not fetch receipt numbers from any table variation');
+                            }
+                        } catch (err) {
+                            console.error('Exception when fetching receipt numbers:', err);
+                        }
+                    }
+
                     // Format transactions with the fetched data
                     const formattedTransactions = transactionsData.map(tx => ({
                         id: tx.id,
@@ -159,7 +211,8 @@ export const InventoryDashboard = () => {
                         quantity: tx.quantity,
                         created_at: tx.created_at,
                         location_name: locationsMap[tx.location_id]?.name || 'Unknown Location',
-                        reference_id: tx.reference_id
+                        reference_id: tx.reference_id,
+                        receipt_number: receiptsMap[tx.reference_id] || null
                     }));
 
                     setRecentTransactions(formattedTransactions);
@@ -380,7 +433,11 @@ export const InventoryDashboard = () => {
                                                         {transaction.location_name}
                                                     </td>
                                                     <td className="px-4 py-3 whitespace-nowrap">
-                                                        {transaction.reference_id || '-'}
+                                                        {transaction.receipt_number ?
+                                                            transaction.receipt_number :
+                                                            (transaction.reference_id ?
+                                                                `ID: ${transaction.reference_id}` :
+                                                                '-')}
                                                     </td>
                                                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                                                         {new Date(transaction.created_at).toLocaleDateString()}

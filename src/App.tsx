@@ -31,9 +31,9 @@ import { QuoteDetailPage } from './components/admin/QuoteDetailPage';
 import { OrdersPage } from './components/admin/OrdersPage';
 import { OrderDetailPage } from './components/admin/OrderDetailPage';
 import { OrderForm } from './components/admin/OrderForm';
-import { PurchaseOrdersPage } from './components/admin/PurchaseOrdersPage';
-import { PurchaseOrderForm } from './components/admin/PurchaseOrderForm';
-import { PurchaseOrderDetailPage } from './components/admin/PurchaseOrderDetailPage';
+// import { PurchaseOrdersPage } from './components/admin/PurchaseOrdersPage';
+// import { PurchaseOrderForm } from './components/admin/PurchaseOrderForm';
+// import { PurchaseOrderDetailPage } from './components/admin/PurchaseOrderDetailPage';
 import { VendorsPage } from './components/admin/VendorsPage';
 import { VendorForm } from './components/admin/VendorForm';
 import { VendorDetailPage } from './components/admin/VendorDetailPage';
@@ -83,6 +83,12 @@ import InventoryTransactions from './components/admin/inventory/InventoryTransac
 import TransactionDetails from './components/admin/inventory/TransactionDetails';
 
 
+import { PurchaseOrderList } from './components/admin/purchase/PurchaseOrderList';
+import { PurchaseOrderForm } from './components/admin/purchase/PurchaseOrderForm';
+import { PurchaseOrderDetails } from './components/admin/purchase/PurchaseOrderDetails';
+import { GoodsReceiptForm } from './components/admin/purchase/GoodsReceiptForm';
+import { PurchaseOrderStats } from './components/admin/purchase/PurchaseOrderStats';
+import { GoodsReceiptDetails } from './components/admin/purchase/GoodsReceiptDetails';
 
 
 
@@ -220,10 +226,16 @@ function App() {
                                     <Route path="orders/new" element={<OrderForm />} />
                                     <Route path="orders/:id" element={<OrderDetailPage />} />
                                     <Route path="orders/:id/edit" element={<OrderForm />} />
-                                    <Route path="purchase-orders" element={<PurchaseOrdersPage />} />
+                                    {/* <Route path="purchase-orders" element={<PurchaseOrdersPage />} />
                                     <Route path="purchase-orders/new" element={<PurchaseOrderForm />} />
-                                    <Route path="purchase-orders/:id" element={<PurchaseOrderDetailPage />} />
+                                    <Route path="purchase-orders/:id" element={<PurchaseOrderDetailPage />} /> */}
+                                    {/* <Route path="purchase-orders/:id/edit" element={<PurchaseOrderForm />} /> */}
+                                    <Route path="purchase-orders" element={<PurchaseOrderList />} />
+                                    <Route path="purchase-orders/new" element={<PurchaseOrderForm />} />
+                                    <Route path="purchase-orders/:id" element={<PurchaseOrderDetails />} />
                                     <Route path="purchase-orders/:id/edit" element={<PurchaseOrderForm />} />
+                                    <Route path="purchase-orders/:id/receive" element={<GoodsReceiptForm />} />
+                                    <Route path="goods-receipts/:id" element={<GoodsReceiptDetails />} />
                                     <Route path="vendors" element={<VendorsPage />} />
                                     <Route path="vendors/new" element={<VendorForm />} />
                                     <Route path="vendors/:id" element={<VendorDetailPage />} />
