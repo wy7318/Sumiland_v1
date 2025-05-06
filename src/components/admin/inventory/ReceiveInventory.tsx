@@ -128,8 +128,8 @@ export const ReceiveInventory = () => {
         const lowerSearch = searchTerm.toLowerCase();
         const filtered = products.filter(
             product =>
-                product.name.toLowerCase().includes(lowerSearch) ||
-                product.sku.toLowerCase().includes(lowerSearch)
+                (product.name && product.name.toLowerCase().includes(lowerSearch)) ||
+                (product.sku && product.sku.toLowerCase().includes(lowerSearch))
         );
 
         setFilteredProducts(filtered);

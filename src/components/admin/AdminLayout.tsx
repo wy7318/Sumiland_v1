@@ -129,6 +129,7 @@ export function AdminLayout() {
     { path: '/admin/portfolio', icon: Image, label: 'Portfolio' },
     { path: '/admin/reports', icon: BarChart2, label: 'Reports' },
     { path: '/admin/sales-assistant', icon: Zap, label: 'Sales Assistant' },
+    
     ...(hasAdminAccess ? [
       { path: '/admin/products', icon: Package, label: 'Products' },
       { path: '/admin/customflow', icon: Package, label: 'Custom Flows' },

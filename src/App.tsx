@@ -90,6 +90,14 @@ import { GoodsReceiptForm } from './components/admin/purchase/GoodsReceiptForm';
 import { PurchaseOrderStats } from './components/admin/purchase/PurchaseOrderStats';
 import { GoodsReceiptDetails } from './components/admin/purchase/GoodsReceiptDetails';
 
+// Work Order components
+import { WorkOrdersPage } from './components/admin/workorder/WorkOrdersPage';
+import { WorkOrderDetailPage } from './components/admin/workorder/WorkOrderDetailPage';
+import { WorkOrderForm } from './components/admin/workorder/WorkOrderForm';
+
+import { ToastContainer } from './components/admin/Toast'; // Adjust the import path as needed
+
+
 
 
 function App() {
@@ -253,6 +261,11 @@ function App() {
                                     <Route path="customflow" element={<LogicFlowBuilder />} />
                                     <Route path="sales-assistant" element={<SalesAssistantPage />} />
 
+                                        <Route path="work-orders" element={<WorkOrdersPage />} />
+                                        <Route path="work-orders/new" element={<WorkOrderForm />} />
+                                        <Route path="work-orders/:id" element={<WorkOrderDetailPage />} />
+                                        <Route path="work-orders/:id/edit" element={<WorkOrderForm />} />
+
                                         {/* Inventory routes */}
                                         <Route path="inventory">
                                             <Route index element={<InventoryDashboard />} />
@@ -271,6 +284,7 @@ function App() {
                                         
                                 </Route>
                             </Routes>
+                            <ToastContainer />
                         </TimeZoneProvider>
                       </OrganizationProvider>
 
