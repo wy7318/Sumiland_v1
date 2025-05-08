@@ -97,6 +97,9 @@ import { WorkOrderForm } from './components/admin/workorder/WorkOrderForm';
 
 import { ToastContainer } from './components/admin/Toast'; // Adjust the import path as needed
 
+import { OrganizationsPage } from './components/admin/OrganizationsPage';
+
+
 
 
 
@@ -260,6 +263,8 @@ function App() {
                                     <Route path="settings" element={<SettingsPage />} />
                                     <Route path="customflow" element={<LogicFlowBuilder />} />
                                     <Route path="sales-assistant" element={<SalesAssistantPage />} />
+                                    <Route path="org-setting" element={<OrganizationsPage />} />
+                                        
 
                                         <Route path="work-orders" element={<WorkOrdersPage />} />
                                         <Route path="work-orders/new" element={<WorkOrderForm />} />
