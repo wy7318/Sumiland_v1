@@ -41,6 +41,7 @@ type ProductFormData = {
   min_stock_level: string;
   max_stock_level: string;
   avg_cost: string;
+  sku: string; // Added SKU field
   custom_fields?: Record<string, any>;
 };
 
@@ -66,6 +67,7 @@ export function ProductForm() {
     min_stock_level: '0',
     max_stock_level: '',
     avg_cost: '0',
+    sku: '', // Added SKU field with default empty string
   });
 
   useEffect(() => {
@@ -155,6 +157,7 @@ export function ProductForm() {
           min_stock_level: product.min_stock_level?.toString() || '0',
           max_stock_level: product.max_stock_level?.toString() || '',
           avg_cost: product.avg_cost?.toString() || '0',
+          sku: product.sku || '', // Added SKU field loading
         });
       }
     } catch (err) {
@@ -297,6 +300,23 @@ export function ProductForm() {
                   className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200 outline-none transition-all duration-200"
                   placeholder="Enter product name"
                 />
+              </div>
+
+              <div>
+                <label htmlFor="sku" className="block text-sm font-medium text-gray-600 mb-1.5">
+                  SKU
+                </label>
+                <input
+                  type="text"
+                  id="sku"
+                  value={formData.sku}
+                  onChange={(e) => setFormData(prev => ({ ...prev, sku: e.target.value }))}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200 outline-none transition-all duration-200"
+                  placeholder="Enter product SKU"
+                />
+                <p className="mt-2 text-sm text-gray-500">
+                  Unique identifier for inventory tracking
+                </p>
               </div>
 
               <div>

@@ -6,7 +6,7 @@ import {
   Edit, AlertCircle, FileText, Package, DollarSign, User,
   ChevronDown, ChevronUp, Send, Reply, X,
   UserCheck, Clock, Target, Globe, LinkIcon,
-  Briefcase, MessageSquare, Bookmark, Tag,
+  Briefcase, MessageSquare, Bookmark, Tag, Scale,
   Flag, Star, Percent, MapPin, FileBarChart2
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
