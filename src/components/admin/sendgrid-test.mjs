@@ -12,7 +12,7 @@ import { promises as fs } from 'fs';
 dotenv.config();
 
 // Set your SendGrid API key
-const SENDGRID_API_KEY = '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';
+const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
 if (!SENDGRID_API_KEY) {
     console.error('SENDGRID_API_KEY environment variable is not set');
     console.log('Create a .env file with SENDGRID_API_KEY=your_api_key');
