@@ -712,7 +712,7 @@ export function FoldableEmailModal({
                 onClick={e => e.stopPropagation()}
             >
                 <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-xl font-semibold">Send Email</h2>
+                    <h2 className="text-xl font-semibold">Send Email2</h2>
                     <div className="flex space-x-2">
                         <button
                             onClick={onMinimize}
