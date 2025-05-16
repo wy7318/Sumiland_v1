@@ -23,6 +23,7 @@ import { EmailModal } from './EmailModal';
 import { getEmailConfig } from '../../lib/email';
 import { SquarePaymentLinkButton } from './SquarePaymentLinkButton';
 import { TestSquareWebhookButton } from './TestSquareWebhookButton';
+import { OrderEmailPDF } from './OrderEmailPDF';
 
 
 type Order = {
@@ -455,6 +456,16 @@ export function OrderDetailPage() {
 
           {/* Right buttons group */}
           <div className="flex space-x-3">
+            <OrderEmailPDF
+              order={order}
+              organizationName={selectedOrganization?.name}
+              organizationLogo={selectedOrganization?.logo_url}
+              orgId={selectedOrganization?.id}
+              onEmailSuccess={() => {
+                // Refresh the email list after successful send
+                setRefreshEmailList(prev => prev + 1);
+              }}
+            />
             <Link
               to={`/admin/tasks/new?module=order_hdr&recordId=${id}`}
               className="inline-flex items-center px-5 py-2.5 text-sm font-medium rounded-full text-white bg-green-600 hover:bg-green-700 transition-colors shadow-sm"

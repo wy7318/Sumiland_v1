@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Send, AlertCircle, Sparkles, Bot, Copy, Minimize2, Maximize2, Mail, AtSign, CheckCircle, Info } from 'lucide-react';
+import { X, Send, AlertCircle, Sparkles, Bot, Copy, Minimize2, Maximize2, Mail, AtSign, CheckCircle, Info, Paperclip } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import 'react-quill/dist/quill.snow.css';
 import ReactQuill from 'react-quill';
@@ -15,6 +15,8 @@ import {
     EmailConfig
 } from '../../lib/email';
 import { generateContent } from '../../services/aiService';
+import { pdf } from '@react-pdf/renderer';
+import PurchaseOrderPDF from '../admin/purchase/PurchaseOrderPDF';
 
 // Define fallback models in case OPENAI_MODELS is not available
 const AI_MODELS = {
@@ -39,11 +41,18 @@ type Props = {
     caseTitle?: string;
     orgId?: string;
     caseId?: string;
-    isVisible: boolean; // New prop to control visibility
-    onMinimize: () => void; // New prop for minimizing
-    onMaximize: () => void; // New prop for maximizing
+    isVisible: boolean;
+    onMinimize: () => void;
+    onMaximize: () => void;
+    // Add purchase order and organization properties
+    purchaseOrder?: any; // Purchase order object for attachment
+    organizationName?: string; // Organization name for PDF
+    organizationLogo?: string; // Organization logo for PDF
+    existingPdfAttachment?: Blob | null;
+    attachmentName?: string;
+    quote?: any; // Quote object
+    order?: any; // Order object - Add this new prop
 };
-
 const modules = {
     toolbar: [
         [{ header: [1, 2, 3, false] }],
@@ -96,14 +105,25 @@ export function FoldableEmailModal({
     caseId,
     isVisible,
     onMinimize,
-    onMaximize
+    onMaximize,
+    purchaseOrder,
+    organizationName,
+    organizationLogo,
+    existingPdfAttachment = null,        // Add default value here
+    quote,
+    order
 }: Props) {
     const { user } = useAuth();
     const [body, setBody] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [subject, setSubject] = useState(caseTitle ? `[${caseTitle}]` : '');
-    const [toAddress, setToAddress] = useState(to);
+    // Update default subject to include PO number if available
+    const [subject, setSubject] = useState(
+        purchaseOrder
+            ? `Purchase Order #${purchaseOrder.order_number} from ${organizationName || 'our company'}`
+            : (caseTitle ? `[${caseTitle}]` : '')
+    );
+    const [toAddress, setToAddress] = useState(to || (purchaseOrder?.vendors?.email || ''));
     const [cc, setCc] = useState('');
     const [bcc, setBcc] = useState('');
     const [showCcBcc, setShowCcBcc] = useState(false);
@@ -122,6 +142,12 @@ export function FoldableEmailModal({
     const [aiTarget, setAiTarget] = useState<'subject' | 'body'>('body');
     const [aiTone, setAiTone] = useState('professional');
 
+    // Add states for PDF attachment
+    const [pdfAttachment, setPdfAttachment] = useState<Blob | null>(null);
+    const [attachmentName, setAttachmentName] = useState<string>('');
+    const [generatingPdf, setGeneratingPdf] = useState(false);
+    const [pdfReady, setPdfReady] = useState(false);
+
     // Always use GPT-3.5 Turbo by default and don't allow changing it
     const aiModel = OPENAI_MODELS.GPT_3_5_TURBO;
     const quillRef = useRef<any>(null);
@@ -129,6 +155,136 @@ export function FoldableEmailModal({
 
     const [isAddingEmailAccount, setIsAddingEmailAccount] = useState(false);
     const [temporaryMessage, setTemporaryMessage] = useState<string | null>(null);
+    const [isRemoving, setIsRemoving] = useState(false);
+
+    // If using an existing PDF attachment
+    useEffect(() => {
+        // Safe access with optional chaining and default parameters
+        const pdfAttachment = existingPdfAttachment || null;
+        const name = attachmentName || '';
+
+        if (pdfAttachment && name) {
+            setPdfAttachment(pdfAttachment);
+            setAttachmentName(name);
+            setPdfReady(true);
+        }
+    }, [existingPdfAttachment, attachmentName]);
+
+    // Additionally, make sure your component unmounts cleanly by adding this useEffect
+    useEffect(() => {
+        // Cleanup function for unmounting
+        return () => {
+            // Clear all PDF-related state when component unmounts
+            setPdfAttachment(null);
+            setAttachmentName('');
+            setPdfReady(false);
+        };
+    }, []);
+
+
+
+    // Add this useEffect to handle order emails - add it after the Quote useEffect
+    useEffect(() => {
+        if (order && !body) {
+            const defaultBody =
+                `<p>Dear ${order.customer?.first_name || 'Customer'},</p>
+            <p>Please find attached your Order #${order.order_number}.</p>
+            <p>Order Details:</p>
+            <ul>
+              <li>Order Number: #${order.order_number}</li>
+              <li>Order Date: ${new Date(order.created_at).toLocaleDateString()}</li>
+              <li>Total Amount: ${new Intl.NumberFormat('en-US', {
+                    style: 'currency',
+                    currency: 'USD'
+                }).format(order.total_amount)}</li>
+              ${order.payment_status !== 'Fully Received' ?
+                    `<li>Amount Due: ${new Intl.NumberFormat('en-US', {
+                        style: 'currency',
+                        currency: 'USD'
+                    }).format(order.total_amount - order.payment_amount)}</li>` :
+                    `<li>Payment Status: Paid in Full</li>`}
+            </ul>
+            <p>Please review the attached order document and let us know if you have any questions or concerns.</p>
+            <p>Thank you for your business,<br>${organizationName || 'Our Company'}</p>`;
+
+            setBody(defaultBody);
+
+            // Set default subject to include order number
+            if (!subject || subject === (caseTitle ? `[${caseTitle}]` : '')) {
+                setSubject(`Order #${order.order_number} from ${organizationName || 'our company'}`);
+            }
+        }
+    }, [order, organizationName]);
+
+    // Update default subject and body if quote is provided
+    useEffect(() => {
+        if (quote && !body) {
+            const defaultBody =
+                `<p>Dear ${quote.customer?.first_name || 'Customer'},</p>
+        <p>Please find attached our quotation #${quote.quote_number}.</p>
+        <p>Quote Details:</p>
+        <ul>
+          <li>Quote Number: #${quote.quote_number}</li>
+          <li>Quote Date: ${new Date(quote.quote_date).toLocaleDateString()}</li>
+          <li>Total Amount: ${new Intl.NumberFormat('en-US', {
+                    style: 'currency',
+                    currency: 'USD'
+                }).format(quote.total_amount)}</li>
+          ${quote.expire_at ?
+                    `<li>Valid Until: ${new Date(quote.expire_at).toLocaleDateString()}</li>` : ''}
+        </ul>
+        <p>Please review the attached quotation and let us know if you have any questions or would like to proceed.</p>
+        <p>Thank you for your business,<br>${organizationName || 'Our Company'}</p>`;
+
+            setBody(defaultBody);
+
+            // Set default subject to include quote number
+            if (!subject || subject === (caseTitle ? `[${caseTitle}]` : '')) {
+                setSubject(`Quotation #${quote.quote_number} from ${organizationName || 'our company'}`);
+            }
+        }
+    }, [quote, organizationName]);
+
+
+    // Update default body text if purchase order exists
+    useEffect(() => {
+        if (purchaseOrder && !body) {
+            const defaultBody =
+                `<p>Dear ${purchaseOrder.vendors?.contact_person || purchaseOrder.vendors?.name || 'Vendor'},</p>
+                <p>Please find attached our Purchase Order #${purchaseOrder.order_number}.</p>
+                <p>Order Details:</p>
+                <ul>
+                <li>Purchase Order: #${purchaseOrder.order_number}</li>
+                <li>Order Date: ${new Date(purchaseOrder.order_date).toLocaleDateString()}</li>
+                <li>Total Amount: ${new Intl.NumberFormat('en-US', {
+                    style: 'currency',
+                    currency: 'USD'
+                }).format(purchaseOrder.total_amount)}</li>
+                ${purchaseOrder.expected_delivery_date ?
+                    `<li>Expected Delivery: ${new Date(purchaseOrder.expected_delivery_date).toLocaleDateString()}</li>` : ''}
+                </ul>
+                <p>Please confirm receipt of this order and the expected delivery date.</p>
+                <p>Thank you,<br>${organizationName || 'Our Company'}</p>`;
+
+            setBody(defaultBody);
+        }
+    }, [purchaseOrder, organizationName]);
+
+    // Generate PDF on component mount if purchase order exists
+    useEffect(() => {
+        if (purchaseOrder && !pdfAttachment) {
+            generatePdfAttachment();
+        }
+        // Only generate PDF if we don't already have one and the entity exists
+        if (quote && !pdfAttachment && !pdfReady) {
+            console.log("Triggering quote PDF generation from effect");
+            generateQuotePdf();
+        }
+        if (order && !pdfAttachment && !pdfReady) {
+            console.log("Triggering order PDF generation from effect");
+            generateOrderPdf();
+        }
+    }, [purchaseOrder, quote, order]);
 
     useEffect(() => {
         if (temporaryMessage) {
@@ -177,6 +333,193 @@ export function FoldableEmailModal({
             document.removeEventListener('mousedown', handleClickOutside);
         };
     }, [isVisible, onMinimize]);
+
+    // First, add this function inside the component
+    const removeAttachment = () => {
+        try {
+            // Set removing flag to true to prevent re-generation
+            setIsRemoving(true);
+            console.log("Starting attachment removal");
+
+            // First set PDF ready to false
+            setPdfReady(false);
+
+            // Then clear attachmentName
+            setAttachmentName('');
+
+            // Clear PDF attachment immediately
+            setPdfAttachment(null);
+
+            console.log("Attachment successfully removed");
+
+            // Keep the removing flag on for a short while to prevent accidental regeneration
+            setTimeout(() => {
+                setIsRemoving(false);
+            }, 500);
+        } catch (error) {
+            console.error("Error removing attachment:", error);
+            setError("Failed to remove attachment. Please try again.");
+            setIsRemoving(false);
+        }
+    };
+
+    // Generate PDF attachment
+    const generatePdfAttachment = async () => {
+        if (!purchaseOrder) return;
+
+        try {
+            setGeneratingPdf(true);
+
+            // Create the PDF document using the PurchaseOrderPDF component
+            const pdfDoc = (
+                <PurchaseOrderPDF
+                    purchaseOrder={purchaseOrder}
+                    organizationName={organizationName || 'Your Company'}
+                    organizationLogo={organizationLogo}
+                />
+            );
+
+            // Generate PDF blob
+            const pdfBlob = await pdf(pdfDoc).toBlob();
+
+            // Set the attachment
+            setPdfAttachment(pdfBlob);
+            setAttachmentName(`PO_${purchaseOrder.order_number}_${purchaseOrder.vendors?.name || 'Vendor'}.pdf`);
+            setPdfReady(true);
+
+        } catch (error) {
+            console.error("Error generating PDF attachment:", error);
+            setError("Failed to generate PDF attachment. Please try again.");
+        } finally {
+            setGeneratingPdf(false);
+        }
+    };
+
+    // Add this generateOrderPdf function with proper error handling
+    const generateOrderPdf = async () => {
+        if (!order) return;
+
+        try {
+            setGeneratingPdf(true);
+            console.log("Generating order PDF...");
+
+            // Create a reference to hold the OrderPDF module
+            let OrderPDF;
+
+            try {
+                // Try to import it from the most likely location first
+                const module = await import('../admin/OrderPDF');
+                OrderPDF = module.default;
+                console.log("Successfully imported OrderPDF from admin/orders");
+            } catch (importError) {
+                console.warn("Failed to import from admin/orders/OrderPDF, trying alternate path...", importError);
+
+                try {
+                    // Try an alternate path
+                    const module = await import('../admin/OrderPDF');
+                    OrderPDF = module.default;
+                    console.log("Successfully imported OrderPDF from admin");
+                } catch (secondImportError) {
+                    console.error("Failed to import OrderPDF from alternate path", secondImportError);
+                    // Try one more path
+                    const module = await import('./OrderPDF');
+                    OrderPDF = module.default;
+                    console.log("Successfully imported OrderPDF from current directory");
+                }
+            }
+
+            if (!OrderPDF) {
+                throw new Error("Could not import OrderPDF component");
+            }
+
+            // Create the PDF document using the OrderPDF component
+            const pdfDoc = (
+                <OrderPDF
+                    order={order}
+                    organizationName={organizationName || 'Your Company'}
+                    organizationLogo={organizationLogo}
+                />
+            );
+
+            // Generate PDF blob
+            const pdfBlob = await pdf(pdfDoc).toBlob();
+            console.log("PDF blob generated successfully", pdfBlob);
+
+            // Set the attachment
+            setPdfAttachment(pdfBlob);
+            setAttachmentName(`Order_${order.order_number}_${order.customer?.first_name || 'Customer'}.pdf`);
+            setPdfReady(true);
+
+        } catch (error) {
+            console.error("Error generating PDF attachment:", error);
+            setError(`Failed to generate PDF: ${error.message}`);
+        } finally {
+            setGeneratingPdf(false);
+        }
+    };
+
+    // Add this function below the generatePdfAttachment function in your component
+    const generateQuotePdf = async () => {
+        if (!quote) return;
+
+        try {
+            setGeneratingPdf(true);
+            console.log("Generating quote PDF...");
+
+            // Create a reference to hold the QuotePDF module
+            let QuotePDF;
+
+            try {
+                // Try to import it from the most likely location first
+                const module = await import('../admin/QuotePDF');
+                QuotePDF = module.default;
+                console.log("Successfully imported QuotePDF from admin/quotes");
+            } catch (importError) {
+                console.warn("Failed to import from admin/quotes/QuotePDF, trying alternate path...", importError);
+
+                try {
+                    // Try an alternate path
+                    const module = await import('../admin/QuotePDF');
+                    QuotePDF = module.default;
+                    console.log("Successfully imported QuotePDF from admin");
+                } catch (secondImportError) {
+                    console.error("Failed to import QuotePDF from alternate path", secondImportError);
+                    // Try one more path
+                    const module = await import('./QuotePDF');
+                    QuotePDF = module.default;
+                    console.log("Successfully imported QuotePDF from current directory");
+                }
+            }
+
+            if (!QuotePDF) {
+                throw new Error("Could not import QuotePDF component");
+            }
+
+            // Create the PDF document using the QuotePDF component
+            const pdfDoc = (
+                <QuotePDF
+                    quote={quote}
+                    organizationName={organizationName || 'Your Company'}
+                    organizationLogo={organizationLogo}
+                />
+            );
+
+            // Generate PDF blob
+            const pdfBlob = await pdf(pdfDoc).toBlob();
+            console.log("PDF blob generated successfully", pdfBlob);
+
+            // Set the attachment
+            setPdfAttachment(pdfBlob);
+            setAttachmentName(`Quote_${quote.quote_number}_${quote.customer?.first_name || 'Customer'}.pdf`);
+            setPdfReady(true);
+
+        } catch (error) {
+            console.error("Error generating PDF attachment:", error);
+            setError(`Failed to generate PDF: ${error.message}`);
+        } finally {
+            setGeneratingPdf(false);
+        }
+    };
 
     const fetchEmailConfigurations = async () => {
         if (!user) return;
@@ -373,6 +716,18 @@ export function FoldableEmailModal({
                 return;
             }
 
+            // Prepare attachments if we have a PDF
+            const attachments = [];
+
+            // Add the PO PDF if available
+            if (pdfAttachment && attachmentName && pdfReady) {
+                attachments.push({
+                    filename: attachmentName,
+                    content: pdfAttachment,
+                    contentType: 'application/pdf'
+                });
+            }
+
 
 
             // Token is valid, send the email
@@ -385,7 +740,8 @@ export function FoldableEmailModal({
                 bcc,
                 orgId,
                 caseId,
-                selectedConfigId !== null ? selectedConfigId : undefined
+                selectedConfigId !== null ? selectedConfigId : undefined,
+                attachments.length > 0 ? attachments : undefined
             );
             onSuccess();
             resetForm();
@@ -496,6 +852,11 @@ export function FoldableEmailModal({
             // Add context about the case if available
             if (caseTitle) {
                 contextPrompt = `${contextPrompt}\n\nThis email is regarding: ${caseTitle}`;
+            }
+
+            // Add context about purchase order if available
+            if (purchaseOrder) {
+                contextPrompt = `${contextPrompt}\n\nThis email is regarding Purchase Order #${purchaseOrder.order_number} with total amount ${purchaseOrder.total_amount} for vendor ${purchaseOrder.vendors?.name || 'unknown'}.`;
             }
 
             // Different instruction based on target (subject or body)
@@ -625,6 +986,74 @@ export function FoldableEmailModal({
         }
     };
 
+    // Fix for FoldableEmailModal component
+
+    // 1. Update the attachment section condition to include 'order'
+    {
+        (quote || purchaseOrder || order) && (
+            <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Attachments
+                </label>
+
+                <div className="p-3 border border-gray-200 rounded-lg bg-gray-50">
+                    {generatingPdf ? (
+                        <div className="flex items-center text-gray-500">
+                            <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-primary-600 mr-2"></div>
+                            Generating PDF attachment...
+                        </div>
+                    ) : pdfReady ? (
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center">
+                                <Paperclip className="w-4 h-4 text-gray-500 mr-2" />
+                                <span className="text-sm font-medium">{attachmentName}</span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <div className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
+                                    Ready to send
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={removeAttachment}
+                                    className="text-red-500 hover:text-red-700"
+                                    title="Remove attachment"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (purchaseOrder) {
+                                    generatePdfAttachment();
+                                } else if (quote) {
+                                    generateQuotePdf();
+                                } else if (order) {
+                                    generateOrderPdf();
+                                }
+                            }}
+                            className="text-sm text-blue-600 hover:text-blue-800 flex items-center"
+                        >
+                            <Paperclip className="w-4 h-4 mr-1" />
+                            {purchaseOrder
+                                ? "Generate Purchase Order PDF"
+                                : quote
+                                    ? "Generate Quote PDF"
+                                    : order
+                                        ? "Generate Order PDF"
+                                        : "Add Attachment"
+                            }
+                        </button>
+                    )}
+                </div>
+            </div>
+        )
+    }
+
+    
+
 
 
     const handleAddEmailAccount = async (provider: 'gmail' | 'outlook') => {
@@ -690,6 +1119,12 @@ export function FoldableEmailModal({
                         From: {getSelectedConfig()?.email}
                     </div>
                 )}
+                {pdfReady && (
+                    <div className="text-xs text-green-600 truncate mt-1 flex items-center">
+                        <Paperclip className="w-3 h-3 mr-1" />
+                        {attachmentName || "PO Attachment"}
+                    </div>
+                )}
             </div>
         </motion.div>
     );
@@ -712,7 +1147,7 @@ export function FoldableEmailModal({
                 onClick={e => e.stopPropagation()}
             >
                 <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-xl font-semibold">Send Email2</h2>
+                    <h2 className="text-xl font-semibold">Send Email</h2>
                     <div className="flex space-x-2">
                         <button
                             onClick={onMinimize}
@@ -861,6 +1296,78 @@ export function FoldableEmailModal({
                             required
                         />
                     </div>
+
+                    {/* Attachment section */}
+                    {/* Attachment section */}
+                    {(quote || purchaseOrder || order) && (
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Attachments
+                            </label>
+
+                            <div className="p-3 border border-gray-200 rounded-lg bg-gray-50">
+                                {generatingPdf ? (
+                                    <div className="flex items-center text-gray-500">
+                                        <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-primary-600 mr-2"></div>
+                                        Generating PDF attachment...
+                                    </div>
+                                ) : pdfReady && pdfAttachment ? (
+                                    // Added pdfAttachment check to ensure it exists
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center">
+                                            <Paperclip className="w-4 h-4 text-gray-500 mr-2" />
+                                            <span className="text-sm font-medium">{attachmentName}</span>
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                            <div className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
+                                                Ready to send
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={removeAttachment}
+                                                className="text-red-500 hover:text-red-700"
+                                                title="Remove attachment"
+                                            >
+                                                <X className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            try {
+                                                // Clear any previous errors
+                                                setError(null);
+
+                                                if (purchaseOrder) {
+                                                    generatePdfAttachment();
+                                                } else if (quote) {
+                                                    generateQuotePdf();
+                                                } else if (order) {
+                                                    generateOrderPdf();
+                                                }
+                                            } catch (error) {
+                                                console.error("Error initiating PDF generation:", error);
+                                                setError("Failed to generate PDF. Please try again.");
+                                            }
+                                        }}
+                                        className="text-sm text-blue-600 hover:text-blue-800 flex items-center"
+                                    >
+                                        <Paperclip className="w-4 h-4 mr-1" />
+                                        {purchaseOrder
+                                            ? "Generate Purchase Order PDF"
+                                            : quote
+                                                ? "Generate Quote PDF"
+                                                : order
+                                                    ? "Generate Order PDF"
+                                                    : "Add Attachment"
+                                        }
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    )}
 
                     <div>
                         <div className="flex justify-between items-center mb-1">

@@ -165,6 +165,7 @@ import { updateSupabaseHeaders } from '../lib/supabase';
 type Organization = {
   id: string;
   name: string;
+  logo_url: string;
   status: string;
   role: string;
 };
