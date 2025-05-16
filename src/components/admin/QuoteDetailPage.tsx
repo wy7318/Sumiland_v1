@@ -20,6 +20,7 @@ import { EmailConfigModal } from './EmailConfigModal';
 import { useEmailComposer } from './EmailProvider';
 import { EmailModal } from './EmailModal';
 import { getEmailConfig } from '../../lib/email';
+import { QuoteEmailPDF } from './QuoteEmailPDF';
 
 type Quote = {
   quote_id: string;
@@ -533,6 +534,14 @@ export function QuoteDetailPage() {
 
           {/* Right buttons group */}
           <div className="flex space-x-3">
+            {/* PDF Export and Email Buttons */}
+            <QuoteEmailPDF
+              quote={quote}
+              organizationName={selectedOrganization?.name}
+              organizationLogo={selectedOrganization?.logo_url}
+              orgId={selectedOrganization?.id}
+            />
+
             {!quote.is_converted ? (
               <button
                 onClick={handleCreateOrder}
@@ -545,7 +554,7 @@ export function QuoteDetailPage() {
             ) : (
               <Link
                 to={`/admin/orders/${quote.converted_to_id}`}
-                  className="inline-flex items-center px-5 py-2.5 text-sm font-medium rounded-full text-white bg-orange-600 hover:bg-orange-700 transition-colors shadow-sm"
+                className="inline-flex items-center px-5 py-2.5 text-sm font-medium rounded-full text-white bg-orange-600 hover:bg-orange-700 transition-colors shadow-sm"
               >
                 <ShoppingBag className="w-4 h-4 mr-2" />
                 View Order

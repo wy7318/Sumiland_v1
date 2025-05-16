@@ -18,6 +18,9 @@ import {
 import { supabase } from '../../../lib/supabase';
 import { cn, formatCurrency, formatDate } from '../../../lib/utils';
 import { useOrganization } from '../../../contexts/OrganizationContext';
+import PurchaseOrderPDF, { PurchaseOrderPDFDownloadLink } from './PurchaseOrderPDF';
+import GeneratePDF from '../../../lib/GeneratePDF';
+import { FoldableEmailModal } from '../FoldableEmailModal';
 
 export const PurchaseOrderDetails = () => {
     const { id } = useParams();
@@ -27,6 +30,24 @@ export const PurchaseOrderDetails = () => {
     const [loading, setLoading] = useState(true);
     const [purchaseOrder, setPurchaseOrder] = useState(null);
     const [goodsReceipts, setGoodsReceipts] = useState([]);
+
+    // Added state for PDF generation
+    const [generatingPdf, setGeneratingPdf] = useState(false);
+
+    const [showEmailModal, setShowEmailModal] = useState(false);
+    const [isEmailMinimized, setIsEmailMinimized] = useState(false);
+    // Add the email handling functions
+    const handleSendPOEmail = () => {
+        setShowEmailModal(true);
+        setIsEmailMinimized(false);
+    };
+
+    const handleEmailSuccess = () => {
+        setShowEmailModal(false);
+        // Show success message or notification
+        // You can use any notification system your app has
+        alert("Purchase order sent successfully!");
+    };
 
     const [showStatusDropdown, setShowStatusDropdown] = useState(false);
     const [updatingStatus, setUpdatingStatus] = useState(false);
@@ -205,6 +226,14 @@ export const PurchaseOrderDetails = () => {
         return subtotal + taxTotal + shipping - discount;
     };
 
+    // Generate PDF filename
+    const getPdfFilename = () => {
+        const vendorName = purchaseOrder.vendors?.name
+            ? purchaseOrder.vendors.name.replace(/\s+/g, '_')
+            : 'Vendor';
+        return `PO_${purchaseOrder.order_number}_${vendorName}.pdf`;
+    };
+
 
     // Calculate received quantities and remaining quantities
     const itemsStatus = purchaseOrder.purchase_order_items.map(item => {
@@ -269,26 +298,30 @@ export const PurchaseOrderDetails = () => {
                         </motion.button>
                     )}
 
-                    <motion.button
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        className="bg-gray-800 text-white px-4 py-2 rounded-lg flex items-center"
-                        onClick={() => {/* PDF export functionality would go here */ }}
-                    >
-                        <Download className="w-5 h-5 mr-2" />
-                        Export PDF
-                    </motion.button>
+                    {/* Updated PDF export button */}
+                    <GeneratePDF
+                        document={
+                            <PurchaseOrderPDF
+                                purchaseOrder={purchaseOrder}
+                                organizationName={selectedOrganization?.name || 'Your Organization'}
+                                organizationLogo={selectedOrganization?.logo_url || null}
+                            />
+                        }
+                        fileName={getPdfFilename()}
+                        buttonText="Export PDF"
+                        className="bg-gray-800 text-white px-4 py-2 rounded-lg flex items-center hover:bg-gray-700"
+                    />
 
                     {purchaseOrder.vendors?.email && (
                         <motion.button
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
                             className="bg-blue-500 text-white px-4 py-2 rounded-lg flex items-center"
-                            onClick={() => {/* Email sending functionality would go here */ }}
+                            onClick={handleSendPOEmail}
                         >
                             <Mail className="w-5 h-5 mr-2" />
                             Email Vendor
-                        </motion.button>
+                      </motion.button>
                     )}
                 </div>
             </div>
@@ -635,6 +668,8 @@ export const PurchaseOrderDetails = () => {
                                             </table>
                                         </div>
 
+                                        
+
                                         {receipt.notes && (
                                             <div className="mt-3 pt-3 border-t border-gray-200">
                                                 <p className="text-sm text-gray-600">{receipt.notes}</p>
@@ -644,9 +679,26 @@ export const PurchaseOrderDetails = () => {
                                 ))}
                             </div>
                         )}
+
+                        
                     </div>
                 </div>
             </div>
+            {/* ADD THE EMAIL MODAL RIGHT HERE, before the closing div */}
+            {showEmailModal && (
+                <FoldableEmailModal
+                    to={purchaseOrder.vendors?.email || ''}
+                    onClose={() => setShowEmailModal(false)}
+                    onSuccess={handleEmailSuccess}
+                    isVisible={!isEmailMinimized}
+                    onMinimize={() => setIsEmailMinimized(true)}
+                    onMaximize={() => setIsEmailMinimized(false)}
+                    orgId={selectedOrganization?.id}
+                    purchaseOrder={purchaseOrder}
+                    organizationName={selectedOrganization?.name}
+                    organizationLogo={selectedOrganization?.logo_url}
+                />
+            )}
         </div>
     );
 };
