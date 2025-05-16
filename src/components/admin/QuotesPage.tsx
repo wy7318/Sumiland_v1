@@ -205,7 +205,7 @@ function QuoteCard({ quote, onStatusChange, statuses, handleDelete, handleDuplic
                 <Trash2 className="w-4 h-4" />
               </button>
             </div>
-            <div className="flex justify-center pt-1">
+            {/* <div className="flex justify-center pt-1">
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -218,7 +218,7 @@ function QuoteCard({ quote, onStatusChange, statuses, handleDelete, handleDuplic
                 <FileDown className="w-4 h-4" />
                 <span className="text-xs">Download PDF</span>
               </button>
-            </div>
+            </div> */}
           </div>
         )}
       </div>
@@ -792,7 +792,7 @@ export function QuotesPage() {
                             >
                               <ShoppingBag className="w-4 h-4" />
                             </button>
-                            <button
+                            {/* <button
                               onClick={() => {
                                 const doc = generateQuotePDF(quote);
                                 doc.save(`${quote.quote_number}.pdf`);
@@ -801,7 +801,7 @@ export function QuotesPage() {
                               title="Download PDF"
                             >
                               <FileDown className="w-4 h-4" />
-                            </button>
+                            </button> */}
                             <Link
                               to={`/admin/quotes/${quote.quote_id}/edit`}
                               className="p-1.5 bg-amber-50 text-amber-600 rounded-full hover:bg-amber-100 transition-colors"
