@@ -100,7 +100,12 @@ import { ToastContainer } from './components/admin/Toast'; // Adjust the import 
 import { OrganizationsPage } from './components/admin/OrganizationsPage';
 
 
-
+import MenuManagement from './components/admin/restaurant/MenuManagement';
+import TagsManagement from './components/admin/restaurant/TagsManagement';
+import OptionsManagement from './components/admin/restaurant/OptionsManagement';
+import RestaurantSettings from './components/admin/restaurant/RestaurantSettings';
+import OnlineOrdering from './components/admin/restaurant/OnlineOrdering';
+import BookingsManagement from './components/admin/restaurant/BookingsManagement';
 
 
 function App() {
@@ -264,6 +269,13 @@ function App() {
                                     <Route path="customflow" element={<LogicFlowBuilder />} />
                                     <Route path="sales-assistant" element={<SalesAssistantPage />} />
                                     <Route path="org-setting" element={<OrganizationsPage />} />
+
+                                    <Route index element={<RestaurantSettings />} />
+                                    <Route path="restaurant/menu" element={<MenuManagement />} />
+                                    <Route path="restaurant/tags" element={<TagsManagement />} />
+                                    <Route path="restaurant/options" element={<OptionsManagement />} />
+                                    <Route path="restaurant/ordering" element={<OnlineOrdering />} />
+                                    <Route path="restaurant/bookings" element={<BookingsManagement />} />
                                         
 
                                         <Route path="work-orders" element={<WorkOrdersPage />} />
