@@ -108,6 +108,11 @@ import OnlineOrdering from './components/admin/restaurant/OnlineOrdering';
 import BookingsManagement from './components/admin/restaurant/BookingsManagement';
 
 
+import RestaurantStorePage from './pages/RestaurantStorePage';
+import OrderTrackingPage from './pages/OrderTrackingPage';
+import RestaurantListPage from './pages/RestaurantListPage';
+import NotFoundPage from './pages/NotFoundPage';
+
 function App() {
     const { scrollYProgress } = useScroll();
 
@@ -156,6 +161,13 @@ function App() {
                                         </div>
                                     }
                                 />
+                                <Route path="/online-order" element={<RestaurantListPage />} />
+                                <Route path="/online-order/store/:slug" element={<RestaurantStorePage />} />
+                                <Route path="/online-order/store/:slug/track/:orderId" element={<OrderTrackingPage />} />
+                                <Route path="*" element={<NotFoundPage />} />
+
+
+
                                 <Route path="/" element={<HomePage />} />
                                 <Route path="/blog" element={<BlogPage />} />
                                 <Route path="/blog/:slug" element={<BlogPost />} />
