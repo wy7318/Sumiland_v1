@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { SEO } from './SEO';
 import { HeroSection } from './HeroSection';
+import { CRMWorkflowSection } from './CRMWorkflowSection'; // New component
 import { FeaturesHubSection } from './FeaturesHubSection';
 import { ServicesSection } from './ServicesSection';
 import { TestimonialsSection } from './TestimonialsSection';
@@ -29,7 +30,7 @@ export function HomePage() {
         const elementPosition = element.getBoundingClientRect().top + window.scrollY - offset;
         window.scrollTo({ top: elementPosition, behavior: 'smooth' });
 
-        // Clear scrollTo state from history so it doesn’t re-scroll again
+        // Clear scrollTo state from history so it doesn't re-scroll again
         navigate(location.pathname, { replace: true, state: {} });
       }
     }
@@ -43,16 +44,24 @@ export function HomePage() {
         keywords="CRM, customer relationship management, analytics, business intelligence, sales automation, customer support, business growth"
       />
 
-      <main className="bg-gradient-to-b from-gray-900 via-primary-900 to-gray-900 text-white">
+      <main>
+        {/* Hero Section - White background */}
         <HeroSection />
-        <FeaturesHubSection />
-        <ServicesSection />
-        {/* <TestimonialsSection /> */}
-        <PricingSection />
-        {/* <IntegrationsSection /> */}
-        <FAQSection />
-        <ContactSection />
-        <FooterSection />
+
+        {/* NEW: Motion Graphics Section - Shows workflow animation */}
+        <CRMWorkflowSection />
+
+        {/* Rest of your sections with the original dark theme */}
+        <div className="bg-gradient-to-b from-gray-900 via-primary-900 to-gray-900 text-white">
+          <FeaturesHubSection />
+          <ServicesSection />
+          {/* <TestimonialsSection /> */}
+          <PricingSection />
+          {/* <IntegrationsSection /> */}
+          <FAQSection />
+          <ContactSection />
+          <FooterSection />
+        </div>
       </main>
     </>
   );
