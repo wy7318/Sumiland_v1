@@ -324,7 +324,7 @@ import {
   LayoutDashboard, Settings, ShoppingBag, Building2, Truck, ClipboardList,
   BoxSelect as BoxSeam, UserCog, Home, UserPlus, UserCheck, Target,
   Search, MoreHorizontal, Zap, BarChart2, CheckSquare, ChevronLeft, ChevronRight,
-  Bell, User, ChevronDown, Globe
+  Bell, User, ChevronDown, Globe, Utensils, Calendar
 } from 'lucide-react';
 import { getCurrentUser, signOut } from '../../lib/auth';
 import { cn } from '../../lib/utils';
@@ -404,7 +404,8 @@ export function AdminLayout() {
             module_sales_assistant,
             module_products,
             module_user_management,
-            module_org_management
+            module_org_management,
+            module_restaurant
           `)
           .eq('id', selectedOrganization.id)
           .single();
@@ -502,6 +503,12 @@ export function AdminLayout() {
         return "bg-violet-50 text-violet-600 border-l-4 border-violet-500";
       case 'Web':
         return "bg-indigo-50 text-indigo-600 border-l-4 border-indigo-500";
+      case 'Restaurant':
+        return "bg-orange-50 text-orange-600 border-l-4 border-orange-500";
+      case 'Restaurant Menu':
+        return "bg-orange-50 text-orange-600 border-l-4 border-orange-500";
+      case 'Menu Management':
+        return "bg-orange-50 text-orange-600 border-l-4 border-orange-500";
       default:
         return "bg-primary-100 text-primary-700 border-l-4 border-primary-500";
     }
@@ -579,6 +586,42 @@ export function AdminLayout() {
       icon: CheckSquare,
       label: 'Tasks',
       moduleFlag: 'module_tasks'
+    },
+    {
+      type: 'group',
+      id: 'restaurant-group',
+      icon: Utensils,
+      label: 'Restaurant',
+      children: [
+        {
+          type: 'item',
+          path: '/admin/restaurant',
+          icon: Settings,
+          label: 'Settings',
+          moduleFlag: 'module_restaurant'
+        },
+        {
+          type: 'item',
+          path: '/admin/restaurant/menu',
+          icon: FileText,
+          label: 'Menu Management',
+          moduleFlag: 'module_restaurant'
+        },
+        {
+          type: 'item',
+          path: '/admin/restaurant/ordering',
+          icon: ShoppingBag,
+          label: 'Online Ordering',
+          moduleFlag: 'module_restaurant'
+        },
+        {
+          type: 'item',
+          path: '/admin/restaurant/bookings',
+          icon: Calendar,
+          label: 'Bookings',
+          moduleFlag: 'module_restaurant'
+        }
+      ]
     },
     {
       type: 'item',

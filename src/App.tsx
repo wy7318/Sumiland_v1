@@ -100,8 +100,18 @@ import { ToastContainer } from './components/admin/Toast'; // Adjust the import 
 import { OrganizationsPage } from './components/admin/OrganizationsPage';
 
 
+import MenuManagement from './components/admin/restaurant/MenuManagement';
+import TagsManagement from './components/admin/restaurant/TagsManagement';
+import OptionsManagement from './components/admin/restaurant/OptionsManagement';
+import RestaurantSettings from './components/admin/restaurant/RestaurantSettings';
+import OnlineOrdering from './components/admin/restaurant/OnlineOrdering';
+import BookingsManagement from './components/admin/restaurant/BookingsManagement';
 
 
+import RestaurantStorePage from './pages/RestaurantStorePage';
+import OrderTrackingPage from './pages/OrderTrackingPage';
+import RestaurantListPage from './pages/RestaurantListPage';
+import NotFoundPage from './pages/NotFoundPage';
 
 function App() {
     const { scrollYProgress } = useScroll();
@@ -151,6 +161,13 @@ function App() {
                                         </div>
                                     }
                                 />
+                                <Route path="/online-order" element={<RestaurantListPage />} />
+                                <Route path="/online-order/store/:slug" element={<RestaurantStorePage />} />
+                                <Route path="/online-order/store/:slug/track/:orderId" element={<OrderTrackingPage />} />
+                                <Route path="*" element={<NotFoundPage />} />
+
+
+
                                 <Route path="/" element={<HomePage />} />
                                 <Route path="/blog" element={<BlogPage />} />
                                 <Route path="/blog/:slug" element={<BlogPost />} />
@@ -264,6 +281,13 @@ function App() {
                                     <Route path="customflow" element={<LogicFlowBuilder />} />
                                     <Route path="sales-assistant" element={<SalesAssistantPage />} />
                                     <Route path="org-setting" element={<OrganizationsPage />} />
+
+                                    <Route index element={<RestaurantSettings />} />
+                                    <Route path="restaurant/menu" element={<MenuManagement />} />
+                                    <Route path="restaurant/tags" element={<TagsManagement />} />
+                                    <Route path="restaurant/options" element={<OptionsManagement />} />
+                                    <Route path="restaurant/ordering" element={<OnlineOrdering />} />
+                                    <Route path="restaurant/bookings" element={<BookingsManagement />} />
                                         
 
                                         <Route path="work-orders" element={<WorkOrdersPage />} />
