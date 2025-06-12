@@ -98,7 +98,6 @@ export function HeroSection() {
             transition={{ duration: 0.6, delay: 0.6 }}
             className="text-center mt-8 text-sm text-gray-500"
           >
-            Trusted by 500+ businesses worldwide
           </motion.div>
         </div>
 

@@ -54,7 +54,7 @@ export function HomePage() {
         {/* Rest of your sections with the original dark theme */}
         <div className="bg-gradient-to-b from-gray-900 via-primary-900 to-gray-900 text-white">
           <FeaturesHubSection />
-          <ServicesSection />
+          {/* <ServicesSection /> */}
           {/* <TestimonialsSection /> */}
           <PricingSection />
           {/* <IntegrationsSection /> */}

@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react';
 import { motion, useInView } from 'framer-motion';
-import { Mail, Phone, MapPin, MessageSquare } from 'lucide-react';
-import { supabase } from '../lib/supabase'; // Make sure you have this import
+import { Mail, Phone, MapPin, MessageSquare, ArrowRight, Check } from 'lucide-react';
+// Note: Make sure you have supabase configured in your project
+import { supabase } from '../lib/supabase';
 
 export function ContactSection() {
   const ref = useRef(null);
@@ -17,13 +18,18 @@ export function ContactSection() {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (e) => {
     const { name, value } = e.target;
     setFormState(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async () => {
+    // Basic validation
+    if (!formState.name.trim() || !formState.email.trim() || !formState.company.trim() || !formState.message.trim()) {
+      setError('Please fill in all required fields.');
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -32,7 +38,7 @@ export function ContactSection() {
       const nameParts = formState.name.trim().split(' ');
       const firstName = nameParts[0] || '';
       const lastName = nameParts.slice(1).join(' ') || '';
-
+      
       // Get default organization (SimpliDone)
       const { data: orgData, error: orgError } = await supabase
         .from('organizations')
@@ -40,7 +46,6 @@ export function ContactSection() {
         .eq('name', 'SimpliDone')
         .single();
 
-      console.log('orgData : ' + orgData);
       if (orgError) throw orgError;
       if (!orgData?.id) throw new Error('Default organization not found');
 
@@ -60,14 +65,14 @@ export function ContactSection() {
           created_by: '9754b84d-c65c-45b8-8f51-a59a9a25edcd',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-          // Set optional tracking information if available in your app
-          // referrer: document.referrer || null,
-          // device_type: detectDeviceType() || null,
-          // browser: detectBrowser() || null,
         }]);
 
       if (leadError) throw leadError;
-      console.log('leadError : ' + leadError);
+      
+
+      // Demo simulation - remove this in production
+      console.log('Demo form submission:', { firstName, lastName, ...formState });
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API delay
 
       setSuccess(true);
       setFormState({
@@ -86,138 +91,123 @@ export function ContactSection() {
   };
 
   return (
-    <section ref={ref} id="contact" className="py-24 relative overflow-hidden">
-      {/* Background gradient */}
-      <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-primary-950 to-gray-900"></div>
+    <section ref={ref} id="contact" className="py-24 relative overflow-hidden bg-black">
+      {/* Subtle Background Pattern */}
+      <div className="absolute inset-0">
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PGNpcmNsZSBjeD0iMiIgY3k9IjIiIHI9IjEiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4xKSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNncmlkKSIvPjwvc3ZnPg==')] opacity-20" />
+      </div>
 
-      {/* Decorative elements */}
-      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary-500 to-transparent"></div>
-      <div className="absolute -top-40 -left-40 w-80 h-80 bg-primary-500/10 rounded-full blur-3xl"></div>
-      <div className="absolute -bottom-40 -right-40 w-80 h-80 bg-primary-500/10 rounded-full blur-3xl"></div>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+      <div className="max-w-6xl mx-auto px-6 lg:px-8 relative z-10">
+        {/* Header */}
         <div className="text-center mb-16">
-          <motion.span
-            initial={{ opacity: 0 }}
-            animate={isInView ? { opacity: 1 } : {}}
-            transition={{ duration: 0.6 }}
-            className="inline-block px-3 py-1 text-sm font-medium bg-primary-900/50 rounded-full text-primary-400 mb-4"
-          >
-            Get In Touch
-          </motion.span>
-
           <motion.h2
-            initial={{ opacity: 0, y: -20 }}
+            initial={{ opacity: 0, y: 20 }}
             animate={isInView ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="text-4xl md:text-5xl font-bold mb-6"
+            transition={{ duration: 0.6 }}
+            className="text-5xl md:text-6xl font-bold text-white mb-6"
           >
-            Ready to <span className="text-primary-400">Transform</span> Your Business?
+            Let's Talk
+            <br />
+            Business.
           </motion.h2>
 
           <motion.p
-            initial={{ opacity: 0 }}
-            animate={isInView ? { opacity: 1 } : {}}
-            transition={{ duration: 0.6, delay: 0.3 }}
-            className="text-xl text-gray-300 max-w-3xl mx-auto"
+            initial={{ opacity: 0, y: 20 }}
+            animate={isInView ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 0.6, delay: 0.1 }}
+            className="text-xl text-gray-300 max-w-2xl mx-auto font-light"
           >
-            Speak with our team about how SimpliDone CRM can help you achieve your business goals.
+            Ready to transform your business? Get in touch with our team.
           </motion.p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+          {/* Contact Info */}
           <motion.div
-            initial={{ opacity: 0, x: -50 }}
+            initial={{ opacity: 0, x: -30 }}
             animate={isInView ? { opacity: 1, x: 0 } : {}}
             transition={{ duration: 0.6, delay: 0.2 }}
             className="lg:col-span-1"
           >
-            <div className="bg-gray-800/50 backdrop-blur-sm rounded-2xl p-8 border border-gray-700/50">
-              <h3 className="text-2xl font-bold mb-6">Contact Information</h3>
+            <div className="space-y-8">
+              <div>
+                <h3 className="text-2xl font-bold text-white mb-8">Get in Touch</h3>
 
-              <div className="space-y-6">
-                <div className="flex items-start gap-4">
-                  <div className="rounded-full bg-primary-900/50 p-3 text-primary-400">
-                    <Mail className="w-5 h-5" />
+                <div className="space-y-6">
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-lg bg-white flex items-center justify-center">
+                      <Mail className="w-6 h-6 text-black" />
+                    </div>
+                    <div>
+                      <h4 className="text-lg font-medium text-white mb-1">Email Us</h4>
+                      <a href="mailto:info@SimpliDone.com" className="text-gray-300 hover:text-white transition-colors">
+                        info@SimpliDone.com
+                      </a>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="text-lg font-medium mb-1">Email Us</h4>
-                    <a href="mailto:info@SimpliDone.com" className="text-gray-300 hover:text-primary-400 transition-colors">
-                      info@SimpliDone.com
-                    </a>
-                  </div>
-                </div>
 
-                <div className="flex items-start gap-4">
-                  <div className="rounded-full bg-primary-900/50 p-3 text-primary-400">
-                    <Phone className="w-5 h-5" />
+                  {/* <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-lg bg-white flex items-center justify-center">
+                      <Phone className="w-6 h-6 text-black" />
+                    </div>
+                    <div>
+                      <h4 className="text-lg font-medium text-white mb-1">Call Us</h4>
+                      <a href="tel:+1234567890" className="text-gray-300 hover:text-white transition-colors">
+                        +1 (234) 567-890
+                      </a>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="text-lg font-medium mb-1">Call Us</h4>
-                    <a href="tel:+1234567890" className="text-gray-300 hover:text-primary-400 transition-colors">
-                      +1 (234) 567-890
-                    </a>
-                  </div>
-                </div>
 
-                <div className="flex items-start gap-4">
-                  <div className="rounded-full bg-primary-900/50 p-3 text-primary-400">
-                    <MapPin className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h4 className="text-lg font-medium mb-1">Visit Us</h4>
-                    <address className="text-gray-300 not-italic">
-                      123 Innovation Way<br />
-                      San Francisco, CA 94103
-                    </address>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-4">
-                  <div className="rounded-full bg-primary-900/50 p-3 text-primary-400">
-                    <MessageSquare className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h4 className="text-lg font-medium mb-1">Live Chat</h4>
-                    <p className="text-gray-300">
-                      Available 24/7 for your support needs
-                    </p>
-                  </div>
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-lg bg-white flex items-center justify-center">
+                      <MessageSquare className="w-6 h-6 text-black" />
+                    </div>
+                    <div>
+                      <h4 className="text-lg font-medium text-white mb-1">Live Support</h4>
+                      <p className="text-gray-300">
+                        24/7 email support available
+                      </p>
+                    </div>
+                  </div> */}
                 </div>
               </div>
 
-              <div className="mt-8">
-                <h4 className="text-lg font-medium mb-4">Follow Us</h4>
-                <div className="flex gap-4">
-                  {['facebook', 'twitter', 'linkedin', 'instagram'].map((social, index) => (
-                    <a
-                      key={index}
-                      href={`#${social}`}
-                      className="bg-gray-700 hover:bg-primary-500 rounded-full w-10 h-10 flex items-center justify-center transition-colors"
-                      aria-label={`Follow us on ${social}`}
-                    >
-                      <span className="sr-only">Follow us on {social}</span>
-                      <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                        <path fillRule="evenodd" d="M12 2C6.477 2 2 6.477 2 12c0 5.523 4.477 10 10 10s10-4.477 10-10c0-5.523-4.477-10-10-10z" clipRule="evenodd" />
-                      </svg>
-                    </a>
-                  ))}
+              <div className="pt-8 border-t border-gray-700">
+                <h4 className="text-lg font-medium text-white mb-4">Why Choose SimpliDone?</h4>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <Check className="w-4 h-4 text-green-400" />
+                    <span className="text-gray-300">14-day free trial</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Check className="w-4 h-4 text-green-400" />
+                    <span className="text-gray-300">Free data migration</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Check className="w-4 h-4 text-green-400" />
+                    <span className="text-gray-300">Personal onboarding</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Check className="w-4 h-4 text-green-400" />
+                    <span className="text-gray-300">No long-term contracts</span>
+                  </div>
                 </div>
               </div>
             </div>
           </motion.div>
 
+          {/* Contact Form */}
           <motion.div
-            initial={{ opacity: 0, x: 50 }}
+            initial={{ opacity: 0, x: 30 }}
             animate={isInView ? { opacity: 1, x: 0 } : {}}
-            transition={{ duration: 0.6, delay: 0.4 }}
+            transition={{ duration: 0.6, delay: 0.3 }}
             className="lg:col-span-2"
           >
-            <div className="bg-gray-800/50 backdrop-blur-sm rounded-2xl p-8 border border-gray-700/50">
-              <h3 className="text-2xl font-bold mb-6">Send Us a Message</h3>
+            <div className="bg-white rounded-2xl p-8 shadow-xl">
+              <h3 className="text-2xl font-bold text-black mb-6">Send Us a Message</h3>
 
               {error && (
-                <div className="mb-6 p-4 bg-red-500/20 border border-red-500/50 rounded-lg text-red-200">
+                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
                   {error}
                 </div>
               )}
@@ -228,26 +218,24 @@ export function ContactSection() {
                   animate={{ opacity: 1, y: 0 }}
                   className="text-center py-12"
                 >
-                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary-500/20 text-primary-400 mb-6">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
+                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 text-green-600 mb-6">
+                    <Check className="w-8 h-8" />
                   </div>
-                  <h4 className="text-2xl font-bold mb-2">Thank You!</h4>
-                  <p className="text-gray-300 mb-6">Your message has been sent successfully.</p>
+                  <h4 className="text-2xl font-bold text-black mb-2">Thank You!</h4>
+                  <p className="text-gray-600 mb-6">Your message has been sent successfully. We'll get back to you soon.</p>
                   <button
                     onClick={() => setSuccess(false)}
-                    className="px-6 py-2 bg-primary-600 hover:bg-primary-700 rounded-lg text-white transition-colors"
+                    className="px-6 py-3 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
                   >
                     Send Another Message
                   </button>
                 </motion.div>
               ) : (
-                <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label htmlFor="name" className="block text-gray-200 mb-2">
-                        Full Name
+                      <label htmlFor="name" className="block text-gray-700 font-medium mb-2">
+                        Full Name *
                       </label>
                       <input
                         type="text"
@@ -256,14 +244,14 @@ export function ContactSection() {
                         value={formState.name}
                         onChange={handleChange}
                         required
-                        className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent text-white"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent text-gray-900 placeholder-gray-500"
                         placeholder="John Doe"
                       />
                     </div>
 
                     <div>
-                      <label htmlFor="email" className="block text-gray-200 mb-2">
-                        Email Address
+                      <label htmlFor="email" className="block text-gray-700 font-medium mb-2">
+                        Email Address *
                       </label>
                       <input
                         type="email"
@@ -272,7 +260,7 @@ export function ContactSection() {
                         value={formState.email}
                         onChange={handleChange}
                         required
-                        className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent text-white"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent text-gray-900 placeholder-gray-500"
                         placeholder="john@example.com"
                       />
                     </div>
@@ -280,8 +268,8 @@ export function ContactSection() {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label htmlFor="company" className="block text-gray-200 mb-2">
-                        Company Name
+                      <label htmlFor="company" className="block text-gray-700 font-medium mb-2">
+                        Company Name *
                       </label>
                       <input
                         type="text"
@@ -290,13 +278,13 @@ export function ContactSection() {
                         value={formState.company}
                         onChange={handleChange}
                         required
-                        className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent text-white"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent text-gray-900 placeholder-gray-500"
                         placeholder="Acme Inc"
                       />
                     </div>
 
                     <div>
-                      <label htmlFor="phone" className="block text-gray-200 mb-2">
+                      <label htmlFor="phone" className="block text-gray-700 font-medium mb-2">
                         Phone Number
                       </label>
                       <input
@@ -305,15 +293,15 @@ export function ContactSection() {
                         name="phone"
                         value={formState.phone}
                         onChange={handleChange}
-                        className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent text-white"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent text-gray-900 placeholder-gray-500"
                         placeholder="+1 (234) 567-890"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label htmlFor="message" className="block text-gray-200 mb-2">
-                      Message
+                    <label htmlFor="message" className="block text-gray-700 font-medium mb-2">
+                      Message *
                     </label>
                     <textarea
                       id="message"
@@ -322,37 +310,65 @@ export function ContactSection() {
                       onChange={handleChange}
                       required
                       rows={6}
-                      className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent text-white resize-none"
-                      placeholder="Let us know how we can help you..."
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent resize-none text-gray-900 placeholder-gray-500"
+                      placeholder="Tell us about your business and how we can help..."
                     ></textarea>
                   </div>
 
-                  <div className="flex items-center">
+                  <div className="flex items-start gap-3">
                     <input
                       type="checkbox"
                       id="consent"
                       required
-                      className="w-4 h-4 rounded text-primary-500 focus:ring-2 focus:ring-offset-0 focus:ring-primary-500 bg-gray-700 border-gray-600"
+                      className="w-4 h-4 mt-1 rounded border-gray-300 text-black focus:ring-2 focus:ring-black bg-white"
                     />
-                    <label htmlFor="consent" className="ml-2 text-gray-300 text-sm">
-                      I agree to the processing of my personal data according to the <a href="#privacy" className="text-primary-400 hover:underline">Privacy Policy</a>.
+                    <label htmlFor="consent" className="text-gray-600 text-sm">
+                      I agree to the processing of my personal data according to the{' '}
+                      <a href="#privacy" className="text-black hover:underline">Privacy Policy</a>.
                     </label>
                   </div>
 
                   <motion.button
-                    whileHover={{ scale: 1.03 }}
-                    whileTap={{ scale: 0.97 }}
-                    type="submit"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    type="button"
+                    onClick={handleSubmit}
                     disabled={loading}
-                    className="w-full py-4 bg-primary-500 hover:bg-primary-600 text-white rounded-lg font-medium transition-colors disabled:opacity-70"
+                    className="group w-full py-4 bg-black hover:bg-gray-800 text-white rounded-lg font-medium transition-colors disabled:opacity-70 flex items-center justify-center gap-2"
                   >
                     {loading ? 'Sending...' : 'Send Message'}
+                    {!loading && (
+                      <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                    )}
                   </motion.button>
-                </form>
+                </div>
               )}
             </div>
           </motion.div>
         </div>
+
+        {/* Quick Stats */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={isInView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.6, delay: 0.4 }}
+          className="mt-16 text-center"
+        >
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-3xl mx-auto">
+            <div>
+              <div className="text-3xl font-bold text-white mb-2">AI-Powered</div>
+              <div className="text-gray-400">From the Ground Up</div>
+            </div>
+            <div>
+              <div className="text-3xl font-bold text-white mb-2">24/7</div>
+              <div className="text-gray-400">Support Available</div>
+            </div>
+            <div>
+              <div className="text-3xl font-bold text-white mb-2">99.9%</div>
+              <div className="text-gray-400">Uptime Guarantee</div>
+            </div>
+          </div>
+        </motion.div>
       </div>
     </section>
   );

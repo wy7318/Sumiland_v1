@@ -1,306 +1,945 @@
+// import { useState } from 'react';
+// import { motion, AnimatePresence } from 'framer-motion';
+// import { ChevronRight, ChevronDown, Plus, Sparkles, TrendingUp, Brain, Zap, Mail, Globe } from 'lucide-react';
+
+// export function FeaturesHubSection() {
+//     const [activeTab, setActiveTab] = useState(0);
+//     const [expandedFeature, setExpandedFeature] = useState(null);
+
+//     // Cloud-based features data
+//     const cloudFeatures = [
+//         // Simply-Sales
+//         [
+//             {
+//                 id: 'lead-management',
+//                 icon: '🎯',
+//                 title: 'AI-Powered Lead Management',
+//                 shortDesc: 'Intelligent lead scoring with automated nurturing workflows',
+//                 description: 'Advanced lead capture, scoring, and nurturing with AI-driven insights and automated follow-up sequences',
+//                 benefits: 'Transform prospects into customers 40% faster with our intelligent lead scoring system. AI analyzes behavior patterns, engagement levels, and demographic data to prioritize your hottest leads. Automated nurturing sequences ensure no lead falls through the cracks, while predictive analytics help forecast conversion probability.',
+//                 tags: ['AI-Powered', 'Automation', 'Analytics']
+//             },
+//             {
+//                 id: 'account-management',
+//                 icon: '🏢',
+//                 title: 'Unified Account Management',
+//                 shortDesc: '360-degree account visibility with relationship mapping',
+//                 description: 'Comprehensive account tracking with relationship mapping, contact hierarchies, and engagement history',
+//                 benefits: 'Get complete visibility into your most valuable accounts with detailed relationship maps, interaction timelines, and business hierarchy tracking. Our AI identifies expansion opportunities, tracks decision-maker influence, and predicts account health to help you grow revenue within existing accounts by an average of 35%.',
+//                 tags: ['360-View', 'Relationship Mapping', 'Growth Tracking']
+//             },
+//             {
+//                 id: 'opportunity-pipeline',
+//                 icon: '📈',
+//                 title: 'Smart Opportunity Pipeline',
+//                 shortDesc: 'Predictive forecasting with automated stage progression',
+//                 description: 'Intelligent pipeline management with AI-powered forecasting, deal probability scoring, and automated workflows',
+//                 benefits: 'Increase forecast accuracy by 60% with AI-driven deal scoring and predictive analytics. Track opportunities through customizable sales stages with automated task creation, reminder systems, and probability assessments. Real-time pipeline insights help sales managers make data-driven decisions and optimize team performance.',
+//                 tags: ['Forecasting', 'AI Scoring', 'Pipeline Management']
+//             },
+//             {
+//                 id: 'quote-order-management',
+//                 icon: '📋',
+//                 title: 'Automated Quote & Order System',
+//                 shortDesc: 'Dynamic pricing with approval workflows and order tracking',
+//                 description: 'Streamlined quote generation, approval workflows, and order management with integrated pricing intelligence',
+//                 benefits: 'Reduce quote generation time by 70% with automated templates, dynamic pricing rules, and built-in approval workflows. Track orders from creation to fulfillment with real-time status updates. Integration with inventory systems ensures accurate pricing and availability, while customizable templates maintain brand consistency.',
+//                 tags: ['Automation', 'Dynamic Pricing', 'Workflow Management']
+//             },
+//             {
+//                 id: 'sales-analytics',
+//                 icon: '📊',
+//                 title: 'Advanced Sales Analytics',
+//                 shortDesc: 'Insightful reporting with predictive forecasting capabilities',
+//                 description: 'Comprehensive sales analytics with customizable dashboards, performance metrics, and forecasting tools',
+//                 benefits: 'Make informed decisions with real-time sales performance insights, team productivity metrics, and market trend analysis. Our advanced forecasting algorithms help predict revenue with 85% accuracy, while customizable dashboards provide at-a-glance visibility into KPIs that matter most to your business.',
+//                 tags: ['Custom Reports', 'Forecasting', 'Performance Metrics']
+//             },
+//             {
+//                 id: 'email-integration-sales',
+//                 icon: '✉️',
+//                 title: 'Seamless Email Integration',
+//                 shortDesc: 'Gmail/Outlook sync with engagement tracking and automation',
+//                 description: 'Native integration with Gmail and Outlook featuring engagement tracking, automated sequences, and CRM sync',
+//                 benefits: 'Never miss important communications with automatic email logging, engagement tracking, and follow-up reminders. Track open rates, click-through rates, and response times to optimize your outreach strategy. Automated email sequences nurture leads while you focus on closing deals.',
+//                 tags: ['Gmail/Outlook', 'Engagement Tracking', 'Auto-Sequences']
+//             }
+//         ],
+//         // Simply-Service
+//         [
+//             {
+//                 id: 'case-management',
+//                 icon: '🎫',
+//                 title: 'Intelligent Case Management',
+//                 shortDesc: 'AI-powered routing with SLA tracking and escalation',
+//                 description: 'Advanced case routing, priority management, and SLA tracking with automated escalation workflows',
+//                 benefits: 'Resolve customer issues 50% faster with intelligent case routing that automatically assigns tickets to the right agents based on expertise, workload, and priority. SLA tracking ensures compliance while escalation workflows prevent issues from falling through cracks. AI suggests solutions based on historical case data.',
+//                 tags: ['AI Routing', 'SLA Tracking', 'Auto-Escalation']
+//             },
+//             {
+//                 id: 'multichannel-support',
+//                 icon: '🎧',
+//                 title: 'Omnichannel Customer Support',
+//                 shortDesc: 'Unified support across email, chat, phone, and social media',
+//                 description: 'Centralized support hub managing all customer communications across multiple channels with unified agent workspace',
+//                 benefits: 'Provide consistent, personalized support across all channels with complete conversation history and context. Agents can seamlessly switch between email, chat, phone, and social media without losing context. Knowledge base integration provides instant access to solutions, reducing resolution time by 45%.',
+//                 tags: ['Omnichannel', 'Unified Workspace', 'Knowledge Base']
+//             },
+//             {
+//                 id: 'email-to-case',
+//                 icon: '📧',
+//                 title: 'Smart Email-to-Case',
+//                 shortDesc: 'Automated case creation from emails with intelligent categorization',
+//                 description: 'Automatic case creation from incoming emails with AI-powered categorization, priority assignment, and routing',
+//                 benefits: 'Transform every customer email into a trackable case automatically. AI analyzes email content to determine priority, category, and appropriate agent assignment. Thread management keeps related communications organized, while duplicate detection prevents case proliferation. Reduce manual case creation by 90%.',
+//                 tags: ['Auto-Creation', 'AI Categorization', 'Thread Management']
+//             },
+//             {
+//                 id: 'web-to-case',
+//                 icon: '🌐',
+//                 title: 'Advanced Web-to-Case',
+//                 shortDesc: 'Customizable web forms with intelligent pre-population',
+//                 description: 'Flexible web forms with conditional logic, file attachments, and automatic case creation with customer matching',
+//                 benefits: 'Capture customer issues directly from your website with customizable forms that adapt based on issue type. Automatic customer matching links cases to existing records, while intelligent pre-population speeds up form completion. Real-time form analytics help optimize conversion rates.',
+//                 tags: ['Custom Forms', 'Auto-Matching', 'Conditional Logic']
+//             },
+//             {
+//                 id: 'service-analytics',
+//                 icon: '📈',
+//                 title: 'Service Performance Analytics',
+//                 shortDesc: 'Customer satisfaction tracking with predictive insights',
+//                 description: 'Comprehensive service metrics including response times, resolution rates, and customer satisfaction with predictive analytics',
+//                 benefits: 'Monitor service quality with real-time dashboards tracking first-call resolution, average response time, and customer satisfaction scores. Predictive analytics identify potential service issues before they impact customers. Team performance metrics help optimize agent productivity and training needs.',
+//                 tags: ['CSAT Tracking', 'Predictive Analytics', 'Team Performance']
+//             },
+//             {
+//                 id: 'communication-hub',
+//                 icon: '💬',
+//                 title: 'Unified Communication Hub',
+//                 shortDesc: 'Integrated messaging with conversation continuity',
+//                 description: 'Centralized communication platform with conversation threading, automated responses, and escalation management',
+//                 benefits: 'Maintain conversation continuity across all touchpoints with complete interaction history. Automated acknowledgments reassure customers while intelligent routing ensures expertise matching. Internal collaboration tools enable team consultation without customer visibility, improving first-contact resolution by 60%.',
+//                 tags: ['Conversation Threading', 'Auto-Responses', 'Team Collaboration']
+//             }
+//         ],
+//         // Simply-Inventory
+//         [
+//             {
+//                 id: 'inventory-tracking',
+//                 icon: '📦',
+//                 title: 'Real-Time Inventory Tracking',
+//                 shortDesc: 'Live stock monitoring with automated reordering and alerts',
+//                 description: 'Advanced inventory management with real-time stock levels, automated reorder points, and low-stock alerts',
+//                 benefits: 'Eliminate stockouts and overstock situations with real-time inventory visibility across multiple locations. AI-powered demand forecasting automatically adjusts reorder points based on seasonal trends, supplier lead times, and sales patterns. Reduce carrying costs by 25% while improving product availability.',
+//                 tags: ['Real-Time Tracking', 'Auto-Reordering', 'Multi-Location']
+//             },
+//             {
+//                 id: 'purchase-management',
+//                 icon: '🛒',
+//                 title: 'Intelligent Purchase Management',
+//                 shortDesc: 'Vendor optimization with smart ordering and cost analysis',
+//                 description: 'Comprehensive purchase order management with vendor performance tracking, cost optimization, and approval workflows',
+//                 benefits: 'Optimize purchasing decisions with vendor performance analytics, cost trend analysis, and automated approval workflows. Smart ordering suggestions based on historical data, current inventory levels, and demand forecasting help reduce costs by 20% while ensuring optimal stock levels.',
+//                 tags: ['Vendor Analytics', 'Cost Optimization', 'Smart Ordering']
+//             },
+//             {
+//                 id: 'product-catalog',
+//                 icon: '🏷️',
+//                 title: 'Dynamic Product Management',
+//                 shortDesc: 'Intelligent catalog management with pricing optimization',
+//                 description: 'Advanced product catalog with dynamic pricing, variant management, and automated updates across channels',
+//                 benefits: 'Manage complex product catalogs with ease using AI-powered categorization, automated attribute mapping, and dynamic pricing rules. Sync product information across all sales channels instantly while tracking performance metrics to optimize pricing and positioning strategies.',
+//                 tags: ['Dynamic Pricing', 'Channel Sync', 'AI Categorization']
+//             },
+//             {
+//                 id: 'warehouse-optimization',
+//                 icon: '🏭',
+//                 title: 'Smart Warehouse Management',
+//                 shortDesc: 'Location optimization with pick path efficiency and cycle counting',
+//                 description: 'Intelligent warehouse operations with location tracking, pick path optimization, and automated cycle counting',
+//                 benefits: 'Increase warehouse efficiency by 40% with optimized pick paths, intelligent slotting recommendations, and automated inventory auditing. Real-time location tracking and barcode scanning integration ensure accuracy while reducing fulfillment time and labor costs.',
+//                 tags: ['Pick Optimization', 'Location Tracking', 'Cycle Counting']
+//             },
+//             {
+//                 id: 'inventory-analytics',
+//                 icon: '📊',
+//                 title: 'Predictive Inventory Analytics',
+//                 shortDesc: 'Demand forecasting with profitability analysis and trend identification',
+//                 description: 'Advanced analytics for inventory turnover, demand forecasting, profitability analysis, and seasonal trend identification',
+//                 benefits: 'Make data-driven inventory decisions with comprehensive analytics covering turnover rates, carrying costs, and profit margins. Predictive models forecast demand patterns with 90% accuracy, helping optimize stock levels and identify slow-moving inventory before it impacts cash flow.',
+//                 tags: ['Demand Forecasting', 'Profitability Analysis', 'Trend Identification']
+//             },
+//             {
+//                 id: 'supply-chain-integration',
+//                 icon: '🔗',
+//                 title: 'Supply Chain Automation',
+//                 shortDesc: 'Vendor communication with automated workflows and performance tracking',
+//                 description: 'Integrated supply chain management with automated vendor communication, performance monitoring, and exception handling',
+//                 benefits: 'Streamline supplier relationships with automated purchase orders, delivery confirmations, and performance scorecards. Exception handling workflows alert you to potential disruptions while automated communication keeps vendors informed of requirements and changes.',
+//                 tags: ['Vendor Communication', 'Performance Monitoring', 'Exception Handling']
+//             }
+//         ],
+//         // Simply-Restaurant
+//         [
+//             {
+//                 id: 'customer-loyalty',
+//                 icon: '👥',
+//                 title: 'Smart Customer Management',
+//                 shortDesc: 'Loyalty programs with preference tracking and personalized experiences',
+//                 description: 'Advanced customer profiling with loyalty programs, dietary preferences, and personalized marketing automation',
+//                 benefits: 'Build lasting customer relationships with comprehensive preference tracking, automated loyalty rewards, and personalized dining experiences. AI analyzes ordering patterns to suggest menu items and promotions, increasing average order value by 30% while improving customer satisfaction.',
+//                 tags: ['Loyalty Programs', 'Preference Tracking', 'Personalization']
+//             },
+//             {
+//                 id: 'online-ordering',
+//                 icon: '📱',
+//                 title: 'Integrated Online Ordering',
+//                 shortDesc: 'Multi-platform ordering with real-time tracking and delivery management',
+//                 description: 'Comprehensive online ordering system with mobile apps, delivery tracking, and integrated payment processing',
+//                 benefits: 'Maximize revenue with seamless online ordering across web, mobile, and third-party platforms. Real-time order tracking, automated notifications, and integrated delivery management create exceptional customer experiences while reducing operational overhead by 35%.',
+//                 tags: ['Multi-Platform', 'Real-Time Tracking', 'Payment Integration']
+//             },
+//             {
+//                 id: 'menu-inventory',
+//                 icon: '📋',
+//                 title: 'Dynamic Menu & Inventory',
+//                 shortDesc: 'Intelligent pricing with real-time availability and cost optimization',
+//                 description: 'Smart menu management with dynamic pricing, real-time ingredient tracking, and automated availability updates',
+//                 benefits: 'Optimize profitability with intelligent menu engineering that analyzes ingredient costs, popularity, and profit margins. Real-time inventory integration automatically updates item availability while dynamic pricing maximizes revenue during peak and off-peak periods.',
+//                 tags: ['Dynamic Pricing', 'Real-Time Availability', 'Cost Optimization']
+//             },
+//             {
+//                 id: 'website-management',
+//                 icon: '🌐',
+//                 title: 'Restaurant Website Hub',
+//                 shortDesc: 'SEO-optimized presence with reservation integration and content management',
+//                 description: 'Complete website management with SEO optimization, online reservations, menu displays, and content management',
+//                 benefits: 'Attract more customers with an SEO-optimized website featuring integrated reservations, dynamic menu displays, and engaging content management. Analytics track visitor behavior and conversion rates, helping optimize your online presence for maximum revenue impact.',
+//                 tags: ['SEO Optimization', 'Reservation Integration', 'Content Management']
+//             },
+//             {
+//                 id: 'marketing-automation',
+//                 icon: '📢',
+//                 title: 'Restaurant Marketing Suite',
+//                 shortDesc: 'Social media automation with campaign management and customer engagement',
+//                 description: 'Integrated marketing platform with social media management, email campaigns, and customer engagement automation',
+//                 benefits: 'Drive repeat business with automated marketing campaigns, social media scheduling, and targeted promotions based on customer behavior. Email marketing integration sends personalized offers, birthday promotions, and re-engagement campaigns to boost customer lifetime value by 45%.',
+//                 tags: ['Social Media Automation', 'Email Campaigns', 'Targeted Promotions']
+//             },
+//             {
+//                 id: 'restaurant-analytics',
+//                 icon: '📈',
+//                 title: 'Restaurant Performance Analytics',
+//                 shortDesc: 'Sales insights with menu optimization and customer behavior analysis',
+//                 description: 'Comprehensive analytics covering sales performance, menu item analysis, customer behavior, and operational efficiency',
+//                 benefits: 'Make informed decisions with detailed analytics on sales trends, popular menu items, peak hours, and customer preferences. Predictive analytics help optimize staffing, inventory, and pricing strategies while identifying opportunities for menu engineering and promotional campaigns.',
+//                 tags: ['Sales Analytics', 'Menu Optimization', 'Customer Behavior']
+//             }
+//         ]
+//     ];
+
+//     // Cloud definitions with enhanced styling
+//     const clouds = [
+//         {
+//             name: "Simply-Sales",
+//             subtitle: "Intelligent Sales Management",
+//             description: "AI-powered sales automation with predictive insights",
+//             gradient: "from-purple-500 to-pink-500",
+//             bgGradient: "from-purple-900/20 to-pink-900/20",
+//             icon: "💼"
+//         },
+//         {
+//             name: "Simply-Service",
+//             subtitle: "Customer Service Excellence",
+//             description: "Omnichannel support with intelligent case management",
+//             gradient: "from-blue-500 to-cyan-500",
+//             bgGradient: "from-blue-900/20 to-cyan-900/20",
+//             icon: "🎯"
+//         },
+//         {
+//             name: "Simply-Inventory",
+//             subtitle: "Smart Warehouse Management",
+//             description: "Real-time inventory with predictive analytics",
+//             gradient: "from-green-500 to-emerald-500",
+//             bgGradient: "from-green-900/20 to-emerald-900/20",
+//             icon: "📦"
+//         },
+//         {
+//             name: "Simply-Restaurant",
+//             subtitle: "Complete Restaurant Operations",
+//             description: "End-to-end restaurant management platform",
+//             gradient: "from-orange-500 to-red-500",
+//             bgGradient: "from-orange-900/20 to-red-900/20",
+//             icon: "🍽️"
+//         }
+//     ];
+
+//     // Toggle expanded feature
+//     const toggleFeature = (id) => {
+//         setExpandedFeature(expandedFeature === id ? null : id);
+//     };
+
+//     return (
+//         <section id="features" className="py-20 relative overflow-hidden bg-black">
+//             {/* Dynamic background elements */}
+//             <div className="absolute inset-0 z-0">
+//                 <div className={`absolute inset-0 bg-gradient-to-br ${clouds[activeTab].bgGradient} transition-all duration-1000`}></div>
+//                 <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-transparent via-black/50 to-black"></div>
+//             </div>
+
+//             {/* Animated background particles */}
+//             <div className="absolute inset-0 z-0">
+//                 {[...Array(20)].map((_, i) => (
+//                     <motion.div
+//                         key={i}
+//                         className="absolute w-1 h-1 bg-white rounded-full opacity-20"
+//                         animate={{
+//                             x: [0, 100, 0],
+//                             y: [0, -100, 0],
+//                             opacity: [0.2, 0.8, 0.2]
+//                         }}
+//                         transition={{
+//                             duration: 10 + i * 0.5,
+//                             repeat: Infinity,
+//                             delay: i * 0.2
+//                         }}
+//                         style={{
+//                             left: `${Math.random() * 100}%`,
+//                             top: `${Math.random() * 100}%`
+//                         }}
+//                     />
+//                 ))}
+//             </div>
+
+//             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+//                 {/* Section Header */}
+//                 <div className="text-center mb-16">
+//                     <motion.div
+//                         initial={{ opacity: 0, y: 20 }}
+//                         whileInView={{ opacity: 1, y: 0 }}
+//                         viewport={{ once: true }}
+//                         transition={{ duration: 0.5 }}
+//                         className="inline-block"
+//                     >
+//                         <span className="bg-white/10 backdrop-blur-sm text-white text-sm font-medium px-4 py-2 rounded-full border border-white/20">
+//                             <Sparkles className="inline w-4 h-4 mr-2" />
+//                             Powerful Cloud Solutions
+//                         </span>
+//                     </motion.div>
+
+//                     <motion.h2
+//                         initial={{ opacity: 0, y: 20 }}
+//                         whileInView={{ opacity: 1, y: 0 }}
+//                         viewport={{ once: true }}
+//                         transition={{ duration: 0.5, delay: 0.1 }}
+//                         className="text-5xl font-bold mt-6 mb-4"
+//                     >
+//                         <span className={`bg-gradient-to-r ${clouds[activeTab].gradient} bg-clip-text text-transparent`}>
+//                             SimpliDone
+//                         </span>{" "}
+//                         <span className="text-white">Clouds</span>
+//                     </motion.h2>
+
+//                     <motion.p
+//                         initial={{ opacity: 0, y: 20 }}
+//                         whileInView={{ opacity: 1, y: 0 }}
+//                         viewport={{ once: true }}
+//                         transition={{ duration: 0.5, delay: 0.2 }}
+//                         className="text-xl text-gray-300 max-w-3xl mx-auto"
+//                     >
+//                         Experience the future of business management with our AI-powered cloud solutions
+//                         designed to transform your operations
+//                     </motion.p>
+//                 </div>
+
+//                 {/* Enhanced Cloud Navigation */}
+//                 <div className="mb-16">
+//                     <div className="flex flex-wrap justify-center gap-4 mb-8">
+//                         {clouds.map((cloud, index) => (
+//                             <motion.button
+//                                 key={index}
+//                                 whileHover={{ y: -4, scale: 1.02 }}
+//                                 whileTap={{ y: 0, scale: 0.98 }}
+//                                 onClick={() => setActiveTab(index)}
+//                                 className={`relative group px-6 py-4 rounded-2xl font-medium text-sm transition-all duration-300 overflow-hidden ${activeTab === index
+//                                         ? "text-white shadow-2xl"
+//                                         : "text-gray-300 hover:text-white"
+//                                     }`}
+//                             >
+//                                 {/* Background gradient */}
+//                                 <div className={`absolute inset-0 bg-gradient-to-r ${cloud.gradient} transition-opacity duration-300 ${activeTab === index ? "opacity-100" : "opacity-0 group-hover:opacity-30"
+//                                     }`}></div>
+
+//                                 {/* Glass morphism background */}
+//                                 <div className="absolute inset-0 bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl"></div>
+
+//                                 <div className="relative flex items-center space-x-3">
+//                                     <span className="text-2xl">{cloud.icon}</span>
+//                                     <div className="text-left">
+//                                         <div className="font-bold">{cloud.name}</div>
+//                                         <div className="text-xs opacity-75">{cloud.subtitle}</div>
+//                                     </div>
+//                                 </div>
+
+//                                 {activeTab === index && (
+//                                     <motion.div
+//                                         initial={{ scaleX: 0 }}
+//                                         animate={{ scaleX: 1 }}
+//                                         className="absolute bottom-0 left-0 right-0 h-1 bg-white rounded-full"
+//                                     />
+//                                 )}
+//                             </motion.button>
+//                         ))}
+//                     </div>
+
+//                     {/* Active cloud description */}
+//                     <motion.div
+//                         key={activeTab}
+//                         initial={{ opacity: 0, y: 10 }}
+//                         animate={{ opacity: 1, y: 0 }}
+//                         transition={{ duration: 0.3 }}
+//                         className="text-center"
+//                     >
+//                         <p className="text-gray-400 max-w-2xl mx-auto">
+//                             {clouds[activeTab].description}
+//                         </p>
+//                     </motion.div>
+//                 </div>
+
+//                 {/* Enhanced Features Grid */}
+//                 <AnimatePresence mode="wait">
+//                     <motion.div
+//                         key={activeTab}
+//                         initial={{ opacity: 0, y: 30 }}
+//                         animate={{ opacity: 1, y: 0 }}
+//                         exit={{ opacity: 0, y: -30 }}
+//                         transition={{ duration: 0.6 }}
+//                         className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
+//                     >
+//                         {cloudFeatures[activeTab].map((feature, index) => (
+//                             <motion.div
+//                                 key={feature.id}
+//                                 initial={{ opacity: 0, y: 30 }}
+//                                 animate={{ opacity: 1, y: 0 }}
+//                                 transition={{ duration: 0.6, delay: index * 0.1 }}
+//                                 className="h-full"
+//                             >
+//                                 <div
+//                                     className={`h-full rounded-2xl overflow-hidden border transition-all duration-300 group ${expandedFeature === feature.id
+//                                             ? `border-white/30 shadow-2xl shadow-white/10`
+//                                             : "border-white/10 hover:border-white/20 hover:shadow-xl hover:shadow-white/5"
+//                                         }`}
+//                                     style={{
+//                                         background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%)',
+//                                         backdropFilter: 'blur(10px)'
+//                                     }}
+//                                 >
+//                                     {/* Feature Card Header */}
+//                                     <div
+//                                         onClick={() => toggleFeature(feature.id)}
+//                                         className="p-6 cursor-pointer"
+//                                     >
+//                                         <div className="flex justify-between items-start mb-4">
+//                                             <div className="flex items-center">
+//                                                 <div className="flex-shrink-0 flex items-center justify-center w-14 h-14 rounded-xl text-3xl mr-4"
+//                                                     style={{
+//                                                         background: `linear-gradient(135deg, ${clouds[activeTab].gradient.split(' ')[1]} 0%, ${clouds[activeTab].gradient.split(' ')[3]} 100%)`,
+//                                                         backdropFilter: 'blur(10px)'
+//                                                     }}>
+//                                                     {feature.icon}
+//                                                 </div>
+//                                                 <div>
+//                                                     <h3 className="text-xl font-bold text-white mb-1">
+//                                                         {feature.title}
+//                                                     </h3>
+//                                                     <div className="flex flex-wrap gap-1 mb-2">
+//                                                         {feature.tags.map((tag, tagIndex) => (
+//                                                             <span key={tagIndex} className="text-xs px-2 py-1 rounded-full bg-white/10 text-white/80">
+//                                                                 {tag}
+//                                                             </span>
+//                                                         ))}
+//                                                     </div>
+//                                                 </div>
+//                                             </div>
+//                                             <button className="flex-shrink-0 text-white/60 hover:text-white transition-colors p-2 rounded-lg hover:bg-white/10">
+//                                                 {expandedFeature === feature.id ? (
+//                                                     <ChevronDown size={20} />
+//                                                 ) : (
+//                                                     <Plus size={20} />
+//                                                 )}
+//                                             </button>
+//                                         </div>
+
+//                                         <p className="text-gray-300 text-sm leading-relaxed">{feature.shortDesc}</p>
+//                                     </div>
+
+//                                     {/* Expandable Content */}
+//                                     <AnimatePresence>
+//                                         {expandedFeature === feature.id && (
+//                                             <motion.div
+//                                                 initial={{ height: 0, opacity: 0 }}
+//                                                 animate={{ height: "auto", opacity: 1 }}
+//                                                 exit={{ height: 0, opacity: 0 }}
+//                                                 transition={{ duration: 0.4 }}
+//                                                 className="overflow-hidden"
+//                                             >
+//                                                 <div className="px-6 pb-6 border-t border-white/10 pt-6">
+//                                                     <div className="mb-6">
+//                                                         <div className="flex items-center mb-3">
+//                                                             <Brain className="w-4 h-4 mr-2 text-blue-400" />
+//                                                             <span className="text-blue-400 text-xs font-semibold uppercase tracking-wide">
+//                                                                 Feature Details
+//                                                             </span>
+//                                                         </div>
+//                                                         <p className="text-gray-300 text-sm leading-relaxed">{feature.description}</p>
+//                                                     </div>
+
+//                                                     <div className="mb-6">
+//                                                         <div className="flex items-center mb-3">
+//                                                             <TrendingUp className="w-4 h-4 mr-2 text-green-400" />
+//                                                             <span className="text-green-400 text-xs font-semibold uppercase tracking-wide">
+//                                                                 Key Benefits
+//                                                             </span>
+//                                                         </div>
+//                                                         <p className="text-gray-300 text-sm leading-relaxed">{feature.benefits}</p>
+//                                                     </div>
+
+//                                                     <div className="flex items-center justify-between pt-4 border-t border-white/10">
+//                                                         {/* <button className="group text-white text-sm font-medium flex items-center hover:text-gray-300 transition-colors">
+//                                                             Learn more
+//                                                             <ChevronRight size={16} className="ml-1 group-hover:ml-2 transition-all" />
+//                                                         </button> */}
+//                                                         <div className="flex items-center space-x-2 text-xs text-gray-400">
+//                                                             <Zap className="w-3 h-3" />
+//                                                             <span>AI-Powered</span>
+//                                                         </div>
+//                                                     </div>
+//                                                 </div>
+//                                             </motion.div>
+//                                         )}
+//                                     </AnimatePresence>
+//                                 </div>
+//                             </motion.div>
+//                         ))}
+//                     </motion.div>
+//                 </AnimatePresence>
+
+//                 {/* Enhanced Bottom CTA */}
+//                 <motion.div
+//                     initial={{ opacity: 0, y: 20 }}
+//                     whileInView={{ opacity: 1, y: 0 }}
+//                     viewport={{ once: true }}
+//                     transition={{ duration: 0.5 }}
+//                     className="mt-20 text-center"
+//                 >
+//                     <div className="relative">
+//                         <motion.a
+//                             href="#contact"
+//                             whileHover={{ scale: 1.05, y: -2 }}
+//                             whileTap={{ scale: 0.95 }}
+//                             className={`inline-flex items-center justify-center px-10 py-5 rounded-2xl text-white text-lg font-medium bg-gradient-to-r ${clouds[activeTab].gradient} shadow-2xl transition-all relative overflow-hidden group`}
+//                         >
+//                             <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-0 transition-transform duration-500"></div>
+//                             <Globe className="mr-3 w-5 h-5 relative z-10" />
+//                             <span className="relative z-10">Explore {clouds[activeTab].name}</span>
+//                         </motion.a>
+//                     </div>
+
+//                     <p className="text-gray-400 text-sm mt-4">
+//                         Start your free trial today • No credit card required
+//                     </p>
+//                 </motion.div>
+//             </div>
+//         </section>
+//     );
+// }
+
+
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight, ChevronDown, Plus } from 'lucide-react';
+import { ChevronRight, Check, ArrowRight, Sparkles } from 'lucide-react';
 
 export function FeaturesHubSection() {
     const [activeTab, setActiveTab] = useState(0);
-    const [expandedFeature, setExpandedFeature] = useState(null);
+    const [hoveredFeature, setHoveredFeature] = useState(null);
 
-    // Features data
-    const featureSets = [
-        // First Set (Tab 0)
+    // Simplified cloud features with powerful descriptions
+    const cloudFeatures = [
+        // Simply-Sales
         [
             {
-                id: 'ai-capabilities',
-                icon: '✨',
-                title: 'Future-Ready AI Capabilities',
-                shortDesc: 'AI-powered tools and intelligent automation',
-                description: 'Ongoing development of AI-powered tools and intelligent automation',
-                benefits: 'As SimpliDone continues to expand our capabilities, customers will benefit from cutting-edge AI features that transform how you understand and engage with your customers. Our development pipeline includes predictive analytics that forecast customer behavior, automated insight generation that surfaces hidden opportunities, intelligent lead scoring that prioritizes your most promising prospects, and AI-assisted communication tools.'
+                id: 'sales-pipeline',
+                icon: '🎯',
+                title: 'Smart Sales Pipeline',
+                description: 'AI-powered lead management with predictive analytics',
+                benefits: ['40% faster deal closure', 'Automated follow-ups', 'Revenue forecasting']
             },
             {
-                id: 'analytics-engine',
-                icon: '📊',
-                title: 'Powerful Analytics Engine',
-                shortDesc: 'Advanced data analysis with predictive capabilities',
-                description: 'Advanced data analysis tools with predictive capabilities and actionable insights',
-                benefits: 'SimpliDone\'s core strength lies in our powerful analytics that transform raw customer data into strategic business intelligence. Make confident decisions based on comprehensive data analysis, trend identification, and predictive modeling. Our customers report 42% better forecasting accuracy and 37% faster identification of market opportunities compared to standard CRM reporting tools.'
-            },
-            {
-                id: 'user-experience',
+                id: 'contact-management',
                 icon: '👥',
-                title: 'Intuitive User Experience',
-                shortDesc: 'Clean, modern interface with minimal learning curve',
-                description: 'Clean, modern interface with minimal learning curve',
-                benefits: 'Get your entire team up and running in hours, not weeks, with minimal training required. Our intuitive design means staff spend less time navigating software and more time engaging with customers. The simplified workflow reduces onboarding costs by an average of 60% compared to enterprise CRM systems, while increasing adoption rates across team members of all technical skill levels.'
+                title: 'Unified Customer Hub',
+                description: '360-degree customer view with interaction history',
+                benefits: ['Complete customer profiles', 'Interaction tracking', 'Relationship mapping']
             },
             {
-                id: 'inclusive-pricing',
-                icon: '💰',
-                title: 'All-Inclusive Pricing',
-                shortDesc: 'Flat monthly rate with all features included',
-                description: 'Flat $150/month for up to 20 users with all features included, with 20% discount on annual subscriptions',
-                benefits: 'Predictable budgeting without the tiered pricing complexity of competitors. No need to pay per user or for premium features, allowing you to maximize your CRM investment. While competitors charge $65-125 per user monthly for comparable functionality, SimpliDone saves the average company over $15,000 annually while providing access to every feature regardless of team size.'
+                id: 'sales-automation',
+                icon: '⚡',
+                title: 'Sales Automation',
+                description: 'Automate quotes, orders, and email sequences',
+                benefits: ['Quote generation', 'Order processing', 'Email automation']
             },
             {
-                id: 'infrastructure',
-                icon: '🏗️',
-                title: 'Enterprise-Grade Infrastructure',
-                shortDesc: 'Built on Supabase with generous resource allocations',
-                description: 'Built on Supabase technology with generous resource allocations and flexible scaling',
-                benefits: 'Access the reliability and performance typically reserved for enterprise customers at a fraction of the cost. Our platform supports up to 250,000 customer profiles, includes 200GB file storage, 10GB database capacity, and 500GB monthly bandwidth—resources that would cost thousands with traditional providers but are included in your flat monthly rate.'
-            },
-            {
-                id: 'customizable',
-                icon: '🔧',
-                title: 'Customizable Without Coding',
-                shortDesc: 'Drag-and-drop customization tools',
-                description: 'Drag-and-drop customization tools for fields, forms, and workflows',
-                benefits: 'Adapt the system to your specific business processes without expensive consultants or developers. Make changes on the fly as your business evolves. Teams report saving an average of $8,000 in custom development costs annually while maintaining a CRM that perfectly mirrors their unique business requirements and terminology.'
+                id: 'sales-analytics',
+                icon: '📊',
+                title: 'Performance Analytics',
+                description: 'Real-time insights and forecasting tools',
+                benefits: ['Sales dashboards', 'Performance metrics', 'Trend analysis']
             }
         ],
-        // Second Set (Tab 1)
+        // Simply-Service
         [
             {
-                id: 'mobile',
+                id: 'case-management',
+                icon: '🎫',
+                title: 'Smart Case Management',
+                description: 'AI-powered ticket routing and SLA tracking',
+                benefits: ['Auto-assignment', 'SLA monitoring', 'Escalation workflows']
+            },
+            {
+                id: 'omnichannel',
+                icon: '🌐',
+                title: 'Omnichannel Support',
+                description: 'Unified support across email, chat, and phone',
+                benefits: ['Multi-channel support', 'Conversation history', 'Agent collaboration']
+            },
+            {
+                id: 'knowledge-base',
+                icon: '📚',
+                title: 'Knowledge Management',
+                description: 'Self-service portal with smart suggestions',
+                benefits: ['FAQ automation', 'Solution database', 'Customer self-service']
+            },
+            {
+                id: 'service-analytics',
+                icon: '📈',
+                title: 'Service Insights',
+                description: 'Customer satisfaction and performance tracking',
+                benefits: ['CSAT tracking', 'Response time metrics', 'Agent performance']
+            }
+        ],
+        // Simply-Inventory
+        [
+            {
+                id: 'inventory-tracking',
+                icon: '📦',
+                title: 'Real-Time Inventory',
+                description: 'Live stock monitoring with automated alerts',
+                benefits: ['Stock level alerts', 'Multi-location tracking', 'Reorder automation']
+            },
+            {
+                id: 'purchase-management',
+                icon: '🛒',
+                title: 'Purchase Optimization',
+                description: 'Intelligent ordering with vendor management',
+                benefits: ['Vendor tracking', 'Cost optimization', 'Order automation']
+            },
+            {
+                id: 'warehouse-ops',
+                icon: '🏭',
+                title: 'Warehouse Operations',
+                description: 'Efficient picking, packing, and shipping',
+                benefits: ['Pick optimization', 'Shipping integration', 'Barcode scanning']
+            },
+            {
+                id: 'inventory-analytics',
+                icon: '💡',
+                title: 'Inventory Intelligence',
+                description: 'Demand forecasting and profitability analysis',
+                benefits: ['Demand forecasting', 'Profit analysis', 'Trend identification']
+            }
+        ],
+        // Simply-Restaurant
+        [
+            {
+                id: 'menu-management',
+                icon: '🍽️',
+                title: 'Dynamic Menu Management',
+                description: 'Smart pricing with real-time availability',
+                benefits: ['Dynamic pricing', 'Inventory integration', 'Menu optimization']
+            },
+            {
+                id: 'online-ordering',
                 icon: '📱',
-                title: 'Mobile Optimization',
-                shortDesc: 'Full mobile apps for iOS and Android',
-                description: 'Fully-featured mobile apps for iOS and Android',
-                benefits: 'Access complete CRM functionality from anywhere, keeping your team productive whether in the office, working remotely, or meeting clients in the field. Field sales teams report 35% higher data entry compliance and 28% faster deal progression when using our mobile tools compared to desktop-only solutions.'
+                title: 'Online Ordering Platform',
+                description: 'Multi-platform ordering with delivery tracking',
+                benefits: ['Web & mobile orders', 'Payment processing', 'Delivery tracking']
             },
             {
-                id: 'integration',
-                icon: '🔄',
-                title: 'Integration Ecosystem',
-                shortDesc: 'Connect with essential business tools',
-                description: 'Growing network of integrations with focus on payment services and essential business tools',
-                benefits: 'SimpliDone is actively developing connections with payment processors like Square and other critical business tools, allowing you to create a seamless workflow between your CRM and the other platforms you rely on. Eliminate data silos and manual data entry while maintaining a single source of truth for all customer information.'
+                id: 'customer-loyalty',
+                icon: '⭐',
+                title: 'Customer Loyalty System',
+                description: 'Automated rewards and personalized experiences',
+                benefits: ['Loyalty programs', 'Personalized offers', 'Customer insights']
             },
             {
-                id: 'workflows',
-                icon: '⚙️',
-                title: 'Automated Workflows',
-                shortDesc: 'Visual workflow builder for repetitive tasks',
-                description: 'Visual workflow builder to automate repetitive tasks',
-                benefits: 'Increase efficiency and consistency while reducing human error. Free your team from mundane administrative work to focus on high-value customer interactions. Teams using our automation tools report handling 40% more customer inquiries without adding staff and reducing response times by an average of 72%.'
-            },
-            {
-                id: 'security',
-                icon: '🔒',
-                title: 'Data Security & Compliance',
-                shortDesc: 'Enterprise-grade security with daily backups',
-                description: 'Enterprise-grade security protocols with daily backups',
-                benefits: 'Protect sensitive customer information with confidence while maintaining compliance with data protection regulations. Our daily backups with 7-day retention provide peace of mind that your valuable customer data is protected against loss or corruption. Our security measures meet or exceed requirements for GDPR, CCPA, HIPAA, and other regulatory frameworks.'
-            },
-            {
-                id: 'customer-view',
-                icon: '👁️',
-                title: 'Unified Customer View',
-                shortDesc: '360-degree customer profiles across departments',
-                description: '360-degree customer profiles with cross-department visibility',
-                benefits: 'Eliminate communication gaps between sales, marketing, and customer service teams. Every team member sees the complete customer journey, ensuring consistent messaging and personalized experiences across all touchpoints. Companies implementing our unified view approach report 47% higher customer satisfaction scores and 29% increase in cross-selling success.'
-            },
-            {
-                id: 'email',
-                icon: '✉️',
-                title: 'Email Integration',
-                shortDesc: 'Seamless email tracking and analytics',
-                description: 'Seamless email synchronization with engagement analytics',
-                benefits: 'Never lose track of important customer communications. Automatically log all emails in customer records, track opens and clicks, and receive notifications when prospects engage with your content. Sales teams using our email tracking feature report 36% shorter sales cycles and 52% improvement in follow-up consistency.'
+                id: 'restaurant-analytics',
+                icon: '📊',
+                title: 'Restaurant Intelligence',
+                description: 'Sales analytics and operational insights',
+                benefits: ['Sales reporting', 'Menu performance', 'Customer behavior']
             }
         ]
     ];
 
-    // Tab labels
-    const tabLabels = ["Core Features", "Integration & Automation"];
+    // Enhanced cloud definitions
+    const clouds = [
+        {
+            name: "Simply-Sales",
+            subtitle: "AI-Powered Sales Engine",
+            description: "Close more deals with intelligent automation",
+            accent: "#3B82F6"
+        },
+        {
+            name: "Simply-Service",
+            subtitle: "Customer Success Platform",
+            description: "Deliver exceptional customer experiences",
+            accent: "#10B981"
+        },
+        {
+            name: "Simply-Inventory",
+            subtitle: "Smart Warehouse Management",
+            description: "Optimize inventory with predictive insights",
+            accent: "#F59E0B"
+        },
+        {
+            name: "Simply-Restaurant",
+            subtitle: "Complete Restaurant Solution",
+            description: "From orders to analytics, everything you need",
+            accent: "#EF4444"
+        }
+    ];
 
-    // Toggle expanded feature
-    const toggleFeature = (id) => {
-        setExpandedFeature(expandedFeature === id ? null : id);
+    const scrollToContact = () => {
+        const element = document.getElementById('contact');
+        if (element) {
+            const offset = 80;
+            const elementPosition = element.getBoundingClientRect().top;
+            const offsetPosition = elementPosition + window.pageYOffset - offset;
+            window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
+        }
     };
 
     return (
-        <section id="features" className="py-20 relative overflow-hidden">
-            {/* Background elements */}
-            <div className="absolute inset-0 bg-gradient-to-b from-white to-gray-50 z-0"></div>
-            <div className="absolute top-0 inset-x-0 h-40 bg-gradient-to-b from-primary-50 to-transparent z-0"></div>
+        <section className="py-24 relative overflow-hidden bg-black">
+            {/* Subtle animated background */}
+            <div className="absolute inset-0">
+                <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-black to-gray-900"></div>
+                <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PGNpcmNsZSBjeD0iMiIgY3k9IjIiIHI9IjEiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4wNSkiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjZ3JpZCkiLz48L3N2Zz4=')] opacity-30"></div>
+            </div>
 
-            {/* Decorative elements */}
-            <div className="absolute -right-64 top-20 w-96 h-96 rounded-full bg-primary-100 blur-3xl opacity-30 z-0"></div>
-            <div className="absolute -left-64 bottom-20 w-96 h-96 rounded-full bg-blue-100 blur-3xl opacity-30 z-0"></div>
-
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-                {/* Section Header */}
+            <div className="max-w-6xl mx-auto px-6 lg:px-8 relative z-10">
+                {/* Header */}
                 <div className="text-center mb-16">
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true }}
-                        transition={{ duration: 0.5 }}
-                        className="inline-block"
+                        transition={{ duration: 0.6 }}
+                        className="inline-flex items-center bg-white/10 backdrop-blur-sm text-white px-4 py-2 rounded-full border border-white/20 mb-6"
                     >
-                        <span className="bg-primary-100 text-primary-800 text-sm font-medium px-3 py-1 rounded-full">
-                            Powerful Features
-                        </span>
+                        <Sparkles className="w-4 h-4 mr-2" />
+                        <span className="text-sm font-medium">All-in-One Business Platform</span>
                     </motion.div>
 
                     <motion.h2
                         initial={{ opacity: 0, y: 20 }}
                         whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true }}
-                        transition={{ duration: 0.5, delay: 0.1 }}
-                        className="text-4xl font-bold mt-4 mb-4"
+                        transition={{ duration: 0.6, delay: 0.1 }}
+                        className="text-5xl md:text-6xl font-bold text-white mb-6 leading-tight"
                     >
-                        <span className="bg-gradient-to-r from-primary-600 to-blue-600 bg-clip-text text-transparent">
-                            SimpliDone CRM
-                        </span>{" "}
-                        <span className="text-gray-900">Features</span>
+                        Four Powerful
+                        <br />
+                        <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+                            Business Solutions
+                        </span>
                     </motion.h2>
 
                     <motion.p
                         initial={{ opacity: 0, y: 20 }}
                         whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true }}
-                        transition={{ duration: 0.5, delay: 0.2 }}
-                        className="text-xl text-gray-600 max-w-3xl mx-auto"
+                        transition={{ duration: 0.6, delay: 0.2 }}
+                        className="text-xl text-gray-300 max-w-3xl mx-auto font-light"
                     >
-                        Explore our powerful tools designed to transform your customer relationships
-                        and streamline business operations
+                        Everything you need to run your business - from sales and customer service
+                        to inventory management and restaurant operations.
                     </motion.p>
                 </div>
 
-                {/* Tab Navigation */}
-                <div className="mb-12">
-                    <div className="flex justify-center space-x-2 mb-8 overflow-x-auto pb-2">
-                        {tabLabels.map((label, index) => (
-                            <motion.button
-                                key={index}
-                                whileHover={{ y: -2 }}
-                                whileTap={{ y: 0 }}
-                                onClick={() => setActiveTab(index)}
-                                className={`px-6 py-3 rounded-full font-medium text-sm transition-all duration-200 flex items-center ${activeTab === index
-                                        ? "bg-primary-600 text-white shadow-lg shadow-primary-500/30"
-                                        : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
-                                    }`}
-                            >
-                                {label}
-                                {activeTab === index && (
-                                    <motion.span
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        className="ml-2 bg-white rounded-full w-2 h-2"
-                                    />
-                                )}
-                            </motion.button>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Features Grid Layout */}
-                <AnimatePresence mode="wait">
-                    <motion.div
-                        key={activeTab}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
-                        transition={{ duration: 0.5 }}
-                        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
-                    >
-                        {featureSets[activeTab].map((feature, index) => (
-                            <div key={feature.id}>
-                                <motion.div
-                                    initial={{ opacity: 0, y: 20 }}
-                                    whileInView={{ opacity: 1, y: 0 }}
-                                    viewport={{ once: true }}
-                                    transition={{ duration: 0.5, delay: index * 0.1 }}
-                                    className="h-full"
-                                >
-                                    <div
-                                        className={`h-full bg-white rounded-xl overflow-hidden border transition-all duration-300 ${expandedFeature === feature.id
-                                                ? "border-primary-500 shadow-xl shadow-primary-500/10"
-                                                : "border-gray-200 shadow-md hover:shadow-lg hover:border-primary-300"
-                                            }`}
-                                    >
-                                        {/* Feature Card Header */}
-                                        <div
-                                            onClick={() => toggleFeature(feature.id)}
-                                            className="p-6 cursor-pointer flex justify-between items-start h-36"
-                                        >
-                                            <div className="flex items-start">
-                                                <div className="flex-shrink-0 flex items-center justify-center w-12 h-12 bg-primary-50 rounded-lg text-2xl mr-4">{feature.icon}</div>
-                                                <div>
-                                                    <h3 className="text-xl font-bold text-gray-900 mb-2 line-clamp-1">
-                                                        {feature.title}
-                                                    </h3>
-                                                    <p className="text-gray-600 line-clamp-2">{feature.shortDesc}</p>
-                                                </div>
-                                            </div>
-                                            <button className="flex-shrink-0 mt-1 text-primary-500 hover:text-primary-700 transition-colors">
-                                                {expandedFeature === feature.id ? (
-                                                    <ChevronDown size={20} />
-                                                ) : (
-                                                    <Plus size={20} />
-                                                )}
-                                            </button>
-                                        </div>
-
-                                        {/* Expandable Content */}
-                                        <AnimatePresence>
-                                            {expandedFeature === feature.id && (
-                                                <motion.div
-                                                    initial={{ height: 0, opacity: 0 }}
-                                                    animate={{ height: "auto", opacity: 1 }}
-                                                    exit={{ height: 0, opacity: 0 }}
-                                                    transition={{ duration: 0.3 }}
-                                                    className="overflow-hidden"
-                                                >
-                                                    <div className="px-6 pb-6 border-t border-gray-100 pt-4">
-                                                        <div className="mb-4">
-                                                            <div className="inline-block bg-primary-50 text-primary-800 text-xs font-semibold px-2.5 py-1 rounded-md mb-2">
-                                                                FEATURE DETAILS
-                                                            </div>
-                                                            <p className="text-gray-700">{feature.description}</p>
-                                                        </div>
-
-                                                        <div>
-                                                            <div className="inline-block bg-green-50 text-green-800 text-xs font-semibold px-2.5 py-1 rounded-md mb-2">
-                                                                KEY BENEFITS
-                                                            </div>
-                                                            <p className="text-gray-700">{feature.benefits}</p>
-                                                        </div>
-
-                                                        <div className="mt-4 pt-4 border-t border-gray-100">
-                                                            <button className="group text-primary-600 text-sm font-medium flex items-center hover:text-primary-800 transition-colors">
-                                                                Learn more
-                                                                <ChevronRight size={16} className="ml-1 group-hover:ml-2 transition-all" />
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                </motion.div>
-                                            )}
-                                        </AnimatePresence>
-                                    </div>
-                                </motion.div>
-                            </div>
-                        ))}
-                    </motion.div>
-                </AnimatePresence>
-
-                {/* Bottom CTA */}
+                {/* Cloud Navigation */}
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
-                    transition={{ duration: 0.5 }}
-                    className="mt-16 text-center"
+                    transition={{ duration: 0.6, delay: 0.3 }}
+                    className="flex flex-wrap justify-center gap-4 mb-16"
                 >
-                    <a
-                        href="#contact"
-                        className="inline-flex items-center justify-center px-8 py-4 rounded-lg text-white text-lg font-medium bg-gradient-to-r from-primary-600 to-blue-600 hover:from-primary-700 hover:to-blue-700 shadow-lg shadow-primary-500/20 transition-all hover:shadow-xl hover:shadow-primary-500/30"
+                    {clouds.map((cloud, index) => (
+                        <button
+                            key={index}
+                            onClick={() => setActiveTab(index)}
+                            className={`group relative px-6 py-4 rounded-2xl font-medium transition-all duration-300 ${activeTab === index
+                                    ? 'bg-white text-black scale-105'
+                                    : 'bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm border border-white/20'
+                                }`}
+                        >
+                            <div className="flex items-center space-x-3">
+                                <div
+                                    className={`w-3 h-3 rounded-full transition-colors ${activeTab === index ? 'bg-black' : 'bg-white/60'
+                                        }`}
+                                    style={{ backgroundColor: activeTab === index ? cloud.accent : undefined }}
+                                ></div>
+                                <div className="text-left">
+                                    <div className="font-bold text-lg">{cloud.name}</div>
+                                    <div className="text-sm opacity-75">{cloud.subtitle}</div>
+                                </div>
+                            </div>
+                        </button>
+                    ))}
+                </motion.div>
+
+                {/* Active Cloud Description */}
+                <motion.div
+                    key={activeTab}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="text-center mb-12"
+                >
+                    <p className="text-gray-400 text-lg max-w-2xl mx-auto">
+                        {clouds[activeTab].description}
+                    </p>
+                </motion.div>
+
+                {/* Features Grid */}
+                <AnimatePresence mode="wait">
+                    <motion.div
+                        key={activeTab}
+                        initial={{ opacity: 0, y: 30 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -30 }}
+                        transition={{ duration: 0.5 }}
+                        className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16"
                     >
-                        Explore All Features
-                    </a>
+                        {cloudFeatures[activeTab].map((feature, index) => (
+                            <motion.div
+                                key={feature.id}
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.5, delay: index * 0.1 }}
+                                className="group"
+                                onMouseEnter={() => setHoveredFeature(feature.id)}
+                                onMouseLeave={() => setHoveredFeature(null)}
+                            >
+                                <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8 hover:bg-white/10 hover:border-white/20 transition-all duration-300 h-full">
+                                    <div className="flex items-start space-x-4 mb-6">
+                                        <div
+                                            className="flex-shrink-0 w-16 h-16 rounded-2xl flex items-center justify-center text-3xl transition-transform group-hover:scale-110"
+                                            style={{ backgroundColor: `${clouds[activeTab].accent}20` }}
+                                        >
+                                            {feature.icon}
+                                        </div>
+                                        <div>
+                                            <h3 className="text-xl font-bold text-white mb-2 group-hover:text-gray-300 transition-colors">
+                                                {feature.title}
+                                            </h3>
+                                            <p className="text-gray-400 leading-relaxed">
+                                                {feature.description}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-3">
+                                        {feature.benefits.map((benefit, idx) => (
+                                            <div key={idx} className="flex items-center space-x-3">
+                                                <Check
+                                                    className="w-4 h-4 text-green-400 flex-shrink-0"
+                                                    style={{ color: clouds[activeTab].accent }}
+                                                />
+                                                <span className="text-gray-300 text-sm">{benefit}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* <div className="mt-6 pt-6 border-t border-white/10">
+                                        <button className="group/btn text-white text-sm font-medium flex items-center hover:text-gray-300 transition-colors">
+                                            Learn more
+                                            <ChevronRight className="w-4 h-4 ml-1 group-hover/btn:ml-2 transition-all" />
+                                        </button>
+                                    </div> */}
+                                </div>
+                            </motion.div>
+                        ))}
+                    </motion.div>
+                </AnimatePresence>
+
+                {/* Stats Section */}
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.6, delay: 0.4 }}
+                    className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-16"
+                >
+                    {[
+                        { number: "AI", label: "Powered" },
+                        { number: "99.9%", label: "Uptime" },
+                        { number: "24/7", label: "Support" },
+                        { number: "4", label: "Business Solutions" }
+                    ].map((stat, index) => (
+                        <div key={index} className="text-center">
+                            <div className="text-4xl font-bold text-white mb-2">{stat.number}</div>
+                            <div className="text-gray-400">{stat.label}</div>
+                        </div>
+                    ))}
+                </motion.div>
+
+                {/* CTA Section */}
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.6, delay: 0.5 }}
+                    className="text-center"
+                >
+                    <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-12">
+                        <h3 className="text-3xl font-bold text-white mb-4">
+                            Ready to Transform Your Business?
+                        </h3>
+                        <p className="text-gray-300 text-lg mb-8 max-w-2xl mx-auto">
+                            Start with a 14-day free trial and experience the power of SimpliDone's
+                            integrated business platform.
+                        </p>
+                        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                            <button
+                                onClick={scrollToContact}
+                                className="group bg-white text-black px-8 py-4 rounded-lg text-lg font-medium hover:bg-gray-100 transition-all flex items-center gap-2 hover:scale-105"
+                            >
+                                Start Free Trial
+                                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                            </button>
+                            <button
+                                onClick={scrollToContact}
+                                className="border border-white/30 text-white px-8 py-4 rounded-lg text-lg font-medium hover:border-white/50 hover:bg-white/5 transition-all"
+                            >
+                                Schedule Demo
+                            </button>
+                        </div>
+                        <p className="text-gray-400 text-sm mt-4">
+                            No credit card required • Full access to all features
+                        </p>
+                    </div>
                 </motion.div>
             </div>
         </section>
