@@ -324,7 +324,7 @@ import {
   LayoutDashboard, Settings, ShoppingBag, Building2, Truck, ClipboardList,
   BoxSelect as BoxSeam, UserCog, Home, UserPlus, UserCheck, Target,
   Search, MoreHorizontal, Zap, BarChart2, CheckSquare, ChevronLeft, ChevronRight,
-  Bell, User, ChevronDown, Globe, Utensils, Calendar
+  Bell, User, ChevronDown, Globe, Utensils, Calendar, BarChart3, PackageOpen, ArrowUpDown, Warehouse
 } from 'lucide-react';
 import { getCurrentUser, signOut } from '../../lib/auth';
 import { cn } from '../../lib/utils';
@@ -637,12 +637,55 @@ export function AdminLayout() {
       label: 'Work Orders',
       moduleFlag: 'module_work_orders'
     },
+    // {
+    //   type: 'item',
+    //   path: '/admin/inventory',
+    //   icon: BoxSeam,
+    //   label: 'Inventory',
+    //   moduleFlag: 'module_inventories'
+    // },
     {
-      type: 'item',
-      path: '/admin/inventory',
-      icon: BoxSeam,
+      type: 'group',
+      id: 'inventory-group',
+      icon: BoxSeam, // Keep this - good for inventory group
       label: 'Inventory',
-      moduleFlag: 'module_inventories'
+      children: [
+        {
+          type: 'item',
+          path: '/admin/inventory',
+          icon: BarChart3, // Dashboard/overview icon
+          label: 'Main',
+          moduleFlag: 'module_inventories'
+        },
+        {
+          type: 'item',
+          path: '/admin/inventory/products',
+          icon: Package, // Perfect for stock/products
+          label: 'Stock',
+          moduleFlag: 'module_inventories'
+        },
+        {
+          type: 'item',
+          path: '/admin/inventory/receive',
+          icon: PackageOpen, // Represents receiving/unpacking goods
+          label: 'Receiving',
+          moduleFlag: 'module_inventories'
+        },
+        {
+          type: 'item',
+          path: '/admin/inventory/transactions',
+          icon: ArrowUpDown, // Shows movement/transactions
+          label: 'Transaction',
+          moduleFlag: 'module_inventories'
+        },
+        {
+          type: 'item',
+          path: '/admin/inventory/locations',
+          icon: Warehouse, // Perfect for storage locations
+          label: 'Location',
+          moduleFlag: 'module_inventories'
+        }
+      ]
     },
     {
       type: 'item',

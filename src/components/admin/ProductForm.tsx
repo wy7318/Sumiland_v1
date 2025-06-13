@@ -65,7 +65,7 @@ export function ProductForm() {
     stock_unit: '',
     weight_unit: null,
     min_stock_level: '0',
-    max_stock_level: '',
+    max_stock_level: '0',
     avg_cost: '0',
     sku: '', // Added SKU field with default empty string
   });
@@ -155,7 +155,7 @@ export function ProductForm() {
           stock_unit: product.stock_unit || '',
           weight_unit: product.weight_unit,
           min_stock_level: product.min_stock_level?.toString() || '0',
-          max_stock_level: product.max_stock_level?.toString() || '',
+          max_stock_level: product.max_stock_level?.toString() || '0',
           avg_cost: product.avg_cost?.toString() || '0',
           sku: product.sku || '', // Added SKU field loading
         });
