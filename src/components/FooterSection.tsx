@@ -50,11 +50,11 @@ export function FooterSection() {
 
                         <div className="flex items-center space-x-6">
                             <a
-                                href="mailto:info@SimpliDone.com"
+                                href="mailto:support@simplidone.com"
                                 className="flex items-center text-gray-600 hover:text-black transition-colors"
                             >
                                 <Mail className="w-4 h-4 mr-2" />
-                                <span className="text-sm">info@SimpliDone.com</span>
+                                <span className="text-sm">support@simplidone.com</span>
                             </a>
 
                         </div>

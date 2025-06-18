@@ -140,8 +140,8 @@ export function ContactSection() {
                     </div>
                     <div>
                       <h4 className="text-lg font-medium text-white mb-1">Email Us</h4>
-                      <a href="mailto:info@SimpliDone.com" className="text-gray-300 hover:text-white transition-colors">
-                        info@SimpliDone.com
+                      <a href="mailto:support@simplidone.com" className="text-gray-300 hover:text-white transition-colors">
+                        support@simplidone.com
                       </a>
                     </div>
                   </div>
