@@ -282,7 +282,8 @@ function App() {
                                     <Route path="sales-assistant" element={<SalesAssistantPage />} />
                                     <Route path="org-setting" element={<OrganizationsPage />} />
 
-                                    <Route index element={<RestaurantSettings />} />
+                                    {/* <Route index element={<RestaurantSettings />} /> */}
+                                    <Route path="restaurant/settings" element={<RestaurantSettings />} />
                                     <Route path="restaurant/menu" element={<MenuManagement />} />
                                     <Route path="restaurant/tags" element={<TagsManagement />} />
                                     <Route path="restaurant/options" element={<OptionsManagement />} />

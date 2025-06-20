@@ -595,20 +595,6 @@ export function AdminLayout() {
       children: [
         {
           type: 'item',
-          path: '/admin/restaurant',
-          icon: Settings,
-          label: 'Settings',
-          moduleFlag: 'module_restaurant'
-        },
-        {
-          type: 'item',
-          path: '/admin/restaurant/menu',
-          icon: FileText,
-          label: 'Menu Management',
-          moduleFlag: 'module_restaurant'
-        },
-        {
-          type: 'item',
           path: '/admin/restaurant/ordering',
           icon: ShoppingBag,
           label: 'Online Ordering',
@@ -619,6 +605,20 @@ export function AdminLayout() {
           path: '/admin/restaurant/bookings',
           icon: Calendar,
           label: 'Bookings',
+          moduleFlag: 'module_restaurant'
+        },
+        {
+          type: 'item',
+          path: '/admin/restaurant/settings',
+          icon: Settings,
+          label: 'Settings',
+          moduleFlag: 'module_restaurant'
+        },
+        {
+          type: 'item',
+          path: '/admin/restaurant/menu',
+          icon: FileText,
+          label: 'Menu Management',
           moduleFlag: 'module_restaurant'
         }
       ]
