@@ -1253,7 +1253,7 @@ export default function RestaurantOrderingPlatform({ restaurantData }: Props) {
     // Validate booking time against operating hours
     const validateBookingTime = (bookingDate, bookingTime) => {
         const operatingHours = restaurant.website_settings?.operating_hours;
-        
+
         if (!operatingHours || !bookingDate || !bookingTime) {
             return { isValid: false, error: 'Missing booking information' };
         }
@@ -1264,7 +1264,7 @@ export default function RestaurantOrderingPlatform({ restaurantData }: Props) {
         const dayName = dayNames[date.getDay()];
 
         const dayHours = operatingHours[dayName];
-        
+
         if (!dayHours || !dayHours.isOpen) {
             return { isValid: false, error: `Restaurant is closed on ${dayName}s` };
         }
@@ -1292,9 +1292,9 @@ export default function RestaurantOrderingPlatform({ restaurantData }: Props) {
             }
         }
 
-        return { 
-            isValid: false, 
-            error: `Restaurant is closed at this time. Operating hours on ${dayName}s: ${dayHours.open} - ${dayHours.close}` 
+        return {
+            isValid: false,
+            error: `Restaurant is closed at this time. Operating hours on ${dayName}s: ${dayHours.open} - ${dayHours.close}`
         };
     };
 
