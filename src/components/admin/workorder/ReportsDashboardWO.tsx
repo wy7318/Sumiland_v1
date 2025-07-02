@@ -19,11 +19,11 @@ import { ExportDropdown } from './ExportDropdown';
 // Color constants
 const COLORS = ['#4F46E5', '#8B5CF6', '#EC4899', '#F97316', '#10B981', '#3B82F6', '#6366F1'];
 const STATUS_COLORS = {
-    'draft': '#E5E7EB',
-    'scheduled': '#DBEAFE',
-    'in_progress': '#FEF3C7',
-    'completed': '#D1FAE5',
-    'cancelled': '#FEE2E2'
+    'draft': '#64748B',        // Strong slate gray
+    'scheduled': '#3B82F6',    // Strong blue
+    'in_progress': '#F59E0B',  // Strong amber
+    'completed': '#10B981',    // Strong emerald
+    'cancelled': '#EF4444'     // Strong red
 };
 
 interface Organization {
@@ -85,7 +85,13 @@ export function ReportsDashboardWO() {
             avgTaskCompletion: 0
         }
     });
-    const [dateRange, setDateRange] = useState('last30days');
+
+    // Updated date range state
+    const [dateRange, setDateRange] = useState('thisMonth');
+    const [customStartDate, setCustomStartDate] = useState('');
+    const [customEndDate, setCustomEndDate] = useState('');
+    const [tempStartDate, setTempStartDate] = useState('');
+    const [tempEndDate, setTempEndDate] = useState('');
     const [filtersExpanded, setFiltersExpanded] = useState(true);
     const [exportLoading, setExportLoading] = useState(false);
 
@@ -93,7 +99,62 @@ export function ReportsDashboardWO() {
         if (selectedOrganization?.id) {
             fetchReportData();
         }
-    }, [selectedOrganization, dateRange]);
+    }, [selectedOrganization, dateRange, customStartDate, customEndDate]);
+
+    // Helper function to get date range based on selection
+    const getDateRangeFilter = (range: string) => {
+        const now = new Date();
+        let startDate = new Date();
+        let endDate = new Date(now);
+        endDate.setHours(23, 59, 59, 999); // End of today
+
+        switch (range) {
+            case 'today':
+                startDate = new Date(now);
+                startDate.setHours(0, 0, 0, 0);
+                break;
+
+            case 'thisWeek':
+                // Get start of current week (Sunday)
+                const dayOfWeek = now.getDay();
+                startDate = new Date(now);
+                startDate.setDate(now.getDate() - dayOfWeek);
+                startDate.setHours(0, 0, 0, 0);
+                break;
+
+            case 'thisMonth':
+                startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+                startDate.setHours(0, 0, 0, 0);
+                break;
+
+            case 'thisYear':
+                startDate = new Date(now.getFullYear(), 0, 1);
+                startDate.setHours(0, 0, 0, 0);
+                break;
+
+            case 'customRange':
+                if (customStartDate && customEndDate) {
+                    startDate = new Date(customStartDate);
+                    startDate.setHours(0, 0, 0, 0);
+                    endDate = new Date(customEndDate);
+                    endDate.setHours(23, 59, 59, 999);
+                } else {
+                    // Default to this month if custom dates not set
+                    startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+                    startDate.setHours(0, 0, 0, 0);
+                }
+                break;
+
+            default:
+                startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+                startDate.setHours(0, 0, 0, 0);
+        }
+
+        return {
+            startDate: startDate.toISOString(),
+            endDate: endDate.toISOString()
+        };
+    };
 
     const fetchReportData = async () => {
         if (!selectedOrganization?.id) {
@@ -105,15 +166,11 @@ export function ReportsDashboardWO() {
             setLoading(true);
             setError(null);
 
-            // 1. Status distribution
-            const { data: statusData, error: statusError } = await supabase.rpc(
-                'get_work_order_status_counts',
-                { org_id: selectedOrganization.id }
-            );
+            // Get date range filter
+            const { startDate, endDate } = getDateRangeFilter(dateRange);
+            console.log('Filtering data from', startDate, 'to', endDate);
 
-            if (statusError) throw statusError;
-
-            // 2. Work order data - use work_orders table directly instead of non-existent summary view
+            // 1. Work order data with date filtering
             const { data: workOrdersData, error: workOrdersError } = await supabase
                 .from('work_orders')
                 .select(`
@@ -125,62 +182,134 @@ export function ReportsDashboardWO() {
                   scheduled_start_date,
                   scheduled_end_date,
                   actual_start_date,
-                  actual_end_date
+                  actual_end_date,
+                  created_at
                 `)
-                .eq('organization_id', selectedOrganization.id);
+                .eq('organization_id', selectedOrganization.id)
+                .gte('created_at', startDate)
+                .lte('created_at', endDate);
 
             if (workOrdersError) throw workOrdersError;
 
-            // 3. Task completion data - use the optimized work_order_tasks_status view
-            const { data: taskStatsData, error: taskStatsError } = await supabase
-                .from('work_order_tasks_status')
-                .select(`
-                  work_order_id,
-                  total_tasks,
-                  completed_tasks,
-                  completion_percentage
-                `)
-                .eq('organization_id', selectedOrganization.id);
+            // 2. Status distribution from filtered work orders
+            const statusCounts = (workOrdersData || []).reduce((acc: { [key: string]: number }, wo) => {
+                const status = wo.status || 'Unknown';
+                acc[status] = (acc[status] || 0) + 1;
+                return acc;
+            }, {});
 
-            if (taskStatsError) throw taskStatsError;
+            const statusData = Object.entries(statusCounts).map(([status, count]) => ({
+                status,
+                count
+            }));
 
-            // 4. Priority distribution
-            const { data: priorityData, error: priorityError } = await supabase
-                .from('work_orders')
-                .select('priority')
-                .eq('organization_id', selectedOrganization.id);
+            // 3. Task completion data with date filtering
+            const workOrderIds = (workOrdersData || []).map(wo => wo.id);
+            let taskStatsData = [];
 
-            if (priorityError) throw priorityError;
+            if (workOrderIds.length > 0) {
+                const { data: taskStats, error: taskStatsError } = await supabase
+                    .from('work_order_tasks_status')
+                    .select(`
+                    work_order_id,
+                    total_tasks,
+                    completed_tasks,
+                    completion_percentage
+                    `)
+                    .eq('organization_id', selectedOrganization.id);
 
-            // 5. Labor hours
-            const { data: laborData, error: laborError } = await supabase
-                .from('work_order_labor_summary')
-                .select('*')
-                .eq('organization_id', selectedOrganization.id);
+                if (taskStatsError) throw taskStatsError;
+                taskStatsData = taskStats || [];
+            }
 
-            if (laborError) throw laborError;
+            // 4. Priority distribution (from filtered work orders)
+            const priorityData = workOrdersData || [];
 
-            // 6. Inventory consumption
-            const { data: inventoryData, error: inventoryError } = await supabase
-                .from('work_order_inventory_consumption')
-                .select('*')
-                .eq('organization_id', selectedOrganization.id)
-                .order('total_cost', { ascending: false });
+            // 5. Labor hours with date filtering
+            let laborData = [];
+            try {
+                const { data: labor, error: laborError } = await supabase
+                    .from('work_order_labor_summary')
+                    .select('*')
+                    .eq('organization_id', selectedOrganization.id)
+                    .gte('created_at', startDate)
+                    .lte('created_at', endDate);
 
-            if (inventoryError) throw inventoryError;
+                if (laborError && !laborError.message.includes('does not exist')) {
+                    throw laborError;
+                }
+                laborData = labor || [];
+            } catch (err: any) {
+                if (!err.message.includes('does not exist')) {
+                    console.warn('Labor data not available:', err);
+                }
+            }
 
-            // 7. Work order items with cost data (for cost breakdown)
-            const { data: itemsData, error: itemsError } = await supabase
-                .from('work_order_items')
-                .select(`
-                  id,
-                  work_order_id,
-                  type,
-                  total_cost
-                `)
-                .eq('organization_id', selectedOrganization.id);
+            let inventoryData = [];
+            if (workOrderIds.length > 0) {
+                try {
+                    const { data: inventory, error: inventoryError } = await supabase
+                        .from('work_order_inventory_consumption')
+                        .select('*')
+                        .eq('organization_id', selectedOrganization.id)
+                        .in('work_order_id', workOrderIds)
+                        .order('total_cost', { ascending: false });
 
-            if (itemsError) throw itemsError;
+                    if (inventoryError && !inventoryError.message.includes('does not exist')) {
+                        throw inventoryError;
+                    }
+                    inventoryData = inventory || [];
+                } catch (err: any) {
+                    console.warn('Inventory consumption view not available, trying alternative data source:', err);
+
+                    // Fallback: Try to get inventory data from work_order_items
+                    try {
+                        const { data: itemInventory, error: itemError } = await supabase
+                            .from('work_order_items')
+                            .select('item_name, total_cost, type')
+                            .eq('organization_id', selectedOrganization.id)
+                            .eq('type', 'inventory')
+                            .in('work_order_id', workOrderIds)
+                            .not('item_name', 'is', null);
+
+                        if (!itemError && itemInventory) {
+                            // Transform to match expected format
+                            inventoryData = itemInventory.map(item => ({
+                                product_name: item.item_name,
+                                total_cost: item.total_cost || 0
+                            }));
+                        }
+                    } catch (fallbackErr) {
+                        console.warn('Fallback inventory data also not available:', fallbackErr);
+                    }
+                }
+            }
+
+            // 7. Work order items with cost data (filtered by work order IDs from date range)
+            let itemsData = [];
+            if (workOrderIds.length > 0) {
+                try {
+                    const { data: items, error: itemsError } = await supabase
+                        .from('work_order_items')
+                        .select(`
+                          id,
+                          work_order_id,
+                          type,
+                          total_cost
+                        `)
+                        .eq('organization_id', selectedOrganization.id)
+                        .in('work_order_id', workOrderIds);
+
+                    if (itemsError && !itemsError.message.includes('does not exist')) {
+                        throw itemsError;
+                    }
+                    itemsData = items || [];
+                } catch (err: any) {
+                    if (!err.message.includes('does not exist')) {
+                        console.warn('Work order items data not available:', err);
+                    }
+                }
+            }
 
             const processedData = processReportData(
                 statusData || [],
@@ -242,7 +371,7 @@ export function ReportsDashboardWO() {
             value: value as number
         }));
 
-        // Aggregate inventory items
+        // Aggregate inventory items - should show actual product names
         const aggregatedInventory = inventoryData.reduce((acc: any[], item: any) => {
             const existingItem = acc.find(i => i.name === item.product_name);
             if (existingItem) {
@@ -259,6 +388,13 @@ export function ReportsDashboardWO() {
         const itemConsumption = aggregatedInventory
             .sort((a, b) => b.value - a.value)
             .slice(0, 5);
+
+        console.log('Inventory consumption data:', {
+            rawInventoryData: inventoryData.length,
+            aggregatedInventory: aggregatedInventory.length,
+            itemConsumption: itemConsumption.length,
+            sampleItems: itemConsumption.slice(0, 3)
+        });
 
         // Calculate KPIs
         // 1. Average Completion Time - fixed calculation
@@ -297,14 +433,8 @@ export function ReportsDashboardWO() {
             ['draft', 'scheduled', 'in_progress'].includes(wo.status)
         ).length;
 
-        const oneMonthAgo = new Date();
-        oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-
-        const completedLastMonth = workOrdersData.filter((wo: any) => {
-            if (wo.status !== 'completed') return false;
-            const completionDate = wo.actual_end_date ? new Date(wo.actual_end_date) : null;
-            return completionDate && completionDate >= oneMonthAgo;
-        }).length;
+        // For filtered period, show completed work orders in that period
+        const completedInPeriod = workOrdersData.filter((wo: any) => wo.status === 'completed').length;
 
         // Total cost from inventory and labor
         const inventoryCost = inventoryData.reduce((sum, item) => sum + (item.total_cost || 0), 0);
@@ -322,7 +452,7 @@ export function ReportsDashboardWO() {
             kpis: {
                 totalWorkOrders,
                 openWorkOrders,
-                completedLastMonth,
+                completedLastMonth: completedInPeriod,
                 avgCompletionTime,
                 totalCost,
                 avgTaskCompletion
@@ -345,13 +475,58 @@ export function ReportsDashboardWO() {
     // Map date range value to human-readable text
     const getDateRangeText = (range: string): string => {
         switch (range) {
-            case 'last7days': return 'Last 7 Days';
-            case 'last30days': return 'Last 30 Days';
-            case 'last90days': return 'Last 90 Days';
+            case 'today': return 'Today';
+            case 'thisWeek': return 'This Week';
+            case 'thisMonth': return 'This Month';
             case 'thisYear': return 'This Year';
-            case 'lastYear': return 'Last Year';
-            default: return 'Last 30 Days';
+            case 'customRange':
+                if (customStartDate && customEndDate) {
+                    return `${new Date(customStartDate).toLocaleDateString()} - ${new Date(customEndDate).toLocaleDateString()}`;
+                }
+                return 'Custom Range';
+            default: return 'This Month';
         }
+    };
+
+    // Set default custom dates when custom range is selected
+    const handleDateRangeChange = (value: string) => {
+        setDateRange(value);
+        if (value === 'customRange' && (!customStartDate || !customEndDate)) {
+            // Set default to this month
+            const now = new Date();
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+            const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+            const startDateStr = startOfMonth.toISOString().split('T')[0];
+            const endDateStr = endOfMonth.toISOString().split('T')[0];
+
+            setCustomStartDate(startDateStr);
+            setCustomEndDate(endDateStr);
+            setTempStartDate(startDateStr);
+            setTempEndDate(endDateStr);
+        }
+    };
+
+    // Handle date input changes with debouncing
+    const handleStartDateChange = (value: string) => {
+        setTempStartDate(value);
+        // Use timeout to allow user to navigate without immediately triggering data fetch
+        setTimeout(() => {
+            setCustomStartDate(value);
+        }, 1000);
+    };
+
+    const handleEndDateChange = (value: string) => {
+        setTempEndDate(value);
+        // Use timeout to allow user to navigate without immediately triggering data fetch
+        setTimeout(() => {
+            setCustomEndDate(value);
+        }, 1000);
+    };
+
+    const handleApplyCustomDates = () => {
+        setCustomStartDate(tempStartDate);
+        setCustomEndDate(tempEndDate);
     };
 
     const handleExportPDF = async () => {
@@ -450,28 +625,76 @@ export function ReportsDashboardWO() {
                     </div>
 
                     {filtersExpanded && (
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="flex flex-col">
-                                <label className="text-sm text-gray-600 mb-1.5 font-medium">Date Range</label>
-                                <select
-                                    value={dateRange}
-                                    onChange={(e) => setDateRange(e.target.value)}
-                                    className="px-4 py-2.5 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all duration-200 bg-white"
-                                >
-                                    <option value="last7days">Last 7 Days</option>
-                                    <option value="last30days">Last 30 Days</option>
-                                    <option value="last90days">Last 90 Days</option>
-                                    <option value="thisYear">This Year</option>
-                                    <option value="lastYear">Last Year</option>
-                                </select>
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="flex flex-col">
+                                    <label className="text-sm text-gray-600 mb-1.5 font-medium">Date Range</label>
+                                    <select
+                                        value={dateRange}
+                                        onChange={(e) => handleDateRangeChange(e.target.value)}
+                                        className="px-4 py-2.5 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all duration-200 bg-white"
+                                    >
+                                        <option value="today">Today</option>
+                                        <option value="thisWeek">This Week</option>
+                                        <option value="thisMonth">This Month</option>
+                                        <option value="thisYear">This Year</option>
+                                        <option value="customRange">Custom Range</option>
+                                    </select>
+                                </div>
+
+                                <div className="flex items-end justify-end col-span-2">
+                                    <ExportDropdown
+                                        isLoading={exportLoading}
+                                        onExportPDF={handleExportPDF}
+                                        onExportExcel={handleExportExcel}
+                                    />
+                                </div>
                             </div>
 
-                            <div className="flex items-end justify-end col-span-2">
-                                <ExportDropdown
-                                    isLoading={exportLoading}
-                                    onExportPDF={handleExportPDF}
-                                    onExportExcel={handleExportExcel}
-                                />
+                            {/* Custom Date Range Inputs */}
+                            {dateRange === 'customRange' && (
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                                        <div className="flex flex-col">
+                                            <label className="text-sm text-gray-600 mb-1.5 font-medium">Start Date</label>
+                                            <input
+                                                type="date"
+                                                value={tempStartDate || customStartDate}
+                                                onChange={(e) => handleStartDateChange(e.target.value)}
+                                                className="px-4 py-2.5 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all duration-200 bg-white"
+                                            />
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <label className="text-sm text-gray-600 mb-1.5 font-medium">End Date</label>
+                                            <input
+                                                type="date"
+                                                value={tempEndDate || customEndDate}
+                                                onChange={(e) => handleEndDateChange(e.target.value)}
+                                                className="px-4 py-2.5 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all duration-200 bg-white"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Apply Button for Custom Dates */}
+                                    {(tempStartDate !== customStartDate || tempEndDate !== customEndDate) && (
+                                        <div className="flex justify-center">
+                                            <button
+                                                onClick={handleApplyCustomDates}
+                                                className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors font-medium"
+                                            >
+                                                Apply Date Range
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Current Filter Display */}
+                            <div className="flex items-center gap-2 p-3 bg-indigo-50 rounded-lg border border-indigo-100">
+                                <Calendar className="w-4 h-4 text-indigo-600" />
+                                <span className="text-sm font-medium text-indigo-800">
+                                    Showing data for: {getDateRangeText(dateRange)}
+                                </span>
                             </div>
                         </div>
                     )}
@@ -511,7 +734,7 @@ export function ReportsDashboardWO() {
 
                 <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
                     <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-gray-500 text-sm font-medium">Completed Last Month</h3>
+                        <h3 className="text-gray-500 text-sm font-medium">Completed in Period</h3>
                         <div className="p-2 bg-green-50 text-green-600 rounded-lg">
                             <Calendar className="w-5 h-5" />
                         </div>
@@ -673,6 +896,17 @@ export function ReportsDashboardWO() {
                     </div>
                 )}
             </div>
+
+            {/* No Data Message */}
+            {reportData.statusCounts.length === 0 && reportData.priorityCounts.length === 0 && reportData.costBreakdown.length === 0 && reportData.itemConsumption.length === 0 && (
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
+                    <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-500 mb-2">No Data Available</h3>
+                    <p className="text-gray-400">
+                        No work orders found for the selected date range: {getDateRangeText(dateRange)}
+                    </p>
+                </div>
+            )}
         </div>
     );
 }
