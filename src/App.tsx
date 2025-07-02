@@ -65,7 +65,11 @@ import { SearchResultsPage } from './components/admin/search/SearchResultsPage';
 import LogicFlowBuilder from './components/admin/LogicFlowBuilder';
 import { PrivacyPolicyPage } from './components/PrivacyPolicyPage';
 import { TermsOfServicePage } from './components/TermsOfServicePage';
-import {ResetPasswordPage} from './components/ResetPasswordPage';
+// import {ResetPasswordPage} from './components/ResetPasswordPage';
+import ForgotPassword from './components/ForgotPassword';
+import ResetPassword from './components/ResetPassword';
+
+import { AuthPage } from './components/AuthPage';
 import SetPasswordPage from './components/SetPasswordPage';
 import { SalesAssistantPage } from './components/admin/SalesAssistantPage';
 import { TimeZoneProvider } from './contexts/TimeZoneContext';
@@ -175,7 +179,10 @@ function App() {
                                 <Route path="/faq" element={<FAQPage />} />
                                 <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
                                 <Route path="/terms-of-service" element={<TermsOfServicePage />} />
-                                <Route path="/reset-password" element={<ResetPasswordPage />} />
+                                {/* <Route path="/reset-password" element={<ResetPasswordPage />} /> */}
+                                <Route path="/forgot-password" element={<ForgotPassword />} />
+                                <Route path="/reset-password" element={<ResetPassword />} />
+                                    
                                 <Route path="/set-password" element={<SetPasswordPage />} />
                                     
                                     
