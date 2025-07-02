@@ -64,6 +64,7 @@ export function UsersPage() {
   const [organizationLicense, setOrganizationLicense] = useState<number>(0);
   const [userCount, setUserCount] = useState<number>(0);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [sendingPasswordReset, setSendingPasswordReset] = useState<string | null>(null);
 
   useEffect(() => {
     checkUserPermissions();
@@ -220,42 +221,53 @@ export function UsersPage() {
     }
   };
 
-  // const handlePasswordReset = async (email: string) => {
-  //   try {
-  //     setError(null);
-
-  //     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-  //       redirectTo: `${window.location.origin}/reset-password`
-  //     });
-
-  //     if (error) throw error;
-
-  //     setSuccessMessage('Password reset email sent');
-  //     setTimeout(() => setSuccessMessage(null), 3000);
-  //   } catch (err) {
-  //     console.error('Error sending password reset:', err);
-  //     setError(err instanceof Error ? err.message : 'Failed to send password reset');
-  //   }
-  // };
-
-  const handlePasswordReset = async (email: string) => {
+  const handlePasswordReset = async (email: string, userId: string) => {
     try {
+      setSendingPasswordReset(userId);
       setError(null);
 
+      if (!email) {
+        setError('Email address is required');
+        return;
+      }
+
+      console.log(`Sending password reset to: ${email}`);
+      console.log(`Redirect URL: ${window.location.origin}/reset-password`);
+
+      // Use the exact same method as the ForgotPassword component
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`
+        redirectTo: `${window.location.origin}/reset-password`,
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Password reset error:', error);
+        setError(`Failed to send password reset email: ${error.message}`);
+        return;
+      }
 
-      setSuccessMessage('Password reset email sent');
-      setTimeout(() => setSuccessMessage(null), 3000);
+      console.log(`Password reset email sent successfully to ${email}`);
+      setSuccessMessage(`Password reset link sent to ${email}. Please ask the user to check their email (including spam folder).`);
+      setTimeout(() => setSuccessMessage(null), 7000);
     } catch (err) {
       console.error('Error sending password reset:', err);
-      setError(err instanceof Error ? err.message : 'Failed to send password reset');
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred. Please try again.');
+    } finally {
+      setSendingPasswordReset(null);
     }
   };
 
+  // Add this new helper function after handlePasswordReset:
+  const handlePasswordResetWithConfirmation = async (email: string, userName: string, userId: string) => {
+    // Add a confirmation dialog for admin-initiated password resets
+    const confirmed = window.confirm(
+      `Send password reset email to ${userName} (${email})?\n\n` +
+      `This will allow them to set a new password without knowing their current password.`
+    );
+
+    if (confirmed) {
+      await handlePasswordReset(email, userId);
+    }
+  };
 
   const handleBulkAction = async (action: string) => {
     if (!selectedUsers.length) return;
@@ -732,13 +744,21 @@ export function UsersPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex justify-end space-x-2">
-                        <button
-                          onClick={() => handlePasswordReset(user.email)}
-                          className="p-2 text-primary-600 hover:bg-primary-50 rounded-full transition-colors"
+                        {/* <button
+                          onClick={() => handlePasswordResetWithConfirmation(user.email, user.profile.name, user.id)}
+                          disabled={sendingPasswordReset === user.id}
+                          className={cn(
+                            "p-2 text-primary-600 hover:bg-primary-50 rounded-full transition-colors",
+                            sendingPasswordReset === user.id && "opacity-50 cursor-not-allowed"
+                          )}
                           title="Send Password Reset"
                         >
-                          <Mail className="w-5 h-5" />
-                        </button>
+                          {sendingPasswordReset === user.id ? (
+                            <RefreshCw className="w-5 h-5 animate-spin" />
+                          ) : (
+                            <Mail className="w-5 h-5" />
+                          )}
+                        </button> */}
                         <button
                           onClick={() => setModalData({ user, mode: 'view' })}
                           className="p-2 text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
