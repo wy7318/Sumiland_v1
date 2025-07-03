@@ -73,12 +73,40 @@ export function WorkOrderItemForm({
     // Load item data if in edit mode
     useEffect(() => {
         if (isEditMode && item) {
-            setFormData(item);
+            // Only set the properties that exist in our form data structure
+            setFormData({
+                work_order_id: item.work_order_id,
+                type: item.type,
+                product_id: item.product_id,
+                name: item.name,
+                description: item.description,
+                quantity_required: item.quantity_required,
+                quantity_consumed: item.quantity_consumed,
+                unit_cost: item.unit_cost,
+                total_cost: item.total_cost,
+                status: item.status
+            });
+
             if (item.product_id) {
                 fetchProduct(item.product_id);
             }
+        } else {
+            // Reset form for new item
+            setFormData({
+                work_order_id: workOrderId,
+                type: 'material',
+                product_id: null,
+                name: '',
+                description: null,
+                quantity_required: 1,
+                quantity_consumed: 0,
+                unit_cost: null,
+                total_cost: null,
+                status: 'pending'
+            });
+            setSelectedProduct(null);
         }
-    }, [item, isEditMode]);
+    }, [item, isEditMode, workOrderId]);
 
     // Fetch product details
     const fetchProduct = async (productId: string) => {
@@ -132,10 +160,21 @@ export function WorkOrderItemForm({
             name: product.name,
             description: product.description,
             unit_cost: product.avg_cost || product.price || null,
-            total_cost: (product.avg_cost || product.price || 0) * formData.quantity_required
+            total_cost: (product.avg_cost || product.price || 0) * prev.quantity_required
         }));
         setSearchResults([]);
         setSearchQuery('');
+    };
+
+    // Handle clearing product selection
+    const handleClearProduct = () => {
+        setSelectedProduct(null);
+        setFormData(prev => ({
+            ...prev,
+            product_id: null,
+            unit_cost: null,
+            total_cost: null
+        }));
     };
 
     // Handle form field changes
@@ -143,7 +182,7 @@ export function WorkOrderItemForm({
         const { name, value } = e.target;
 
         if (name === 'quantity_required') {
-            const quantity = parseFloat(value);
+            const quantity = parseFloat(value) || 0;
             setFormData(prev => {
                 const unitCost = prev.unit_cost || 0;
                 return {
@@ -153,7 +192,7 @@ export function WorkOrderItemForm({
                 };
             });
         } else if (name === 'unit_cost') {
-            const unitCost = parseFloat(value);
+            const unitCost = parseFloat(value) || 0;
             setFormData(prev => ({
                 ...prev,
                 [name]: unitCost,
@@ -177,9 +216,18 @@ export function WorkOrderItemForm({
             const { data: userData } = await supabase.auth.getUser();
             if (!userData.user) throw new Error('Not authenticated');
 
-            // Prepare data for saving
+            // Prepare data for saving - only include valid database columns
             const itemData = {
-                ...formData,
+                work_order_id: formData.work_order_id,
+                type: formData.type,
+                product_id: formData.product_id,
+                name: formData.name,
+                description: formData.description,
+                quantity_required: formData.quantity_required,
+                quantity_consumed: formData.quantity_consumed,
+                unit_cost: formData.unit_cost,
+                total_cost: formData.total_cost,
+                status: formData.status,
                 organization_id: selectedOrganization?.id,
                 updated_at: new Date().toISOString(),
                 updated_by: userData.user.id
@@ -188,7 +236,7 @@ export function WorkOrderItemForm({
             let result;
 
             if (isEditMode) {
-                // Update existing item
+                // Update existing item - only update the specific columns
                 result = await supabase
                     .from('work_order_items')
                     .update(itemData)
@@ -276,6 +324,7 @@ export function WorkOrderItemForm({
                                             onChange={(e) => setSearchQuery(e.target.value)}
                                             className="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-indigo-500 focus:ring-indigo-200 outline-none transition-colors"
                                             placeholder="Search by name or SKU"
+                                            onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleSearch())}
                                         />
                                         {isSearching && (
                                             <div className="absolute right-3 top-3">
@@ -346,13 +395,7 @@ export function WorkOrderItemForm({
                                             </div>
                                             <button
                                                 type="button"
-                                                onClick={() => {
-                                                    setSelectedProduct(null);
-                                                    setFormData(prev => ({
-                                                        ...prev,
-                                                        product_id: null
-                                                    }));
-                                                }}
+                                                onClick={handleClearProduct}
                                                 className="text-gray-400 hover:text-gray-600"
                                             >
                                                 <X className="w-5 h-5" />
